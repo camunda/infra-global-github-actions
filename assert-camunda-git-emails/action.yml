@@ -1,0 +1,22 @@
+---
+name: Assert Camunda Git Emails
+
+description: Asserts that only Camunda email addresses are used in Git commits.
+
+inputs: {}
+
+runs:
+  using: composite
+  steps:
+  - uses: actions/checkout@v2
+    if: ${{ github.event.pull_request }}
+    with:
+      fetch-depth: 0
+      ref: ${{ github.event.pull_request.head.sha }}
+
+  - name: Check for violating email addresses
+    if: ${{ github.event.pull_request }}
+    shell: bash
+    env:
+      GIT_RANGE: "origin/${{ github.base_ref }}...${{ github.event.pull_request.head.sha }}"
+    run: ${{ github.action_path }}/check.sh
