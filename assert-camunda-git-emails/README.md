@@ -21,8 +21,29 @@ jobs:
     - uses: camunda/infra-global-github-actions/assert-camunda-git-emails@main
 ```
 
-### Allowed E-Mail Addresses
+### Allowed Email Addresses
+
+The following email addresses are hardcoded as allowed:
 
 - `@camunda.com` (used by employees)
 - `@users.noreply.github.com` (used for Github users that chose to [keep their email address private](https://docs.github.com/en/account-and-profile/setting-up-and-managing-your-github-user-account/managing-email-preferences/adding-an-email-address-to-your-github-account))
 - `noreply@github.com` (used on merge commits created by Github web UI)
+
+**Note: Pull Requests to extend this list are welcome when you discover edge cases!**
+
+You can also specify additional allowed email addresses via an input as a `grep` regex:
+
+```yaml
+---
+name: assert-camunda-git-emails
+
+on: [pull_request]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: camunda/infra-global-github-actions/assert-camunda-git-emails@main
+      with:
+        additional-allowed-emails-regex: "test@example.com\\|foo@example.org"
+```
