@@ -3,7 +3,10 @@ name: Assert Camunda Git Emails
 
 description: Asserts that only Camunda email addresses are used in Git commits.
 
-inputs: {}
+inputs:
+  additional-allowed-emails-regex:
+    description: 'String containing a regex expression for the grep tool which can contain more emails to allow.'
+    default: ''
 
 runs:
   using: composite
@@ -19,4 +22,5 @@ runs:
     shell: bash
     env:
       GIT_RANGE: "origin/${{ github.base_ref }}...${{ github.event.pull_request.head.sha }}"
+      ADDITIONAL_ALLOWED_EMAILS_REGEX: "${{ inputs.additional-allowed-emails-regex }}"
     run: ${{ github.action_path }}/check.sh
