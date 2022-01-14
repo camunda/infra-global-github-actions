@@ -15,7 +15,7 @@ name: assert-camunda-git-emails
 on: [pull_request]
 
 jobs:
-  check:
+  check-git-emails:
     runs-on: ubuntu-latest
     steps:
     - uses: camunda/infra-global-github-actions/assert-camunda-git-emails@main
@@ -40,7 +40,7 @@ name: assert-camunda-git-emails
 on: [pull_request]
 
 jobs:
-  check:
+  check-git-emails:
     runs-on: ubuntu-latest
     steps:
     - uses: camunda/infra-global-github-actions/assert-camunda-git-emails@main
