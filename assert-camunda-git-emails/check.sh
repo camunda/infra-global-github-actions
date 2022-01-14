@@ -3,7 +3,7 @@
 set -eu
 
 # This variable has to contain regex expression for the grep tool
-HARDCODED_ALLOWED_EMAILS_REGEX="@camunda.com\|@users.noreply.github.com\|noreply@github.com"
+HARDCODED_ALLOWED_EMAILS_REGEX="@camunda.com\|@users.noreply.github.com\|noreply@github.com\|bot@renovateapp.com"
 
 if [ "$ADDITIONAL_ALLOWED_EMAILS_REGEX" = "" ]; then
   ALLOWED_EMAILS_REGEX="$HARDCODED_ALLOWED_EMAILS_REGEX"
