@@ -1,5 +1,5 @@
 # Global Github Actions
 
-This repository contains publicly visible Github Actions (GHA) maintained by the Infra team. Those actions are intended to be consumed by other teams inside Camunda.
+This repository contains Github Actions (GHA) maintained by the Infra team. Those actions are intended to be consumed by other teams inside Camunda.
 
-Note: Until https://github.com/github/roadmap/issues/74 is resolved, we need to use a public repository for this use case although an internal repository would be more fitting given the purpose.
+They are accessible from private and internal repositories in any Github organization in the 'Camunda Services GmbH' Github enterprise account.
