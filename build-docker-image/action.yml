@@ -1,0 +1,84 @@
+---
+name: Build Docker Image
+
+description: Builds Docker image for current repository in opinionated way.
+
+inputs:
+  registry_host:
+    description: Registry host used for the Docker image, e.g. gcr.io.
+    required: true
+  registry_username:
+    description: Registry username used for authenticating to registry host.
+    required: true
+  registry_password:
+    description: Registry password used for authenticating to registry host.
+    required: true
+  image_name:
+    description: Docker image name WITHOUT registry and WITHOUT Docker tag, e.g. example/image.
+    required: true
+
+runs:
+  using: composite
+  steps:
+  - name: Echo inputs
+    shell: bash
+    run: |
+      echo "Inputs"
+      echo "-----"
+      echo "Registry host: ${{ inputs.registry_host }}"
+      echo "Image name:    ${{ inputs.image_name }}"
+
+  - name: Validate inputs
+    shell: bash
+    run: |
+      if [ -z "${{ inputs.registry_host }}" ]; then
+        echo "Need to specify a registry host that is not empty!"
+        exit 1
+      fi
+      if [ -z "${{ inputs.image_name }}" ]; then
+        echo "Need to specify an image name that is not empty!"
+        exit 1
+      fi
+
+  - name: Calculate Docker image name
+    id: meta
+    uses: docker/metadata-action@v4
+    with:
+      images: |
+        ${{ inputs.registry_host }}/${{ inputs.image_name }}
+      flavor: |
+        latest=false
+      # See https://github.com/docker/metadata-action#tags-input=
+      tags: |
+        type=ref,event=branch
+        type=ref,event=tag
+        type=ref,event=pr
+        type=raw,value=latest,enable={{is_default_branch}}
+
+  # See README.md for explained cases when we push
+  - name: Check whether we should push
+    shell: bash
+    run: |
+      echo "SHOULD_WE_PUSH=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/') || endsWith(github.ref, '-push') }}" >> "$GITHUB_ENV"
+
+  - name: Set up Docker Buildx
+    uses: docker/setup-buildx-action@v2
+
+  - name: Login to Docker registry
+    uses: docker/login-action@v2
+    # Only attempt login when we want to push. This avoids depending on a 3rd
+    # party service when not needed. In case the registry is unavailable
+    # the non-push builds will continue to be green.
+    if: ${{ env.SHOULD_WE_PUSH }}
+    with:
+      registry: ${{ inputs.registry_host }}
+      username: ${{ inputs.registry_username }}
+      password: ${{ inputs.registry_password }}
+
+  - name: Build and push Docker image
+    uses: docker/build-push-action@v3
+    with:
+      context: .
+      push: ${{ env.SHOULD_WE_PUSH }}
+      tags: ${{ steps.meta.outputs.tags }}
+      labels: ${{ steps.meta.outputs.labels }}
