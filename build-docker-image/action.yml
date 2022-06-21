@@ -69,7 +69,7 @@ runs:
     # Only attempt login when we want to push. This avoids depending on a 3rd
     # party service when not needed. In case the registry is unavailable
     # the non-push builds will continue to be green.
-    if: ${{ env.SHOULD_WE_PUSH }}
+    if: ${{ env.SHOULD_WE_PUSH == 'true' }}
     with:
       registry: ${{ inputs.registry_host }}
       username: ${{ inputs.registry_username }}
