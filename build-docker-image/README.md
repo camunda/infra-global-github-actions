@@ -17,6 +17,8 @@ This composite GHA can be used in any non-public repository with a `Dockerfile` 
 
 For the above example inputs the resulting Docker image would be named `gcr.io/example/image`.
 
+Please check out Camunda's [Github Actions Recipes](https://github.com/camunda/github-actions-recipes#secrets=) for how to retrieve secrets from Vault.
+
 ### Behavior
 
 | Branch name                       | Tag name | PR number | will be built? | will be pushed? | will be pushed as                                       |
