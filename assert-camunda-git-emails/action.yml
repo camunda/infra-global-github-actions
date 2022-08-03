@@ -21,6 +21,6 @@ runs:
     if: ${{ github.event.pull_request }}
     shell: bash
     env:
-      GIT_RANGE: "origin/${{ github.base_ref }}...${{ github.event.pull_request.head.sha }}"
+      GIT_RANGE: "origin/${{ github.base_ref }}..${{ github.event.pull_request.head.sha }}"
       ADDITIONAL_ALLOWED_EMAILS_REGEX: "${{ inputs.additional-allowed-emails-regex }}"
     run: ${{ github.action_path }}/check.sh
