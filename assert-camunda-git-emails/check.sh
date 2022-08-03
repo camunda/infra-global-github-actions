@@ -19,6 +19,8 @@ git log --pretty=tformat:"%ae%n%ce" "$GIT_RANGE" | sort | uniq
 # shellcheck disable=SC2126
 NUM_VIOLATIONS=$(git log --pretty=tformat:"%ae%n%ce" "$GIT_RANGE" | \
   grep -v "$ALLOWED_EMAILS_REGEX" | \
+  sort | \
+  uniq | \
   wc -l)
 
 if [ "$NUM_VIOLATIONS" -eq 0 ]; then
