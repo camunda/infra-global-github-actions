@@ -1,0 +1,78 @@
+---
+name: Submit Build Status
+
+description: Submits the build status of a GHA workflow job to CI Analytics. See https://confluence.camunda.com/display/HAN/CI+Analytics
+
+inputs:
+  build_status:
+    description: String representing the build status that should be submitted to CI Analytics, e.g. "success", "failed", "cancelled".
+    required: true
+  user_reason:
+    description: Optional string (200 chars max) the user can submit to indicate the reason why a build has ended with a certain build status , e.g. "flaky-tests".
+    required: false
+    default: ''
+  user_description:
+    description: Optional string (1000 chars max) the user can submit to provide details on the user_reason, e.g. a list of flaky tests.
+    required: false
+    default: ''
+
+  gcp_credentials_json:
+    description: Credentials for a Google Clout ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file.
+    required: true
+
+runs:
+  using: composite
+  steps:
+  - name: Echo inputs
+    shell: bash
+    run: |
+      echo "Inputs"
+      echo "-----"
+      echo "Build status: ${{ inputs.build_status }}"
+      echo "User reason: ${{ inputs.user_reason }}"
+      echo "User description: ${{ inputs.user_description }}"
+
+  - name: Validate inputs
+    shell: python
+    run: |
+      if '${{ inputs.build_status }}' == '':
+        print('Need to specify a build status that is not empty!')
+        sys.exit(1)
+      if len('${{ inputs.user_reason }}') > 200:
+        print('Specified user reason has more than 200 characters!')
+        sys.exit(1)
+      if len('${{ inputs.user_description }}') > 1000:
+        print('Specified user description has more than 1000 characters!')
+        sys.exit(1)
+
+  - name: Login to Google Cloud
+    id: auth
+    uses: google-github-actions/auth@v0.8.0
+    with:
+      credentials_json: '${{ inputs.gcp_credentials_json }}'
+
+  - name: Setup Google Cloud SDK
+    uses: google-github-actions/setup-gcloud@v0.6.0
+
+  - name: Submit build status to CI Analytics
+    shell: bash
+    env:
+      # TODO: change to prod
+      BIG_QUERY_TABLE_NAME: ci-30-162810:prod_ci_analytics.build_status_v2
+    run: |
+      cat <<EOF | tr '\n' ' ' | bq insert "$BIG_QUERY_TABLE_NAME"
+      {
+        "report_time": "$(date '+%Y-%m-%d %H:%M:%S')",
+        "ci_url": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY",
+        "workflow_name": "$GITHUB_WORKFLOW",
+        "job_name": "$GITHUB_JOB",
+        "build_id": "$GITHUB_RUN_ID",
+        "build_trigger": "$GITHUB_EVENT_NAME",
+        "build_status": "${{ inputs.build_status }}",
+        "build_ref": "$GITHUB_REF"
+        ${{ (inputs.user_reason == '') && ' ' || format(', "user_reason": "{0}"', inputs.user_reason) }}
+        ${{ (inputs.user_description == '') && ' ' || format(', "user_description": "{0}"', inputs.user_description) }}
+      }
+      EOF
+
+    # See https://github.com/actions/runner/issues/409#issuecomment-1013325196 for above ternary operator!
