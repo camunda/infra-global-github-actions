@@ -1,4 +1,28 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: ["github>camunda/infra-renovate-config"],
+  extends: [
+    "config:base",
+    "docker:enableMajor",
+    ":automergeDisabled",
+    ":semanticCommits",
+    ":dependencyDashboard",
+    ":label(dependency-upgrade)",
+    ":reviewer(team:infra-maintenance-dri)",
+  ],
+  schedule: ["on the 1st and 3rd day instance on sunday after 9pm"],
+  commitBodyTable: true,
+  separateMajorMinor: false,
+  prBodyNotes: [
+    "{{#if isMajor}}:warning: THIS IS A MAJOR VERSION UPDATE :warning:{{/if}}",
+    "Before merging, *always* check with the release notes if any other changes need to be done.",
+  ],
+  major: {
+    enabled: true,
+  },
+  minor: {
+    enabled: true,
+  },
+  patch: {
+    enabled: true,
+  },
 }
