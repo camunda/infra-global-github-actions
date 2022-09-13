@@ -1,0 +1,33 @@
+---
+name: Sanitize Branch Name
+
+description: Sanitizes a branch name based on opiniated rules
+
+inputs:
+  branch:
+    description: 'Name of the branch'
+    required: true
+  max_length:
+    description: 'Max lenght where to cut the string at'
+    default: '0'
+outputs:
+  branch_name:
+    description: "Sanitized Branch Name"
+    value: ${{ steps.sanitize.outputs.branch_name }}
+
+runs:
+  using: composite
+  steps:
+  - name: Echo inputs
+    shell: bash
+    run: |
+      echo "Inputs"
+      echo "-----"
+      echo "Branch Name: ${{ inputs.branch }}"
+      echo "Max Length: ${{ inputs.max_length }}"
+
+  - name: Sanitize the branch name
+    id: sanitize
+    shell: bash
+    run: |
+      echo "::set-output name=branch_name::$(${{ github.action_path }}/sanitize.sh ${{ inputs.branch }} ${{ inputs.max_length }})"
