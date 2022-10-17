@@ -1,0 +1,103 @@
+---
+name: Deploy preview environment
+
+description: Deploys a preview environment.
+
+inputs:
+
+  revision:
+    description: Revision or branch of the Helm chart. Typically the branch to be deployed, or `master`.
+    required: true
+
+  app_name:
+    description: The name of the argocd application, generally "product-deployment_id".
+    required: true
+
+  app_url:
+    description: The URL to access the deployed app.
+    required: true
+
+  argocd_server:
+    description: URL of the Argo CD instance to target.
+    required: false
+    default: argocd.int.camunda.com
+
+  argocd_token:
+    description: An Argo CD token with sufficient permissions to create Applications.
+    required: true
+
+  argocd_version:
+    default: v2.3.1
+    description: Version tag of Argo CD CLI tool
+    required: false
+
+  argocd_arguments:
+    description: List of arguments to pass to Argocd command for creating the new application
+    required: true
+runs:
+  using: composite
+  steps:
+  - name: Restore cache
+    uses: actions/cache@v3
+    id: tool-cache-argocd
+    with:
+      path: /usr/local/bin/argocd
+      key: ${{ runner.os }}-tool-cache-argo-${{ inputs.argocd_version }}
+  - name: Setup Argo CD
+    shell: bash
+    if: ${{ steps.tool-cache-argocd.outputs.cache-hit != 'true' }}
+    run: |-
+      curl -sSL -o /usr/local/bin/argocd https://github.com/argoproj/argo-cd/releases/download/${{ inputs.argocd_version }}/argocd-linux-amd64
+      chmod +x /usr/local/bin/argocd
+      argocd version
+    env:
+      ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
+      ARGOCD_OPTS: "--grpc-web"
+      ARGOCD_SERVER: ${{ inputs.argocd_server }}
+    #########################################################################
+    # Create a GitHub deployment that points to the URL we're going to deploy to.
+    # If a Pull Request exists, it will show the status of this deployment.
+  - uses: bobheadxi/deployments@9d4477fdaa4120020cd10ab7e97f68c801422e73
+    name: Create GitHub deployment
+    id: deployment
+    with:
+      step: start
+      token: "${{ github.token }}"
+      env: ${{ inputs.app_name }}
+      ref: ${{ inputs.revision }}
+  - name: Deploy
+    shell: bash
+    run: >-
+      argocd app create ${{ inputs.argocd_arguments }}
+      
+      argocd app sync ${{ inputs.app_name }} --async --force || true
+    env:
+      ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
+      ARGOCD_OPTS: "--grpc-web"
+      ARGOCD_SERVER: ${{ inputs.argocd_server }}
+  - name: Wait for sync (up to 20 minutes)
+    shell: bash
+    run: |-
+      echo "::group::wait for sync"
+      argocd app wait ${{ inputs.app_name }} --timeout 1200 --health
+      echo "::endgroup::"
+    env:
+      ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
+      ARGOCD_OPTS: "--grpc-web"
+      ARGOCD_SERVER: ${{ inputs.argocd_server  }}
+    #########################################################################
+    # Update the deployment status so we can see the result in the Pull Request
+    # or in the list of environments.
+  - name: Update branch deployment status
+    # `always()` ensures that the deployment status
+    # is updated regardless of previous steps failing.
+    if: always()
+    uses: bobheadxi/deployments@9d4477fdaa4120020cd10ab7e97f68c801422e73
+    with:
+      step: finish
+      token: ${{ github.token }}
+      status: ${{ job.status }}
+      deployment_id: ${{ steps.deployment.outputs.deployment_id }}
+      env_url: ${{ inputs.app_url }}
+      ref: ${{ inputs.revision }}
+      env: ${{ inputs.app_name }}
