@@ -1,14 +1,14 @@
 ---
 name: Sanitize Branch Name
 
-description: Sanitizes a branch name based on opiniated rules
+description: Sanitizes a branch name based on opinionated rules
 
 inputs:
   branch:
     description: 'Name of the branch'
     required: true
   max_length:
-    description: 'Max lenght where to cut the string at'
+    description: 'Max length where to cut the string at'
     default: '0'
 outputs:
   branch_name:
