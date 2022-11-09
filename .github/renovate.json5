@@ -25,11 +25,13 @@
   patch: {
     enabled: true,
   },
-  {
-    fileMatch: ["\.ya?ml$"],
-    matchStrings: [
-      "renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.* (?<currentValue>.*)\\s"
-    ],
-    versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
-  },
+  regexManagers: [
+    {
+      fileMatch: ["\.ya?ml$"],
+      matchStrings: [
+        "renovate: datasource=(?<datasource>.*?) pdepName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.* (?<currentValue>.*)\\s"
+      ],
+      versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
+    },
+  ]
 }
