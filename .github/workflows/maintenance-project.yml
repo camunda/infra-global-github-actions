@@ -29,7 +29,7 @@ jobs:
       with:
         app_id: ${{ steps.secrets.outputs.GITHUB_APP_ID }}
         private_key: ${{ steps.secrets.outputs.GITHUB_APP_PRIVATE_KEY }}
-    - uses: actions/add-to-project@v0.3.0
+    - uses: actions/add-to-project@v0.4.0
       with:
         project-url: https://github.com/orgs/camunda/projects/42/
         github-token: ${{ steps.generate-github-token.outputs.token }}
