@@ -16,6 +16,9 @@ inputs:
   image_name:
     description: Docker image name WITHOUT registry and WITHOUT Docker tag, e.g. example/image.
     required: true
+  build_args:
+    description: Docker build args to append to `docker build` command.
+    required: false
 
 runs:
   using: composite
@@ -27,6 +30,7 @@ runs:
       echo "-----"
       echo "Registry host: ${{ inputs.registry_host }}"
       echo "Image name:    ${{ inputs.image_name }}"
+      echo "Build-Args:    ${{ inputs.build_args }}"
 
   - name: Validate inputs
     shell: bash
@@ -79,6 +83,7 @@ runs:
     uses: docker/build-push-action@v3
     with:
       context: .
+      build-args: ${{ inputs.build_args }}
       push: ${{ env.SHOULD_WE_PUSH }}
       tags: ${{ steps.meta.outputs.tags }}
       labels: ${{ steps.meta.outputs.labels }}
