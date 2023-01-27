@@ -17,6 +17,7 @@ runs:
   - name: Create ~/.m2/settings.xml with cache configuration
     shell: bash
     run: |
+      mkdir ~/.m2 || true
       cat <<EOF > ~/.m2/settings.xml
       <?xml version="1.0" encoding="UTF-8"?>
       <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"
