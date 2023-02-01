@@ -17,6 +17,10 @@ This composite GHA can be used in any non-public repository with a `Dockerfile` 
 | build_args        | Allows defining extra build-args, supply as list with \| (pipe bar) |
 | extra_tags        | Allows defining extra tags according to the [metadata action](https://github.com/docker/metadata-action), supply as list with \| (pipe bar) |
 | force_push        | Allows overwriting the image push behaviour, by setting to 'true' as input |
+| build_context     | Docker build context location                      |
+| build_allow       | Extra privilege entitlements to give builder       |
+| buildx_driver     | Driver to use for buildx builder                   |
+| buildx_version    | Which release version of a buildx action to use    |
 
 For the above example inputs the resulting Docker image would be named `gcr.io/example/image`.
 
