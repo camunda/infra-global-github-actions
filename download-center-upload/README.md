@@ -87,7 +87,7 @@ Please check the `Import Secrets` Step in the example below on how you will get 
     steps:
       - name: Import Secrets
         id: secrets
-        uses: hashicorp/vault-action@v2.3.0
+        uses: hashicorp/vault-action@v2.5.0
         with:
           url: ${{ secrets.VAULT_ADDR }}
           method: approle
@@ -97,7 +97,7 @@ Please check the `Import Secrets` Step in the example below on how you will get 
               secret/data/common/jenkins/downloads-camunda-cloud_google_sa_key DEV_DOWNLOAD_CENTER_GCLOUD_KEY_BYTES | GCP_CREDENTIALS_NAME;
             
       - name: Upload artifact to Camunda Download Center
-        uses: camunda/download-center-upload-action@v0.1.0
+        uses: camunda/infra-global-github-actions/download-center-upload@main
         with:
           gcp_credentials: ${{ steps.secrets.outputs.GCP_CREDENTIALS_NAME }}
           ee: 'true'
