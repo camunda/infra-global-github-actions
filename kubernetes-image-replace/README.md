@@ -39,7 +39,7 @@ jobs:
       uses: 'google-github-actions/get-gke-credentials@v1'
       with:
         cluster_name: camunda-ci
-        location: europe-west1-b
+        location: europe-west1
     - uses: camunda/infra-global-github-actions/kubernetes-image-replace@main
       with:
         app_name: alert-int-camunda-com

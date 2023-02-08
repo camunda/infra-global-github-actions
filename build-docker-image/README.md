@@ -16,6 +16,7 @@ This composite GHA can be used in any non-public repository with a `Dockerfile` 
 | image_name        | Docker image name (*without* registry and Docker tag), e.g. `example/image` |
 | build_args        | Allows defining extra build-args, supply as list with \| (pipe bar) |
 | extra_tags        | Allows defining extra tags according to the [metadata action](https://github.com/docker/metadata-action), supply as list with \| (pipe bar) |
+| force_push        | Allows overwriting the image push behaviour, by setting to 'true' as input |
 
 For the above example inputs the resulting Docker image would be named `gcr.io/example/image`.
 
