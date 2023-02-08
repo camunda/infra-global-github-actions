@@ -1,0 +1,49 @@
+name: Configure Pull Request
+
+description: Sets the parameters of an existing Pull Request at once
+
+inputs:
+  github-token:
+    description: A GitHub personal access token with write access to the project
+    required: true
+  labels:
+    description: Comma-separated list of labels
+    required: false
+  project-url:
+    description: URL of a GitHub project
+    required: false
+  reviewers:
+    description: Comma-separated list of users
+    required: false
+  team-reviewers:
+    description: Comma-separated list of teams
+    required: false
+
+runs:
+  using: composite
+  steps:
+  - name: Set labels
+    uses: buildsville/add-remove-label@v2.0.0
+    with:
+      labels: ${{ inputs.labels }}
+      token: ${{ inputs.github-token }}
+      type: add
+    if: ${{ inputs.labels != '' }}
+  - name: Set project
+    uses: actions/add-to-project@v0.4.0
+    with:
+      github-token: ${{ inputs.github-token }}
+      project-url: ${{ inputs.project-url }}
+    if: ${{ inputs.project-url != '' }}
+  - name: Set reviewers (users)
+    uses: dannysauer/actions-assigner@v2.0.1
+    with:
+      reviewers: ${{ inputs.reviewers }}
+      token: ${{ inputs.github-token }}
+    if: ${{ inputs.reviewers != '' }}
+  - name: Set reviewers (teams)
+    uses: dannysauer/actions-assigner@v2.0.1
+    with:
+      team-reviewers: ${{ inputs.team-reviewers }}
+      token: ${{ inputs.github-token }}
+    if: ${{ inputs.team-reviewers != '' }}
