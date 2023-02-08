@@ -1,0 +1,43 @@
+name: Kubernetes Image Tag Replace
+description: Changes the image tag of a specified deployment / statefulset
+inputs:
+  app_name:
+    description: The name of the deployment / statefulset
+    required: true
+  app_type:
+    description: Whether it's a deployment or statefulset
+    default: 'deployment'
+    required: false
+  image:
+    description: Full image with tag
+    required: true
+  container_name:
+    description: Name of the container to replace the image of
+    required: true
+  namespace:
+    description: Kubernetes namespace that the app is running in
+    required: true
+
+runs:
+  using: "composite"
+
+  steps:
+  - name: Check for available tools
+    shell: bash
+    run: |
+      command -v kubectl >/dev/null 2>&1 || { echo >&2 "kubectl is not installed.  Aborting."; exit 1; }
+  - name: Update image of app
+    shell: bash
+    run: |
+      # if setting the same image tag as present, restart the pod otherwise set new tag
+      if (kubectl get ${{ inputs.app_type }} ${{ inputs.app_name }} -n ${{ inputs.namespace }} -o yaml | grep -q ${{ inputs.image }});
+      then
+        echo "Restarting existing pod due to same image"
+        kubectl rollout restart ${{ inputs.app_type }} ${{ inputs.app_name }} -n ${{ inputs.namespace }}
+      else
+        echo "Setting new image for defined app"
+        kubectl set image ${{ inputs.app_type }} ${{ inputs.app_name }} ${{ inputs.container_name }}=${{ inputs.image }} -n ${{ inputs.namespace }} --record
+      fi
+
+       # wait for deployment to have finished
+      kubectl rollout status -w ${{ inputs.app_type }} ${{ inputs.app_name }} -n ${{ inputs.namespace }}
