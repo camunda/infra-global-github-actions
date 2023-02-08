@@ -36,7 +36,7 @@ runs:
         kubectl rollout restart ${{ inputs.app_type }} ${{ inputs.app_name }} -n ${{ inputs.namespace }}
       else
         echo "Setting new image for defined app"
-        kubectl set image ${{ inputs.app_type }} ${{ inputs.app_name }} ${{ inputs.container_name }}=${{ inputs.image }} -n ${{ inputs.namespace }} --record
+        kubectl set image ${{ inputs.app_type }} ${{ inputs.app_name }} ${{ inputs.container_name }}=${{ inputs.image }} -n ${{ inputs.namespace }}
       fi
 
        # wait for deployment to have finished

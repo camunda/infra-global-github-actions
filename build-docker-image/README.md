@@ -14,10 +14,20 @@ This composite GHA can be used in any non-public repository with a `Dockerfile` 
 | registry_username | Username used for authenticating to registry host  |
 | registry_password | Password used for authenticating to registry host  |
 | image_name        | Docker image name (*without* registry and Docker tag), e.g. `example/image` |
+| build_args        | Allows defining extra build-args, supply as list with \| (pipe bar) |
+| extra_tags        | Allows defining extra tags according to the [metadata action](https://github.com/docker/metadata-action), supply as list with \| (pipe bar) |
 
 For the above example inputs the resulting Docker image would be named `gcr.io/example/image`.
 
 Please check out Camunda's [Github Actions Recipes](https://github.com/camunda/github-actions-recipes#secrets=) for how to retrieve secrets from Vault.
+
+### Outputs
+| Output name        | Description                                        |
+|--------------------|----------------------------------------------------|
+| image_digest       | The image digest (sha256) of the pushed image      |
+| image_metadata     | The json metadata object of the pushed image, according to the [docker-push action](https://github.com/docker/build-push-action). This can often not be set as additional output for other jobs within a workflow      |
+| images             | The "images.name" value from metadata. This is a comma separated string of image:tag |
+| pushed             | The decission whether the image was pushed or not, can be "true" or "false |
 
 ### Behavior
 
