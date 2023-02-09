@@ -23,27 +23,27 @@ runs:
   using: composite
   steps:
     - name: Set labels
+      if: ${{ inputs.labels != '' }}
       uses: buildsville/add-remove-label@eeae411a9be2e173f2420e1644514edbecc4e835 # pin@v2.0.0
       with:
         labels: ${{ inputs.labels }}
         token: ${{ inputs.github-token }}
         type: add
-      if: ${{ inputs.labels != '' }}
     - name: Set project
+      if: ${{ inputs.project-url != '' }}
       uses: actions/add-to-project@960fbad431afda394cfcf8743445e741acd19e85 # pin@v0.4.0
       with:
         github-token: ${{ inputs.github-token }}
         project-url: ${{ inputs.project-url }}
-      if: ${{ inputs.project-url != '' }}
     - name: Set reviewers (users)
+      if: ${{ inputs.reviewers != '' }}
       uses: dannysauer/actions-assigner@ca2ca780928294ee5126986cc31db6c2ee7d69b0 # pin@v2.0.1
       with:
         reviewers: ${{ inputs.reviewers }}
         token: ${{ inputs.github-token }}
-      if: ${{ inputs.reviewers != '' }}
     - name: Set reviewers (teams)
+      if: ${{ inputs.team-reviewers != '' }}
       uses: dannysauer/actions-assigner@ca2ca780928294ee5126986cc31db6c2ee7d69b0 # pin@v2.0.1
       with:
         team-reviewers: ${{ inputs.team-reviewers }}
         token: ${{ inputs.github-token }}
-      if: ${{ inputs.team-reviewers != '' }}
