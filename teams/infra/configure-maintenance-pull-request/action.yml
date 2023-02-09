@@ -1,0 +1,93 @@
+name: Configure a maintenance Pull Request
+
+description: Configure a maintenance Pull Request according to the Infra team guidelines
+
+inputs:
+  github-token:
+    description: A GitHub access token with write access to the project
+    required: true
+    type: string
+
+runs:
+  using: composite
+  steps:
+  # Set global values as outputs to be reused in other steps
+  - id: global # Maintenance parameters of the Infra team
+    run: |
+      {
+        echo maintenance-label=dependency-upgrade
+        echo maintenance-project-url=https://github.com/orgs/camunda/projects/42/
+        echo maintenance-team-reviewers=infra-maintenance-dri
+      } >> $GITHUB_OUTPUT
+    shell: bash
+  - name: Get info about the Pull Request event
+    id: pr-event-info
+    run: |
+      {
+        # Get the action type of the event
+        echo action=${{ github.event.action }}
+
+        # Get labels if any
+        echo labels=${{ format('{0}', join(github.event.pull_request.labels.*.name)) }}
+
+        # Identify the vendor from the branch prefix
+        echo vendor=${{
+          startsWith(github.head_ref, 'renovate/') && 'renovate' ||
+          startsWith(github.head_ref, 'snyk-fix-')  && 'snyk' ||
+          ''
+        }}
+      } >> $GITHUB_OUTPUT
+    shell: bash
+  - name: Deduce assertions about the Pull Request event
+    id: pr-event-assertions
+    run: |
+      {
+        # Is labeled by a vendor ?
+        echo is-opened-by-vendor=${{
+          steps.pr-event-info.outputs.action == 'opened' &&
+          steps.pr-event-info.outputs.vendor != ''
+        }}
+
+        # Is labeled with 'dependency-upgrade'
+        echo is-labeled-with-dependency-upgrade=${{
+          steps.pr-event-info.outputs.action == 'labeled' &&
+          contains(steps.pr-event-info.outputs.labels, steps.global.outputs.maintenance-label) 
+        }}
+      } >> $GITHUB_OUTPUT
+    shell: bash
+  - name: Determine the Pull Request configuration to apply from context and Infra team guidelines
+    id: pr-configuration
+    run: |
+      {
+        # Label the PR if opened by a vendor
+        echo labels=${{
+          (
+            steps.pr-event-assertions.outputs.is-opened-by-vendor == 'true' &&
+            steps.global.outputs.maintenance-label
+          ) || ''
+        }}
+
+        # Add the PR to the maintenance project if labeled (dependecy-upgrade) or opened by a vendor
+        echo project-url=${{
+          (
+            steps.pr-event-assertions.outputs.is-labeled-with-dependency-upgrade == 'true' ||
+            steps.pr-event-assertions.outputs.is-opened-by-vendor == 'true'
+          ) && steps.global.outputs.maintenance-project-url || ''
+        }}
+        
+        # Set the infra-maintenace-dri team as reviewer of the PR if opened by a vendor
+        echo team-reviewers=${{
+          (
+            steps.pr-event-assertions.outputs.is-opened-by-vendor == 'true' &&
+            steps.global.outputs.maintenance-team-reviewers
+          ) || ''
+        }}
+      } >> $GITHUB_OUTPUT
+    shell: bash
+  - name: Apply Pull Request configuration
+    uses: camunda/infra-global-github-actions/configure-pull-request@gh-204-configure-pull-request
+    with:
+      github-token: ${{ inputs.github-token }}
+      labels: ${{ steps.pr-configuration.outputs.labels }}
+      project-url: ${{ steps.pr-configuration.outputs.project-url }}
+      team-reviewers: ${{ steps.pr-configuration.outputs.team-reviewers }}
