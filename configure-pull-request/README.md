@@ -35,6 +35,6 @@ jobs:
         github-token: ${{ secrets.MY_PAT }}
         labels: label-1,label-2
         project-url: https://github.com/orgs/camunda/projects/project-id/
-        reviewsers: user1,user2
+        reviewers: user1,user2
         team-reviewers: team1,team2
 ```
