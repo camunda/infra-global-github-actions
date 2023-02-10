@@ -9,7 +9,7 @@ This composite GHA can be used in any repository and must be triggered on `pull_
 ### Inputs
 | Input name           | Description                                               |
 |----------------------|-----------------------------------------------------------|
-| github-token         | A GitHub personal access token with sufficient scope (*) |
+| github-token         | A GitHub access token with sufficient scope (*) |
 | labels               | Comma-separated list of labels to set |
 | project-url          | URL of a GitHub project to which to add the PR |
 | reviewers            | Comma-separated list of users to set as reviewers |
@@ -32,7 +32,7 @@ jobs:
     steps:
     - uses: camunda/infra-global-github-actions/configure-pull-request@main
       with:
-        github-token: ${{ secrets.MY_PAT }}
+        github-token: ${{ secrets.A_GITHUB_TOKEN }}
         labels: label-1,label-2
         project-url: https://github.com/orgs/camunda/projects/project-id/
         reviewers: user1,user2

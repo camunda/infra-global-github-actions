@@ -6,18 +6,23 @@ inputs:
   github-token:
     description: A GitHub access token with write access to the project
     required: true
+    type: string
   labels:
     description: Comma-separated list of labels
     required: false
+    type: string
   project-url:
     description: URL of a GitHub project
     required: false
+    type: string
   reviewers:
     description: Comma-separated list of users
     required: false
+    type: string
   team-reviewers:
     description: Comma-separated list of teams
     required: false
+    type: string
 
 runs:
   using: composite
