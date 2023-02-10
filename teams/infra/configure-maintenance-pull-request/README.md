@@ -33,5 +33,5 @@ jobs:
     steps:
     - uses: camunda/infra-global-github-actions/teams/infra/configure-maintenance-pull-request@main
       with:
-        github-token: ${{ secrets.A_GITHUB_TOKEN }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 ```
