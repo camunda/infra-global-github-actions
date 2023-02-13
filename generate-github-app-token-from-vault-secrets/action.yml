@@ -1,0 +1,88 @@
+name: Generate a GitHub App token from secrets stored in Vault
+
+description: Generate a GitHub token from GitHub App secrets (ID & Private Key) stored in Vault
+
+inputs:
+  github-app-id-vault-key:
+    description: The key of the Vault secret storing the ID of the GitHub App
+    required: true
+    type: string
+  github-app-id-vault-path:
+    description: The path of the Vault secret storing the ID of the GitHub App
+    required: true
+    type: string
+  github-app-private-key-vault-key:
+    description: The key of the Vault secret storing the private key of the GitHub App
+    required: true
+    type: string
+  github-app-private-key-vault-path:
+    description: The path of the Vault secret storing the private key of the GitHub App
+    required: true
+    type: string
+  vault-auth-method: 
+    description: The method to use to authenticate with Vault
+    required: true
+    type: string
+  vault-auth-role-id:
+    description: The Role Id for (Vault) App Role authentication
+    required: true
+    type: string
+  vault-auth-secret-id:
+    description: The Secret Id for (Vault) App Role authentication
+    required: true
+    type: string
+  vault-url:
+    description: The URL for the Vault endpoint
+    required: true
+    type: string
+
+outputs:
+  token:
+    description: The generated GitHub token
+    value: ${{ steps.github-token.outputs.token }}
+
+runs:
+  using: composite
+  steps:
+  - name: Import the GitHub App ID from vault
+    id: app-id
+    uses: hashicorp/vault-action@v2.5.0
+    with:
+      url: ${{ inputs.vault-url }}
+      method: ${{ inputs.vault-auth-method }}
+      roleId: ${{ inputs.vault-auth-role-id }}
+      secretId: ${{ inputs.vault-auth-secret-id }}
+      exportEnv: false
+      secrets: > 
+        ${{ 
+          format(
+            '{0} {1} | {2};',
+            inputs.github-app-id-vault-path,
+            inputs.github-app-id-vault-key,
+            'id'
+          ) 
+        }}
+  - name: Import the GitHub App secret key from vault
+    id: app-private-key
+    uses: hashicorp/vault-action@v2.5.0
+    with:
+      url: ${{ inputs.vault-url }}
+      method: ${{ inputs.vault-auth-method }}
+      roleId: ${{ inputs.vault-auth-role-id }}
+      secretId: ${{ inputs.vault-auth-secret-id }}
+      exportEnv: false
+      secrets: >
+        ${{ 
+          format(
+            '{0} {1} | {2};',
+            inputs.github-app-private-key-vault-path,
+            inputs.github-app-private-key-vault-key,
+            'private-key'
+          ) 
+        }}
+  - name: Generate a Github App token
+    id: github-token
+    uses: tibdex/github-app-token@v1
+    with:
+      app_id: ${{ steps.app-id.outputs.id }}
+      private_key: ${{ steps.app-private-key.outputs.private-key }}
