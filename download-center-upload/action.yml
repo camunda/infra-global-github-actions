@@ -38,44 +38,42 @@ runs:
       # resolve bucket name
       if [[ "${{inputs.ee}}" == 'true' ]]; then
          if [[ "${{inputs.env}}" == 'prod' ]]; then
-           bucket_name=downloads-camunda-cloud-enterprise-release
-           echo "::set-output name=bucket_name::$(echo $bucket_name)"
+           bucket_name="downloads-camunda-cloud-enterprise-release"
          else
-           bucket_name=${{ inputs.env }}-downloads-camunda-cloud-enterprise-release
-           echo "::set-output name=bucket_name::$(echo $bucket_name)"
+           bucket_name="${{inputs.env}}-downloads-camunda-cloud-enterprise-release"
          fi
       else
          if [[ "${{inputs.env}}" == 'prod' ]]; then
-           bucket_name=downloads-camunda-cloud-release
-           echo "::set-output name=bucket_name::$(echo $bucket_name)"
+           bucket_name="downloads-camunda-cloud-release"
          else
-           bucket_name=${{ inputs.env }}-downloads-camunda-cloud-release
-           echo "::set-output name=bucket_name::$(echo $bucket_name)"
+           bucket_name="${{inputs.env}}-downloads-camunda-cloud-release"
          fi
       fi
-
-      echo "resolve path"
-      if [[ "${{inputs.sub_version}}" != '' ]]; then
-         echo "::set-output name=subversion::$(echo ${{inputs.sub_version}}/)"
-      else
-         echo "::set-output name=subversion::$(echo "")"
-      fi
-
-      if [[ "${{inputs.artifact_subpath}}" != '' ]]; then
-         echo "::set-output name=subpath::$(echo ${{inputs.artifact_subpath}}/)"
-      else
-         echo "::set-output name=subpath::$(echo "")"
-      fi
-
-      if [[ "${{inputs.version}}" != '' ]]; then
-         echo "::set-output name=version::$(echo ${{inputs.version}}/)"
-      else
-         echo "::set-output name=version::$(echo "")"
-      fi
       
-      echo "DC main repository"
-      dc_repo=$(echo ${{github.repository}} | cut -d'/' -f2)
-      echo "::set-output name=dc_repo::$(echo $dc_repo)"
+      echo "bucket_name=${bucket_name}" >> "$GITHUB_OUTPUT"
+
+      # resolve path
+      subversion=''
+      if [[ "${{inputs.sub_version}}" != '' ]]; then
+        subversion="$(echo ${{inputs.sub_version}}/)"
+      fi
+      echo "subversion=${subversion}" >> "$GITHUB_OUTPUT"
+
+      subpath=''
+      if [[ "${{inputs.artifact_subpath}}" != '' ]]; then
+        subpath=$(echo ${{inputs.artifact_subpath}}/)        
+      fi
+      echo "subpath=${subpath}" >> "$GITHUB_OUTPUT"
+
+      version=''
+      if [[ "${{inputs.version}}" != '' ]]; then
+         version="$(echo ${{inputs.version}}/)"
+      fi
+      echo "version=${version}" >> "$GITHUB_OUTPUT"
+      
+      # DC main repository
+      dc_repo="$(echo ${{github.repository}} | cut -d'/' -f2)"
+      echo "dc_repo=${dc_repo}" >> "$GITHUB_OUTPUT"
 
   - name: set up gcloud
     uses: google-github-actions/setup-gcloud@v1.1.0
