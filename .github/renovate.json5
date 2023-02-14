@@ -6,8 +6,6 @@
     ":automergeDisabled",
     ":semanticCommits",
     ":dependencyDashboard",
-    ":label(dependency-upgrade)",
-    ":reviewer(team:infra-maintenance-dri)",
   ],
   schedule: ["on the 1st and 3rd day instance on sunday after 9pm"],
   commitBodyTable: true,
