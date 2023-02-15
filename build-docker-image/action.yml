@@ -42,6 +42,7 @@ inputs:
   docker_load:
     description: Whether load docker image from build into local Docker Images
     required: false
+    default: 'false'
 
 outputs:
   image_digest:
