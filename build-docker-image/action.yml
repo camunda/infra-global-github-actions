@@ -39,6 +39,9 @@ inputs:
   buildx_version:
     description: Which release version of buildx action to use
     required: false
+  docker_load:
+    description: Whether load docker image from build into local Docker Images
+    required: false
 
 outputs:
   image_digest:
@@ -134,6 +137,7 @@ runs:
       push: ${{ env.SHOULD_WE_PUSH }}
       tags: ${{ steps.meta.outputs.tags }}
       labels: ${{ steps.meta.outputs.labels }}
+      load: ${{ inputs.docker_load }}
   - id: get-image-names
     shell: bash
     run: |
