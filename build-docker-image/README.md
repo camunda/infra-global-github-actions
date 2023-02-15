@@ -21,6 +21,7 @@ This composite GHA can be used in any non-public repository with a `Dockerfile` 
 | build_allow       | Extra privilege entitlements to give builder       |
 | buildx_driver     | Driver to use for buildx builder                   |
 | buildx_version    | Which release version of a buildx action to use    |
+| docker_load       | Whether or not to load docker image builds into the local Docker Images |
 
 For the above example inputs the resulting Docker image would be named `gcr.io/example/image`.
 
