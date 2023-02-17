@@ -75,21 +75,18 @@ runs:
       dc_repo="$(echo ${{github.repository}} | cut -d'/' -f2)"
       echo "dc_repo=${dc_repo}" >> "$GITHUB_OUTPUT"
 
-  - name: set up gcloud
-    uses: google-github-actions/setup-gcloud@v1.1.0
+  - name: Authenticate to Google Cloud
+    uses: 'google-github-actions/auth@v1'
+    with:
+      credentials_json: '${{ inputs.gcp_credentials }}'
 
-  - name: Upload file
+  - name: Set up gcloud
+    uses: 'google-github-actions/setup-gcloud@v1'
+
+  - name: Upload files
     shell: bash
     run: |
-      echo -n ${{ inputs.gcp_credentials }} | base64 -d > key-file.json
-      gcloud auth activate-service-account --key-file=key-file.json
-
       gsutil -m cp ${{ inputs.artifact_file }} gs://${{ steps.variables.outputs.bucket_name }}/${{ steps.variables.outputs.dc_repo }}/${{ steps.variables.outputs.subpath }}${{ steps.variables.outputs.version }}${{ steps.variables.outputs.subversion }}
-
-  - name: Post
-    shell: bash
-    run: |
-      rm -f key-file.json
 
 branding:
   icon: upload
