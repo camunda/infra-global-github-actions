@@ -1,0 +1,70 @@
+name: YQ YAML processor
+
+description: Process YAML content by leveraging the capabilities of the [YQ](https://github.com/mikefarah/yq) processor.
+
+inputs:
+  patches:
+    description: |
+      A list of YAML contents (env, file, inline) with associated YQ expressions to apply (piped in the defined order).
+      Consult the ./README.md for more information and examples.
+    required: true
+  options:
+    description: Command options passed to the YQ CLI
+    default: ""
+
+outputs:
+  results:
+    description: |
+      A JSON array with the results of each YQ command executed for each defined YAML content.
+    value: ${{ steps.process.outputs.results }}
+
+runs:
+  using: composite
+  steps:
+  - name: Process patches
+    uses: mikefarah/yq@v4.33.1
+    id: process
+    env:
+      OPTIONS: ${{ inputs.options }}
+      PATCHES: ${{ inputs.patches }}
+    with:
+      cmd: | 
+        # Convert to an array of key/value pairs
+        PATCHES=$(echo "$PATCHES" | yq 'to_entries')
+
+        # Create a temporary file to store standard outputs in JSON format
+        echo '[]' > outputs.tmp 
+
+        for index in $(echo "$PATCHES" | yq '.[].key'); do
+          # Get the patch
+          patch=$(echo "$PATCHES" | i=$index yq '.[env(i)].value')
+
+          # Get the YAML source (env,file,inline)
+          type=$(echo "$patch" | yq 'keys | .[] | select(test("^env|file|inline$"))')
+
+          # Get the yq expressions to apply
+          expressions=$(echo "$patch" | yq '.expressions | join(" | ")')
+
+          # Get the YAML content
+          yaml=""
+          final_options="$OPTIONS"
+          if [[ $type == "env" ]]; then
+            env=$(echo "$patch" | yq '.env')
+            yaml="$(eval echo \\"\$$env\\")"
+          elif [[ $type == "file" ]]; then
+            file=$(echo "$patch" | yq '.file')
+            final_options="$file $final_options"
+          elif [[ $type == "inline" ]]; then
+            yaml=$(echo "$patch" | yq '.inline')
+          fi
+
+          # Apply the yq expressions to the YAML content
+          echo "$yaml" | yq "$expressions" $final_options | \
+            yq '[(. | to_yaml)]' | \
+            yq eval-all --inplace --indent 0 --output-format json \
+              '. as $file ireduce([]; . + $file)' outputs.tmp -
+        done
+
+        # Set the results as an output
+        echo results="$(cat outputs.tmp)" >> $GITHUB_OUTPUT
+        rm outputs.tmp

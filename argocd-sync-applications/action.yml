@@ -1,0 +1,74 @@
+name: Sync ArgoCD applications
+
+description: Sync ArgoCD applications
+
+inputs:
+  app-name:
+    description: ArgoCD application to be synced.
+    required: true
+  argocd-token:
+    description: ArgoCD token with sufficient permissions to sync the ArgoCD application.
+    required: true
+  github-token:
+    description: |
+      A GitHub token to get a higher GitHub's API rate limit to avoid limitations when pulling
+      the ArgoCD CLI from the ArgoCD repository.
+    required: true
+  cli-version:
+    description: Version of the ArgoCD CLI to use.
+    default: 2.5.11
+  max-waiting-time-health:
+    description: |
+      The time (in seconds) to wait for the ArgoCD application to be healthy.
+      Does not wait if set to 0.
+    default: "600"
+  max-waiting-time-sync:
+    description: |
+      The time (in seconds) to wait for the ArgoCD application to be synced.
+      Does not wait if set to 0.
+    default: "30"
+  server:
+    description: URL of the ArgoCD server.
+
+runs:
+  using: composite
+  steps:
+  - name: Sync of the ArgoCD application (app-name=${{ inputs.app-name }})
+    uses: clowdhaus/argo-cd-action@v1.16.0
+    env:
+      # Only required for first step in job where API is called
+      # All subsequent setps in a job will not re-download the CLI
+      GITHUB_TOKEN: ${{ inputs.github-token }}
+    with:
+      command: app sync ${{ inputs.app-name }}
+      options: >-
+        --async
+        --auth-token ${{ inputs.argocd-token }}
+        --force
+        --grpc-web
+        --server ${{ inputs.server }}
+      version: ${{ inputs.cli-version }}
+  - name: Wait for the ArgoCD application to be synced (app-name=${{ inputs.app-name }}, timemout=${{ inputs.max-waiting-time-sync }}s)
+    uses: clowdhaus/argo-cd-action@v1.16.0
+    if: inputs.max-waiting-time-sync != '0'
+    with:
+      command: app wait ${{ inputs.app-name }}
+      options: >-
+        --auth-token ${{ inputs.argocd-token }}
+        --grpc-web
+        --server ${{ inputs.server }}
+        --sync
+        --timeout ${{ inputs.max-waiting-time-sync }}
+      version: ${{ inputs.cli-version }}
+  - name: Wait for the ArgoCD application to be healthy (app-name=${{ inputs.app-name }}, timemout=${{ inputs.max-waiting-time-health }}s)
+    uses: clowdhaus/argo-cd-action@v1.16.0
+    if: inputs.max-waiting-time-health != '0'
+    with:
+      command: app wait ${{ inputs.app-name }}
+      options: >-
+        --auth-token ${{ inputs.argocd-token }}
+        --grpc-web
+        --health
+        --server ${{ inputs.server }}
+        --timeout ${{ inputs.max-waiting-time-health }}
+      version: ${{ inputs.cli-version }}
