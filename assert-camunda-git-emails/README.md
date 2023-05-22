@@ -29,6 +29,8 @@ The following email addresses are hardcoded as allowed:
 - `@users.noreply.github.com` (used for Github users that chose to [keep their email address private](https://docs.github.com/en/account-and-profile/setting-up-and-managing-your-github-user-account/managing-email-preferences/adding-an-email-address-to-your-github-account))
 - `noreply@github.com` (used on merge commits created by Github web UI)
 - `github-actions@github.com` (used for commits created by Github Actions runs)
+- `bot@renovateapp.com` (used for commits created by [Renovate](https://github.com/marketplace/renovate))
+- `snyk-bot@snyk.io` (used for commits created by [Snyk](https://github.com/marketplace/snyk))
 
 **Note: Pull Requests to extend this list are welcome when you discover edge cases!**
 
