@@ -33,17 +33,26 @@ runs:
       echo "User description: ${{ inputs.user_description }}"
 
   - name: Validate inputs
-    shell: python
+    shell: bash
+    env:
+      BUILD_STATUS: "${{ inputs.build_status }}"
+      USER_REASON: "${{ inputs.user_reason }}"
+      USER_DESCRIPTION: "${{ inputs.user_description }}"
     run: |
-      if '${{ inputs.build_status }}' == '':
-        print('Need to specify a build status that is not empty!')
-        sys.exit(1)
-      if len('${{ inputs.user_reason }}') > 200:
-        print('Specified user reason has more than 200 characters!')
-        sys.exit(1)
-      if len('${{ inputs.user_description }}') > 1000:
-        print('Specified user description has more than 1000 characters!')
-        sys.exit(1)
+      if [ "$BUILD_STATUS" == "" ]; then
+        echo "Need to specify a build status that is not empty!"
+        exit 1
+      fi
+
+      if [ "${#USER_REASON}" -gt 200 ]; then
+        echo "Specified user reason has more than 200 characters!"
+        exit 1
+      fi
+
+      if [ "${#USER_DESCRIPTION}" -gt 1000 ]; then
+        echo "Specified user description has more than 1000 characters!"
+        exit 1
+      fi
 
   - name: Login to Google Cloud
     id: auth
@@ -57,7 +66,6 @@ runs:
   - name: Submit build status to CI Analytics
     shell: bash
     env:
-      # TODO: change to prod
       BIG_QUERY_TABLE_NAME: ci-30-162810:prod_ci_analytics.build_status_v2
     run: |
       cat <<EOF | tr '\n' ' ' | bq insert "$BIG_QUERY_TABLE_NAME"
