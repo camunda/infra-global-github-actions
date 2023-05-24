@@ -70,7 +70,7 @@ runs:
     shell: bash
     run: >-
       argocd app create ${{ inputs.argocd_arguments }}
-      
+
       argocd app sync ${{ inputs.app_name }} --async --force || true
     env:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}

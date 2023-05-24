@@ -19,7 +19,7 @@ inputs:
     description: The path of the Vault secret storing the private key of the GitHub App
     required: true
     type: string
-  vault-auth-method: 
+  vault-auth-method:
     description: The method to use to authenticate with Vault
     required: true
     type: string
@@ -53,14 +53,14 @@ runs:
       roleId: ${{ inputs.vault-auth-role-id }}
       secretId: ${{ inputs.vault-auth-secret-id }}
       exportEnv: false
-      secrets: > 
-        ${{ 
+      secrets: >
+        ${{
           format(
             '{0} {1} | {2};',
             inputs.github-app-id-vault-path,
             inputs.github-app-id-vault-key,
             'id'
-          ) 
+          )
         }}
   - name: Import the GitHub App secret key from vault
     id: app-private-key
@@ -72,13 +72,13 @@ runs:
       secretId: ${{ inputs.vault-auth-secret-id }}
       exportEnv: false
       secrets: >
-        ${{ 
+        ${{
           format(
             '{0} {1} | {2};',
             inputs.github-app-private-key-vault-path,
             inputs.github-app-private-key-vault-key,
             'private-key'
-          ) 
+          )
         }}
   - name: Generate a Github App token
     id: github-token

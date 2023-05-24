@@ -35,7 +35,7 @@ This action will help you upload artifacts to Camunda Download Center (dev, stag
 
 The artifact could be an enterprise or community artifact:
 
-- The community artifacts are publicly available while enterprise artifacts are password-protected to allow access only 
+- The community artifacts are publicly available while enterprise artifacts are password-protected to allow access only
 to Enterprise customers. Thus, we should be careful that nothing is accidentally published in the wrong place.
 - The default is community. To change to enterprise you need to set the `ee` input to `true`.
 
@@ -67,7 +67,7 @@ camunda-bpm-rpa-bridge-ee/artifact.zip
 
 ## How to get the credentials
 
-The only credential we need here is the `gcp_credentials` and you need to approach the Infra team 
+The only credential we need here is the `gcp_credentials` and you need to approach the Infra team
 to obtain it. The credential will not be directly shared with you, However, the Infra team will store it
 in Vault and share the path to the credential with you. Thus, you can use it in your workflow to retrieve the credential.
 
@@ -95,7 +95,7 @@ Please check the `Import Secrets` Step in the example below on how you will get 
           secretId: ${{ secrets.VAULT_SECRET_ID }}
           secrets: |
               secret/data/common/jenkins/downloads-camunda-cloud_google_sa_key DEV_DOWNLOAD_CENTER_GCLOUD_KEY_BYTES | GCP_CREDENTIALS_NAME;
-            
+
       - name: Upload artifact to Camunda Download Center
         uses: camunda/infra-global-github-actions/download-center-upload@main
         with:
