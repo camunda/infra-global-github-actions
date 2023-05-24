@@ -28,12 +28,12 @@ runs:
       OPTIONS: ${{ inputs.options }}
       PATCHES: ${{ inputs.patches }}
     with:
-      cmd: | 
+      cmd: |
         # Convert to an array of key/value pairs
         PATCHES=$(echo "$PATCHES" | yq 'to_entries')
 
         # Create a temporary file to store standard outputs in JSON format
-        echo '[]' > outputs.tmp 
+        echo '[]' > outputs.tmp
 
         for index in $(echo "$PATCHES" | yq '.[].key'); do
           # Get the patch

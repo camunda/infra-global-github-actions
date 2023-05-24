@@ -18,7 +18,7 @@ The resulting branch name will be converted to lowercase, remove `dependabot/` a
 ```yaml
 ---
 name: example
-on: 
+on:
   pull_request:
 jobs:
   trigger-branch-deployment:

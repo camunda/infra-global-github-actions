@@ -51,7 +51,7 @@ runs:
         # Is labeled with 'dependency-upgrade'
         echo is-labeled-with-dependency-upgrade=${{
           steps.pr-event-info.outputs.action == 'labeled' &&
-          contains(steps.pr-event-info.outputs.labels, steps.global.outputs.maintenance-label) 
+          contains(steps.pr-event-info.outputs.labels, steps.global.outputs.maintenance-label)
         }}
       } >> $GITHUB_OUTPUT
     shell: bash
@@ -74,7 +74,7 @@ runs:
             steps.pr-event-assertions.outputs.is-opened-by-vendor == 'true'
           ) && steps.global.outputs.maintenance-project-url || ''
         }}
-        
+
         # Set the infra-maintenace-dri team as reviewer of the PR if opened by a vendor
         echo team-reviewers=${{
           (
