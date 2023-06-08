@@ -15,13 +15,16 @@ This composite Github Action (GHA) is aimed to be used by the Camunda Infrastruc
 This composite GHA can be used in any repository and must be triggered on `pull_request` events.
 
 ### Inputs
-| Input name           | Description                                               |
-|----------------------|-----------------------------------------------------------|
-| github-token         | A GitHub access token with sufficient scope (*) |
+
+| Input name           | Description                                          |
+|----------------------|------------------------------------------------------|
+| github-token         | A GitHub access token with sufficient scope (*)      |
+| slack-webhook-url    | A Slack webhook URL for authentication to post security PR notifications |
 
 (*) This action relies on the [configure-pull-request](../../../configure-pull-request) action to edit a Pull Request and requires sufficient scope.
 
 ### Workflow Example
+
 ```yaml
 ---
 name: example
@@ -34,4 +37,5 @@ jobs:
     - uses: camunda/infra-global-github-actions/teams/infra/configure-maintenance-pull-request@main
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
+        slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
 ```

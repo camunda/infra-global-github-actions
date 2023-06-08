@@ -1,3 +1,4 @@
+---
 name: Configure a maintenance Pull Request
 
 description: Configure a maintenance Pull Request according to the Infra team guidelines
@@ -7,21 +8,27 @@ inputs:
     description: A GitHub access token with write access to the project
     required: true
     type: string
+  slack-webhook-url:
+    description: A Slack webhook URL for authentication to post security PR notifications
+    required: true
+    type: string
 
 runs:
   using: composite
   steps:
   # Set global values as outputs to be reused in other steps
   - id: global # Maintenance parameters of the Infra team
+    shell: bash
     run: |
       {
         echo maintenance-label=dependency-upgrade
         echo maintenance-project-url=https://github.com/orgs/camunda/projects/42/
         echo maintenance-team-reviewers=infra-maintenance-dri
       } >> $GITHUB_OUTPUT
-    shell: bash
+
   - name: Get info about the Pull Request event
     id: pr-event-info
+    shell: bash
     run: |
       {
         # Get the action type of the event
@@ -37,9 +44,10 @@ runs:
           ''
         }}
       } >> $GITHUB_OUTPUT
-    shell: bash
+
   - name: Deduce assertions about the Pull Request event
     id: pr-event-assertions
+    shell: bash
     run: |
       {
         # Is labeled by a vendor ?
@@ -54,9 +62,10 @@ runs:
           contains(steps.pr-event-info.outputs.labels, steps.global.outputs.maintenance-label)
         }}
       } >> $GITHUB_OUTPUT
-    shell: bash
+
   - name: Determine the Pull Request configuration to apply from context and Infra team guidelines
     id: pr-configuration
+    shell: bash
     run: |
       {
         # Label the PR if opened by a vendor
@@ -83,7 +92,7 @@ runs:
           ) || ''
         }}
       } >> $GITHUB_OUTPUT
-    shell: bash
+
   - name: Apply Pull Request configuration
     uses: camunda/infra-global-github-actions/configure-pull-request@main
     with:
@@ -91,3 +100,16 @@ runs:
       labels: ${{ steps.pr-configuration.outputs.labels }}
       project-url: ${{ steps.pr-configuration.outputs.project-url }}
       team-reviewers: ${{ steps.pr-configuration.outputs.team-reviewers }}
+
+  - name: Alert Infra team medic on security Pull Requests
+    if: steps.pr-event-info.outputs.action == 'opened' && steps.pr-event-info.outputs.vendor == 'snyk'
+    uses: 8398a7/action-slack@v3
+    with:
+      text: ":snyk: Security Pull Request opened"
+      status: failure
+      channel: '#infra-alerts' # overwritten by webhook config
+      fields: repo,pullRequest
+      mention: 'subteam^S01K6MZC3AQ' # DRI is @infra-medic
+      if_mention: always
+    env:
+      SLACK_WEBHOOK_URL: ${{ inputs.slack-webhook-url }}
