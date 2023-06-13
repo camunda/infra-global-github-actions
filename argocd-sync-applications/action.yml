@@ -34,7 +34,7 @@ runs:
   using: composite
   steps:
   - name: Sync of the ArgoCD application (app-name=${{ inputs.app-name }})
-    uses: clowdhaus/argo-cd-action@v1.16.0
+    uses: clowdhaus/argo-cd-action@v1.17.0
     env:
       # Only required for first step in job where API is called
       # All subsequent setps in a job will not re-download the CLI
@@ -49,7 +49,7 @@ runs:
         --server ${{ inputs.server }}
       version: ${{ inputs.cli-version }}
   - name: Wait for the ArgoCD application to be synced (app-name=${{ inputs.app-name }}, timemout=${{ inputs.max-waiting-time-sync }}s)
-    uses: clowdhaus/argo-cd-action@v1.16.0
+    uses: clowdhaus/argo-cd-action@v1.17.0
     if: inputs.max-waiting-time-sync != '0'
     with:
       command: app wait ${{ inputs.app-name }}
@@ -61,7 +61,7 @@ runs:
         --timeout ${{ inputs.max-waiting-time-sync }}
       version: ${{ inputs.cli-version }}
   - name: Wait for the ArgoCD application to be healthy (app-name=${{ inputs.app-name }}, timemout=${{ inputs.max-waiting-time-health }}s)
-    uses: clowdhaus/argo-cd-action@v1.16.0
+    uses: clowdhaus/argo-cd-action@v1.17.0
     if: inputs.max-waiting-time-health != '0'
     with:
       command: app wait ${{ inputs.app-name }}
