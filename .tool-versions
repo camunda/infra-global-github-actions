@@ -2,4 +2,4 @@
 # renovate: datasource=github-tags depName=rhysd/actionlint
 actionlint 1.6.24
 
-pre-commit 3.3.2
+pre-commit 3.3.3
