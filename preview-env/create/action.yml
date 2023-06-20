@@ -28,7 +28,7 @@ inputs:
 
   argocd_version:
   # renovate: datasource=docker depName=argoproj/argocd
-    default: v2.6.9
+    default: v2.6.11
     description: Version tag of Argo CD CLI tool
     required: false
 
