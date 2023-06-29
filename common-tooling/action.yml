@@ -1,0 +1,296 @@
+name: Install Common Tooling
+
+description: Install common Camunda tooling
+
+inputs:
+  # Node inputs
+  node-always-auth:
+    description: 'Set always-auth in npmrc.'
+    default: 'false'
+  node-version:
+    description: 'Version Spec of the version to use. Examples: 12.x, 10.15.1, >=10.15.0.'
+    default: '16' # used by a lot of actions as default
+  node-version-file:
+    description: 'File containing the version Spec of the version to use.  Examples: .nvmrc, .node-version, .tool-versions.'
+  node-architecture:
+    description: 'Target architecture for Node to use. Examples: x86, x64. Will use system architecture by default.'
+  node-check-latest:
+    description: 'Set this option if you want the action to check for the latest available version that satisfies the version spec.'
+    default: 'false'
+  node-registry-url:
+    description: 'Optional registry to set up for auth. Will set the registry in a project level .npmrc and .yarnrc file, and set up auth to read in from env.NODE_AUTH_TOKEN.'
+  node-scope:
+    description: 'Optional scope for authenticating against scoped registries. Will fall back to the repository owner when using the GitHub Packages registry (https://npm.pkg.github.com/).'
+  node-token:
+    description: Used to pull node distributions from node-versions. Since there's a default, this is typically not supplied by the user. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting.
+    default: ${{ github.server_url == 'https://github.com' && github.token || '' }}
+  node-cache:
+    description: 'Used to specify a package manager for caching in the default directory. Supported values: npm, yarn, pnpm.'
+  node-cache-dependency-path:
+    description: 'Used to specify the path to a dependency file: package-lock.json, yarn.lock, etc. Supports wildcards or a list of file names for caching multiple dependencies.'
+  node-enabled:
+    description: 'Whether to install node or not'
+    default: 'true'
+  # Yarn
+  yarn-enabled:
+    description: 'Whether to install yarn or not'
+    default: 'true'
+  # BuildX
+  buildx-version:
+    description: 'Buildx version. (eg. v0.3.0)'
+    required: false
+  buildx-driver:
+    description: 'Sets the builder driver to be used'
+    default: 'docker-container'
+    required: false
+  buildx-driver-opts:
+    description: 'List of additional driver-specific options. (eg. image=moby/buildkit:master)'
+    required: false
+  buildx-buildkitd-flags:
+    description: 'Flags for buildkitd daemon'
+    default: '--allow-insecure-entitlement security.insecure --allow-insecure-entitlement network.host'
+    required: false
+  buildx-install:
+    description: 'Sets up docker build command as an alias to docker buildx build'
+    default: 'false'
+    required: false
+  buildx-use:
+    description: 'Switch to this builder instance'
+    default: 'true'
+    required: false
+  buildx-endpoint:
+    description: 'Optional address for docker socket or context from `docker context ls`'
+    required: false
+  buildx-platforms:
+    description: 'Fixed platforms for current node. If not empty, values take priority over the detected ones'
+    required: false
+  buildx-config:
+    description: 'BuildKit config file'
+    required: false
+  buildx-config-inline:
+    description: 'Inline BuildKit config'
+    required: false
+  buildx-append:
+    description: 'Append additional nodes to the builder'
+    required: false
+  buildx-cleanup:
+    description: 'Cleanup temp files and remove builder at the end of a job'
+    default: 'true'
+    required: false
+  buildx-enabled:
+    description: 'Whether to install buildx or not'
+    default: 'true'
+  # Qemu
+  qemu-image:
+    description: 'QEMU static binaries Docker image (e.g. tonistiigi/binfmt:latest)'
+    default: 'tonistiigi/binfmt:latest'
+    required: false
+  qemu-platforms:
+    description: 'Platforms to install (e.g. arm64,riscv64,arm)'
+    default: 'all'
+    required: false
+  qemu-enabled:
+    description: 'Whether to install qemu or not'
+    default: 'true'
+  # Java / Maven
+  java-version:
+    description: 'The Java version to set up'
+    default: '17'
+    required: false
+  java-distribution:
+    description: 'Java distribution'
+    default: 'temurin'
+    required: false
+  java-cache-prefix:
+    description: 'Cache key prefix'
+    required: false
+  java-cache-path:
+    description: 'Cache path'
+    default: '~/.m2/repository'
+    required: false
+  java-cache-path-add:
+    description: 'Additional item for cache path'
+    required: false
+  java-maven-version:
+    description: 'The Maven version to set up'
+    default: '3.9.2'
+    required: false
+  secrets:
+    required: false
+    default: ''
+    description: toJSON passed GitHub secrets
+  java-enabled:
+    description: 'Whether to install java or not'
+    default: 'true'
+  # Python
+  python-version:
+    description: "Version range or exact version of Python or PyPy to use, using SemVer's version range syntax. Reads from .python-version if unset."
+    default: "3.11"
+  python-version-file:
+    description: "File containing the Python version to use. Example: .python-version"
+  python-cache:
+    description: "Used to specify a package manager for caching in the default directory. Supported values: pip, pipenv, poetry."
+    required: false
+  python-architecture:
+    description: "The target architecture (x86, x64) of the Python or PyPy interpreter."
+  python-check-latest:
+    description: "Set this option if you want the action to check for the latest available version that satisfies the version spec."
+    default: "false"
+  python-token:
+    description: "The token used to authenticate when fetching Python distributions from https://github.com/actions/python-versions. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting."
+    default: ${{ github.server_url == 'https://github.com' && github.token || '' }}
+  python-cache-dependency-path:
+    description: "Used to specify the path to dependency files. Supports wildcards or a list of file names for caching multiple dependencies."
+  python-update-environment:
+    description: "Set this option if you want the action to update environment variables."
+    default: 'true'
+  python-allow-prereleases:
+    description: "When 'true', a version range passed to 'python-version' input will match prerelease versions if no GA versions are found. Only 'x.y' version range is supported for CPython."
+    default: "false"
+  python-enabled:
+    description: 'Whether to install python or not'
+    default: 'true'
+  overwrite:
+    description: 'Defines whether on hosted runners the present version should be overwritten'
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+  # figure out what's installed and potentially skip
+  - name: Assess System
+    shell: bash
+    run: |
+      if ! command -v node &> /dev/null
+      then
+          echo "node_missing=true" >> "$GITHUB_ENV"
+      fi
+
+      if ! command -v docker buildx &> /dev/null
+      then
+          echo "buildx_missing=true" >> "$GITHUB_ENV"
+      fi
+
+      if ! command -v python &> /dev/null
+      then
+          echo "python_missing=true" >> "$GITHUB_ENV"
+      fi
+
+      if ! command -v yarn &> /dev/null
+      then
+          echo "yarn_missing=true" >> "$GITHUB_ENV"
+      fi
+
+      if ! command -v java &> /dev/null
+      then
+          echo "java_missing=true" >> "$GITHUB_ENV"
+      fi
+  # Add support for more platforms with QEMU
+  - name: Set up QEMU
+    if: ${{ inputs.qemu-enabled == 'true' }}
+    id: qemu
+    uses: docker/setup-qemu-action@v2
+    with:
+      image: ${{ inputs.qemu-image }}
+      platforms: ${{ inputs.qemu-platforms }}
+  # Docker Buildx
+  - name: Set up Docker Buildx
+    if: ${{ inputs.buildx-enabled == 'true' && ( env.buildx_missing == 'true' || inputs.overwrite == 'true' ) }}
+    uses: docker/setup-buildx-action@v2
+    with:
+      version: ${{ inputs.buildx-version }}
+      driver: ${{ inputs.buildx-driver }}
+      driver-opts: ${{ inputs.buildx-driver-opts }}
+      buildkitd-flags: ${{ inputs.buildx-buildkitd-flags }}
+      install: ${{ inputs.buildx-install }}
+      use: ${{ inputs.buildx-use }}
+      endpoint: ${{ inputs.buildx-endpoint }}
+      platforms: ${{ inputs.buildx-platforms }}
+      config: ${{ inputs.buildx-config }}
+      config-inline: ${{ inputs.buildx-config-inline }}
+      append: ${{ inputs.buildx-append }}
+      cleanup: ${{ inputs.buildx-cleanup }}
+  # Yarn
+  - name: Install Yarn
+    if: ${{ inputs.yarn-enabled == 'true' && ( env.yarn_missing == 'true' || inputs.overwrite == 'true' ) }}
+    shell: bash
+    run: |
+      curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
+      echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
+      sudo apt update && sudo apt install yarn -y
+      export PATH="$PATH:`yarn global bin`"
+  # Install node
+  - uses: actions/setup-node@v3
+    if: ${{ inputs.node-enabled == 'true' && ( env.node_missing == 'true' || inputs.overwrite == 'true' ) }}
+    with:
+      always-auth: ${{ inputs.node-always-auth }}
+      node-version: ${{ inputs.node-version }}
+      node-version-file: ${{ inputs.node-version-file }}
+      architecture: ${{ inputs.node-architecture }}
+      check-latest: ${{ inputs.node-check-latest }}
+      registry-url: ${{ inputs.node-registry-url }}
+      scope: ${{ inputs.node-scope }}
+      token: ${{ inputs.node-token }}
+      cache: ${{ inputs.node-cache }}
+      cache-dependency-path: ${{ inputs.node-cache-dependency-path }}
+  # Setup Maven
+  - name: Import secrets
+    if: ${{ inputs.secrets != '' && inputs.java-enabled == 'true' && ( env.java_missing == 'true' || inputs.overwrite == 'true' ) }}
+    id: secrets
+    uses: hashicorp/vault-action@v2.7.0
+    with:
+      url: ${{ fromJSON(inputs.secrets).VAULT_ADDR }}
+      method: approle
+      roleId: ${{ fromJSON(inputs.secrets).VAULT_ROLE_ID }}
+      secretId: ${{ fromJSON(inputs.secrets).VAULT_SECRET_ID }}
+      secrets: |
+        secret/data/github.com/organizations/camunda NEXUS_USR;
+        secret/data/github.com/organizations/camunda NEXUS_PSW;
+  - name: Setup Maven Action
+    if: ${{ inputs.java-enabled == 'true' && ( env.java_missing == 'true' || inputs.overwrite == 'true' ) }}
+    uses: s4u/setup-maven-action@v1.8.0
+    with:
+      java-version: ${{ inputs.java-version }}
+      java-distribution: ${{ inputs.java-distribution }}
+      maven-version: ${{ inputs.java-maven-version }}
+      cache-prefix: ${{ inputs.java-cache-prefix }}
+      cache-path: ${{ inputs.java-cache-path }}
+      cache-path-add: ${{ inputs.java-cache-path-add }}
+  - name: 'Create settings.xml'
+    if: ${{ inputs.secrets != '' && inputs.java-enabled == 'true' && ( env.java_missing == 'true' || inputs.overwrite == 'true' ) }}
+    uses: s4u/maven-settings-action@v2.8.0
+    with:
+      githubServer: false
+      servers: |
+        [{
+          "id": "camunda-nexus",
+          "username": "${{ steps.secrets.outputs.NEXUS_USR }}",
+          "password": "${{ steps.secrets.outputs.NEXUS_PSW }}"
+        }]
+      mirrors: '[{"url": "https://repository.nexus.camunda.cloud/content/groups/internal/", "id": "camunda-nexus", "mirrorOf": "*", "name": "camunda Nexus"}]'
+  # Change Timezone to Berlin
+  - shell: bash
+    run: |
+      sudo rm -rf /etc/localtime
+      sudo ln -s /usr/share/zoneinfo/Europe/Berlin /etc/localtime
+  # Install Python, removed on self-hosted runners
+  - uses: actions/setup-python@v4
+    if: ${{ inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
+    with:
+      python-version: ${{ inputs.python-version }}
+      python-version-file: ${{ inputs.python-version-file }}
+      cache: ${{ inputs.python-cache }}
+      architecture: ${{ inputs.python-architecture }}
+      check-latest: ${{ inputs.python-check-latest }}
+      token: ${{ inputs.python-token }}
+      cache-dependency-path: ${{ inputs.python-cache-dependency-path }}
+      update-environment: ${{ inputs.python-update-environment }}
+      allow-prereleases: ${{ inputs.python-allow-prereleases }}
+  - name: Unset Environment variables
+    shell: bash
+    run: |
+      echo "node_missing=" >> "$GITHUB_ENV"
+      echo "java_missing=" >> "$GITHUB_ENV"
+      echo "buildx_missing=" >> "$GITHUB_ENV"
+      echo "python_missing=" >> "$GITHUB_ENV"
+      echo "yarn_missing=" >> "$GITHUB_ENV"
