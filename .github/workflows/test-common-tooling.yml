@@ -1,0 +1,75 @@
+---
+name: Test Common Tooling
+
+on:
+  push:
+
+jobs:
+  test-common-tooling:
+    strategy:
+      matrix:
+        label: ["ubuntu-latest", "gcp-core-2-default"]
+    runs-on: ${{ matrix.label }}
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v3
+    - uses: ./common-tooling
+      with:
+        secrets: ${{ toJSON(secrets) }}
+    - run: |
+        if ! command -v node &> /dev/null
+        then
+            echo "node could not be found"
+            exit 1
+        else
+            node --version
+        fi
+        if ! command -v yarn &> /dev/null
+        then
+            echo "yarn could not be found"
+            exit 1
+        else
+            yarn --version
+        fi
+        if ! command -v docker buildx &> /dev/null
+        then
+            echo "docker buildx could not be found"
+            exit 1
+        else
+            docker buildx version
+        fi
+        if ! command -v java &> /dev/null
+        then
+            echo "java could not be found"
+            exit 1
+        else
+            java --version
+        fi
+        if ! command -v mvn &> /dev/null
+        then
+            echo "mvn could not be found"
+            exit 1
+        else
+            mvn --version
+        fi
+        if ! command -v python &> /dev/null
+        then
+            echo "python could not be found"
+            exit 1
+        else
+            python --version
+        fi
+    - uses: ./common-tooling
+      with:
+        secrets: ${{ toJSON(secrets) }}
+        node-enabled: "false"
+        yarn-enabled: "false"
+        python-enabled: "false"
+        java-enabled: "false"
+        qemu-enabled: "false"
+        buildx-enabled: "false"
+    - uses: ./common-tooling
+      with:
+        secrets: ${{ toJSON(secrets) }}
+        overwrite: "false"
+    - uses: ./common-tooling
