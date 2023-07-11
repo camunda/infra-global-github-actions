@@ -2,7 +2,9 @@
 name: Test Common Tooling
 
 on:
-  push:
+  pull_request:
+    paths:
+    - 'common-tooling/action.yml'
 
 jobs:
   test-common-tooling:
