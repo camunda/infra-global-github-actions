@@ -115,10 +115,6 @@ inputs:
     description: 'The Maven version to set up'
     default: '3.9.2'
     required: false
-  secrets:
-    required: false
-    default: ''
-    description: toJSON passed GitHub secrets
   java-enabled:
     description: 'Whether to install java or not'
     default: 'true'
@@ -150,9 +146,18 @@ inputs:
   python-enabled:
     description: 'Whether to install python or not'
     default: 'true'
+  # misc
   overwrite:
     description: 'Defines whether on hosted runners the present version should be overwritten'
     default: 'true'
+  secrets:
+    required: false
+    default: ''
+    description: toJSON passed GitHub secrets
+  berlin-timezone:
+    description: 'Whether to keep the runner at UTC or set Berlin timezone'
+    default: 'true'
+
 
 runs:
   using: composite
@@ -270,6 +275,7 @@ runs:
       mirrors: '[{"url": "https://repository.nexus.camunda.cloud/content/groups/internal/", "id": "camunda-nexus", "mirrorOf": "*", "name": "camunda Nexus"}]'
   # Change Timezone to Berlin
   - shell: bash
+    if: ${{ inputs.berlin-timezone == 'true' }}
     run: |
       sudo rm -rf /etc/localtime
       sudo ln -s /usr/share/zoneinfo/Europe/Berlin /etc/localtime
