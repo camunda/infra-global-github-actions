@@ -91,7 +91,7 @@ inputs:
     required: false
   qemu-enabled:
     description: 'Whether to install qemu or not'
-    default: 'true'
+    default: 'false'
   # Java / Maven
   java-version:
     description: 'The Java version to set up'
@@ -149,15 +149,7 @@ inputs:
   # misc
   overwrite:
     description: 'Defines whether on hosted runners the present version should be overwritten'
-    default: 'true'
-  secrets:
-    required: false
-    default: ''
-    description: toJSON passed GitHub secrets
-  berlin-timezone:
-    description: 'Whether to keep the runner at UTC or set Berlin timezone'
-    default: 'true'
-
+    default: 'false'
 
 runs:
   using: composite
@@ -171,9 +163,11 @@ runs:
           echo "node_missing=true" >> "$GITHUB_ENV"
       fi
 
-      if ! command -v docker buildx &> /dev/null
+      # custom case since buildx is a subcomamand of docker
+      docker_buildx_count=$(docker buildx 2>&1 | grep -c "docker buildx" || true)
+      if [[ $docker_buildx_count -eq 0 ]]
       then
-          echo "buildx_missing=true" >> "$GITHUB_ENV"
+        echo "buildx_missing=true" >> "$GITHUB_ENV"
       fi
 
       if ! command -v python &> /dev/null
@@ -190,6 +184,10 @@ runs:
       then
           echo "java_missing=true" >> "$GITHUB_ENV"
       fi
+  # For easier debugging which version is missing
+  - name: Print $GITHUB_ENV
+    shell: bash
+    run: echo $GITHUB_ENV
   # Add support for more platforms with QEMU
   - name: Set up QEMU
     if: ${{ inputs.qemu-enabled == 'true' }}
@@ -225,7 +223,8 @@ runs:
       sudo apt update && sudo apt install yarn -y
       export PATH="$PATH:`yarn global bin`"
   # Install node
-  - uses: actions/setup-node@v3
+  - name: Install NodeJS
+    uses: actions/setup-node@v3
     if: ${{ inputs.node-enabled == 'true' && ( env.node_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:
       always-auth: ${{ inputs.node-always-auth }}
@@ -239,18 +238,6 @@ runs:
       cache: ${{ inputs.node-cache }}
       cache-dependency-path: ${{ inputs.node-cache-dependency-path }}
   # Setup Maven
-  - name: Import secrets
-    if: ${{ inputs.secrets != '' && inputs.java-enabled == 'true' && ( env.java_missing == 'true' || inputs.overwrite == 'true' ) }}
-    id: secrets
-    uses: hashicorp/vault-action@v2.7.0
-    with:
-      url: ${{ fromJSON(inputs.secrets).VAULT_ADDR }}
-      method: approle
-      roleId: ${{ fromJSON(inputs.secrets).VAULT_ROLE_ID }}
-      secretId: ${{ fromJSON(inputs.secrets).VAULT_SECRET_ID }}
-      secrets: |
-        secret/data/github.com/organizations/camunda NEXUS_USR;
-        secret/data/github.com/organizations/camunda NEXUS_PSW;
   - name: Setup Maven Action
     if: ${{ inputs.java-enabled == 'true' && ( env.java_missing == 'true' || inputs.overwrite == 'true' ) }}
     uses: s4u/setup-maven-action@v1.8.0
@@ -261,26 +248,9 @@ runs:
       cache-prefix: ${{ inputs.java-cache-prefix }}
       cache-path: ${{ inputs.java-cache-path }}
       cache-path-add: ${{ inputs.java-cache-path-add }}
-  - name: 'Create settings.xml'
-    if: ${{ inputs.secrets != '' && inputs.java-enabled == 'true' && ( env.java_missing == 'true' || inputs.overwrite == 'true' ) }}
-    uses: s4u/maven-settings-action@v2.8.0
-    with:
-      githubServer: false
-      servers: |
-        [{
-          "id": "camunda-nexus",
-          "username": "${{ steps.secrets.outputs.NEXUS_USR }}",
-          "password": "${{ steps.secrets.outputs.NEXUS_PSW }}"
-        }]
-      mirrors: '[{"url": "https://repository.nexus.camunda.cloud/content/groups/internal/", "id": "camunda-nexus", "mirrorOf": "*", "name": "camunda Nexus"}]'
-  # Change Timezone to Berlin
-  - shell: bash
-    if: ${{ inputs.berlin-timezone == 'true' }}
-    run: |
-      sudo rm -rf /etc/localtime
-      sudo ln -s /usr/share/zoneinfo/Europe/Berlin /etc/localtime
-  # Install Python, removed on self-hosted runners
-  - uses: actions/setup-python@v4
+  # Install Python, it's absent on self-hosted runners
+  - name: Install Python3
+    uses: actions/setup-python@v4
     if: ${{ inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:
       python-version: ${{ inputs.python-version }}

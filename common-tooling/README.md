@@ -2,11 +2,34 @@
 
 This composite Github Action (GHA) is aimed to be used by Camunda teams for configuring either hosted or self-hosted runners with some basic software. Especially useful to have the basics available on self-hosted runners since they come with close to no software.
 
+## Default Software
+- Buildx - latest
+- JDK - 17
+- Maven - 3.9
+- Node - 16
+- Python - 3.11
+- Qemu - for multi arch builds (has to be enabled via `qemu-enabled: true`)
+- Yarn - 1.22
+
+## Used Actions
+See following actions for further information on available inputs and their usages.
+
+- [Setup-Buildx-Action](https://github.com/docker/setup-buildx-action)
+- [Setup-Maven-Action](https://github.com/s4u/setup-maven-action)
+- [Setup-Node](https://github.com/actions/setup-node)
+- [Setup-Python](https://github.com/actions/setup-python)
+- [Setup-Qemu-Action](https://github.com/docker/setup-qemu-action)
+- Yarn installed via Ubuntu package manager
+
 ## Usage
 
 This composite GHA can be used in any repository and should generally run as one of the first actions. Directly before or after the checkout.
 
 ### Inputs
+The inputs of the mentioned actions are mirrored and prefixed with the tooling itself.
+e.g.
+`architecture` --> `node-architecture`
+
 | Input name           | Description                                               | default |
 |----------------------|-----------------------------------------------------------| --------|
 | node-always-auth         | Set always-auth in npmrc. |
@@ -36,7 +59,7 @@ This composite GHA can be used in any repository and should generally run as one
 | buildx-enabled | Whether to install buildx or not |
 | qemu-image | QEMU static binaries Docker image (e.g. tonistiigi/binfmt:latest) |
 | qemu-platforms | Platforms to install (e.g. arm64,riscv64,arm) | all |
-| qemu-enabled | Whether to install qemu or not |
+| qemu-enabled | Whether to install qemu or not | false |
 | java-version | The Java version to set up | 17 |
 | java-distribution | Java distribution | temurin |
 | java-cache-prefix | Cache key prefix |
@@ -54,9 +77,7 @@ This composite GHA can be used in any repository and should generally run as one
 | python-update-environment | Set this option if you want the action to update environment variables. |
 | python-allow-prereleases | When 'true', a version range passed to 'python-version' input will match prerelease versions if no GA versions are found. Only 'x.y' version range is supported for CPython. |
 | python-enabled | Whether to install python or not |
-| overwrite | Defines whether on hosted runners the present version should be overwritten | true |
-| secrets | toJSON passed GitHub secrets |
-| berlin-timezone | Whether to keep the runner at UTC or set Berlin timezone| true|
+| overwrite | Defines whether on hosted runners the present version should be overwritten | false |
 
 ### Workflow Example
 ```yaml
@@ -69,13 +90,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     # install any defaults
-    - uses: camunda/infra-global-github-actions/common-tooling@main
-    # install any defaults and configure maven-settings.xml
-    - uses: camunda/infra-global-github-actions/common-tooling@main
-      with:
-        secrets: ${{ toJSON(secrets) }}
+    - name: Install if required common software tooling
+      uses: camunda/infra-global-github-actions/common-tooling@main
     # only install missing software components
-    - uses: camunda/infra-global-github-actions/common-tooling@main
+    - name: Install and overwrite common software tooling
+      uses: camunda/infra-global-github-actions/common-tooling@main
       with:
         overwrite: "false"
+    # Install missing software with specific node and JDK version
+    - name: Install and overwrite common software tooling
+      uses: camunda/infra-global-github-actions/common-tooling@main
+      with:
+        node-version: 20 # see https://github.com/actions/setup-node#supported-version-syntax for supported syntax
+        java-version: 20 # see https://github.com/marketplace/actions/setup-java-jdk#supported-version-syntax for supported syntax
+        java-distribution: adopt # see https://github.com/marketplace/actions/setup-java-jdk#supported-distributions for supported distros
+        python-version: 3 # see https://github.com/actions/setup-python#supported-version-syntax for supported syntax
 ```
