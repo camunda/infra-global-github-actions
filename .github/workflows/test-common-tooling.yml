@@ -9,16 +9,17 @@ on:
 jobs:
   test-common-tooling:
     strategy:
+      fail-fast: false
       matrix:
         label: ["ubuntu-latest", "gcp-core-2-default"]
     runs-on: ${{ matrix.label }}
     timeout-minutes: 10
     steps:
     - uses: actions/checkout@v3
-    - uses: ./common-tooling
-      with:
-        secrets: ${{ toJSON(secrets) }}
-    - run: |
+    - name: Install if required common software tooling
+      uses: ./common-tooling
+    - name: Check that installed software is available
+      run: |
         if ! command -v node &> /dev/null
         then
             echo "node could not be found"
@@ -33,7 +34,8 @@ jobs:
         else
             yarn --version
         fi
-        if ! command -v docker buildx &> /dev/null
+        docker_buildx_count=$(docker buildx 2>&1 | grep -c "docker buildx")
+        if [[ $docker_buildx_count -eq 0 ]]
         then
             echo "docker buildx could not be found"
             exit 1
@@ -61,17 +63,24 @@ jobs:
         else
             python --version
         fi
-    - uses: ./common-tooling
+    - name: Install nothing, just for testing
+      uses: ./common-tooling
       with:
-        secrets: ${{ toJSON(secrets) }}
         node-enabled: "false"
         yarn-enabled: "false"
         python-enabled: "false"
         java-enabled: "false"
         qemu-enabled: "false"
         buildx-enabled: "false"
-    - uses: ./common-tooling
+    - name: Install and overwrite common software tooling
+      uses: ./common-tooling
       with:
-        secrets: ${{ toJSON(secrets) }}
-        overwrite: "false"
-    - uses: ./common-tooling
+        overwrite: "true"
+    - name: Install and overwrite common software tooling
+      uses: ./common-tooling
+      with:
+        node-version: 20 # see https://github.com/actions/setup-node#supported-version-syntax for supported syntax
+        java-version: 20 # see https://github.com/marketplace/actions/setup-java-jdk#supported-version-syntax for supported syntax
+        java-distribution: adopt # see https://github.com/marketplace/actions/setup-java-jdk#supported-distributions for supported distros
+        python-version: 3 # see https://github.com/actions/setup-python#supported-version-syntax for supported syntax
+        overwrite: 'true'
