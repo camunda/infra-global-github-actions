@@ -1,0 +1,37 @@
+query get_open_pull_requests_with_comments ($owner:String!,$repo:String!,$states:[PullRequestState!],$endCursor:String) {
+
+  repository (name: $repo, owner: $owner) {
+    pullRequests (
+      after: $endCursor
+      first: 100,
+      orderBy: {
+        field: UPDATED_AT
+        direction: DESC
+      }
+      states: $states
+    ) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        comments (first: 100) {
+          nodes {
+            body
+            databaseId
+          }
+        }
+        labels (first: 100) {
+          nodes {
+            id
+            name
+          }
+        }
+        number
+        state
+        title
+      }
+    }
+  }
+
+}

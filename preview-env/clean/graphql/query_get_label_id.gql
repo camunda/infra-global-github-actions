@@ -1,0 +1,9 @@
+query get_label_id ($owner:String!,$repo:String!,$label:String!) {
+
+  repository (name: $repo, owner: $owner) {
+    label (name: $label) {
+      id
+    }
+  }
+  
+}

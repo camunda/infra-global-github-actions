@@ -1,0 +1,17 @@
+mutation remove_labels ($pullRequestId:ID!,$labelIds:[ID!]!) {
+  removeLabelsFromLabelable (
+    input: {
+      labelIds: $labelIds,
+      labelableId: $pullRequestId
+    }
+  ) {
+     labelable {
+       labels (first: 100) {
+         nodes {
+           id
+           name
+         }
+       }
+     }
+  }
+}
