@@ -1,0 +1,38 @@
+query get_open_pull_requests_by_labels ($owner:String!,$repo:String!,$labels:[String!],$states:[PullRequestState!],$endCursor:String) {
+
+  repository (name: $repo, owner: $owner) {
+    pullRequests (
+      after: $endCursor
+      first: 100,
+      labels: $labels,
+      states: $states
+    ) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes {
+        author {
+          login
+        }
+        id
+        headRefName
+        number
+        timelineItems (itemTypes: LABELED_EVENT, last: 100) {
+          nodes {
+            ... on LabeledEvent {
+              label {
+                name
+              }
+              actor {
+                login
+              }
+              createdAt
+            }
+          }
+        }
+      }
+    }
+  }
+
+}

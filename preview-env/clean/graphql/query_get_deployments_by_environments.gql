@@ -1,0 +1,25 @@
+query get_latest_environment_deployment ($owner:String!,$repo:String!,$environments:[String!],$endCursor:String) {
+
+  repository (name: $repo, owner: $owner) {
+    deployments (
+      after: $endCursor
+      environments: $environments
+      first: 100,
+      orderBy: {
+        field: CREATED_AT,
+        direction: DESC
+      }
+    ) {
+      pageInfo {
+        hasNextPage
+        endCursor
+      }
+      nodes  {
+        id
+        state
+        updatedAt
+      }
+    }
+  }
+
+}
