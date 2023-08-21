@@ -1,28 +1,6 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
-  extends: [
-    "config:base",
-    "docker:enableMajor",
-    ":automergeDisabled",
-    ":semanticCommits",
-    ":dependencyDashboard",
-  ],
-  schedule: ["on the 1st and 3rd day instance on sunday after 9pm"],
-  commitBodyTable: true,
-  separateMajorMinor: false,
-  prBodyNotes: [
-    "{{#if isMajor}}:warning: THIS IS A MAJOR VERSION UPDATE :warning:{{/if}}",
-    "Before merging, *always* check with the release notes if any other changes need to be done.",
-  ],
-  major: {
-    enabled: true,
-  },
-  minor: {
-    enabled: true,
-  },
-  patch: {
-    enabled: true,
-  },
+  extends: ["github>camunda/infra-renovate-config:default.json5"],
   regexManagers: [
     {
       fileMatch: ["\.ya?ml$"],
@@ -31,32 +9,11 @@
       ],
       versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
     },
-    // for asdf-vm.org tool versions
-    {
-      fileMatch: ["\.tool-versions$"],
-      matchStrings: [
-        "renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.* (?<currentValue>.*)\\s",
-      ],
-      versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}",
-    },
   ],
   packageRules: [
-    {
-      datasources: ["docker"],
-      packagePatterns: ["argocd"],
-      groupName: "ArgoCD clients",
-    },
     // For known Github repositories that use Github tags/releases of format
     // "v1.2.3" and where the asdf plugin ignores the "v" prefix, we also tell
     // Renovate to ignore it via extractVersion when updating .tool-version file
-    {
-      matchManagers: ["regex"],
-      matchPaths: ["**/.tool-versions", "**/*.tf"],
-      matchPackageNames: [
-        "rhysd/actionlint",
-      ],
-      extractVersion: "^v(?<version>.*)$",
-    },
     {
       matchManagers: ["regex"],
       matchPaths: ["**/argocd-sync-applications/action.yml"],
