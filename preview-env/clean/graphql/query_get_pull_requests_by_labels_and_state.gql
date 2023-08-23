@@ -1,4 +1,4 @@
-query get_open_pull_requests_by_labels ($owner:String!,$repo:String!,$labels:[String!],$states:[PullRequestState!],$endCursor:String) {
+query get_pull_requests_by_labels_and_state ($owner:String!,$repo:String!,$labels:[String!],$states:[PullRequestState!],$endCursor:String) {
 
   repository (name: $repo, owner: $owner) {
     pullRequests (
@@ -12,12 +12,6 @@ query get_open_pull_requests_by_labels ($owner:String!,$repo:String!,$labels:[St
         endCursor
       }
       nodes {
-        author {
-          login
-        }
-        id
-        headRefName
-        number
         timelineItems (itemTypes: LABELED_EVENT, last: 100) {
           nodes {
             ... on LabeledEvent {
@@ -31,6 +25,12 @@ query get_open_pull_requests_by_labels ($owner:String!,$repo:String!,$labels:[St
             }
           }
         }
+        author {
+          login
+        }
+        id
+        headRefName
+        number
       }
     }
   }

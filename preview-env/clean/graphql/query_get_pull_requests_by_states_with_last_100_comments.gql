@@ -1,9 +1,9 @@
-query get_open_pull_requests_with_comments ($owner:String!,$repo:String!,$states:[PullRequestState!],$endCursor:String) {
+query get_pull_requests_by_states_with_last_100_comments ($owner:String!,$repo:String!,$states:[PullRequestState!],$endCursor:String) {
 
   repository (name: $repo, owner: $owner) {
     pullRequests (
       after: $endCursor
-      first: 100,
+      first: 1,
       orderBy: {
         field: UPDATED_AT
         direction: DESC
@@ -15,7 +15,13 @@ query get_open_pull_requests_with_comments ($owner:String!,$repo:String!,$states
         endCursor
       }
       nodes {
-        comments (first: 100) {
+        comments (
+          first: 100
+          orderBy: {
+            field: UPDATED_AT,
+            direction: DESC
+          }
+        ) {
           nodes {
             body
             databaseId

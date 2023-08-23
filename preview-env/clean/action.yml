@@ -10,28 +10,38 @@ inputs:
   labels:
     description: Comma-speparated list of labels used to deploy preview environment.
     default: deploy-preview
+    required: true
+  pull-request:
+    description: |
+      Limit cleanup to a single pull request (number) and a minimal mode. Only inconsistent comments related to preview environment(s) are removed.
+      Useful for quickly eliminating inconsistencies (e.g., after running preview-env deploy or teardown workflows), while waiting for the full cleanup cycle to run.
   repository:
     description: |
       Target GitHub repository with preview environments to clean (in `owner/name` format).
       Set to the current repository by default.
   shutdown-message:
     description: |
-      A message to inform user of preview environment shutdown.
+      A message template to inform user of the complete shutdown of preview environment.
       Use GitHub syntax (https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax)
     default: |
       ## Preview environment
 
-      > [!WARNING]
+      > [!NOTE]
       > **Preview environment(s) has/have been shutdown automatically** as there has been no activity during the last `{ttl-days}` days).
       > cc {actors}
 
       ⏯️ **Want to deploy preview environment(s) again ?**
       Simply add a deploy label (`{preview-labels}`) to the PR.
+    required: true
   ttl:
-    description: TTL before a preview environment is candidate for shutdown (e.g. 2d, 15h, 35m, 5s).
+    description: Lifetime before a preview environment is candidate for shutdown (e.g. 2d, 15h, 35m, 5s).
     default: 21d
+    required: true
   token:
-    description: GitHub token with necessary permissions
+    description: |
+      GitHub token with necessary permissions.
+      Default $GITHUB_TOKEN cannot be used, otherwise no event will be tiggered when removing labels from a PR.
+    required: true
   warning-message:
     description: |
       A message to warn user of the upcoming shutdown of preview environment.
@@ -50,8 +60,8 @@ inputs:
       Simply push a new commit or restart the deployment [workflow]({checks-url}) to **postpone the shutdown to `{ttl-days} day(s)` from now**.
   warning-ttl:
     description: |
-      Time (less than ttl) after which a comment is added to PR to warn users of the upcoming shutdown of preview environment(s) (e.g. 2d, 15h, 35m, 5s).
-      Skipped if set to 0.
+      Duration since last deployment after which users are warned of the upcoming shutdown of preview environment(s) (e.g. 2d, 15h, 35m, 5s).
+      Skipped if set to 0. Must be lower than `ttl`
     default: 0s
 
 runs:
@@ -60,17 +70,11 @@ runs:
   - name: Check and process inputs
     id: inputs
     env:
-      REPOSITORY: ${{ inputs.repository || github.repository }}
       TTL: ${{ inputs.ttl }}
+      WARNING_MESSAGE: ${{ inputs.warning-message }}
       WARNING_TTL: ${{ inputs.warning-ttl }}
     run: |
       set -e
-
-      # Extract repository name and owner
-      {
-        echo repository-name=$(echo $REPOSITORY | cut -d'/' -f2)
-        echo repository-owner=$(echo $REPOSITORY | cut -d'/' -f1)
-      } >> $GITHUB_OUTPUT
 
       # Function to parse and convert a duration in seconds
       time2seconds() {
@@ -95,344 +99,33 @@ runs:
         echo warning-ttl-seconds must be less than ttl-seconds
         exit 1
       fi
+
+      if [ $warning_ttl_seconds -gt 0 ] && [ -z "$WARNING_MESSAGE" ]; then
+        echo "warning-message must be set if warning-ttl > 0"
+      fi
     shell: bash
-  - name: Get Pull Requests with active preview environment(s)
-    id: pull-requests
-    env:
-      GH_TOKEN: ${{ inputs.token || github.token }}
-      LABELS: ${{ inputs.labels }}
-      REPOSITORY_NAME: ${{ steps.inputs.outputs.repository-name }}
-      REPOSITORY_OWNER: ${{ steps.inputs.outputs.repository-owner }}
-    run: |
-      set -e
-
-      results="[]"
-
-      # Retrieve open Pull Requests with preview environment labels
-      pull_requests=$(
-        gh api graphql \
-          --paginate \
-          --field owner=$REPOSITORY_OWNER \
-          --field repo=$REPOSITORY_NAME \
-          $(echo ${LABELS//,/ } | xargs -n 1 sh -c 'echo --field labels[]=$0') \
-          --field states=OPEN \
-          --field query=@${{ github.action_path }}/graphql/query_get_pull_requests_by_labels_and_states.gql \
-          --jq '.data.repository.pullRequests.nodes | unique | .[]'
-      )
-
-      # Keep only Pull Requests with at least one active deployment, i.e. candidates for a preview environment shutdown or warning.
-      for pr in $pull_requests; do
-        pr_id=$(echo $pr | jq -r .id)
-        pr_ref=$(echo $pr | jq -r .headRefName)
-        pr_number=$(echo $pr | jq -r .number)
-        pr_author=$(echo $pr | jq -r .author.login)
-        pr_labeled_event_timeline=$(echo $pr | jq -r .timelineItems.nodes)
-
-        # Retrieve the deployments of the associated preview environment(s).
-        environments=$(
-          gh api \
-            --paginate \
-            "/repos/$REPOSITORY_OWNER/$REPOSITORY_NAME/deployments?ref=$pr_ref" \
-            --jq '.[].environment' | \
-          sort | uniq
-        )
-        deployments=$(
-          gh api graphql \
-            --paginate \
-            --field owner=$REPOSITORY_OWNER \
-            --field repo=$REPOSITORY_NAME \
-            $(echo $environments | xargs -n 1 sh -c 'echo --field environments[]=$0') \
-            --field query=@${{ github.action_path }}/graphql/query_get_deployments_by_environments.gql \
-            --jq '.data.repository.deployments.nodes | sort_by(.updatedAt) | reverse'
-        )
-        
-        # Keep Pull Request if:
-        #  - at least one deployment is ACTIVE
-        #  - last updated deployment is completed (not in progress)
-        all_deployments_completed=$(
-          echo $deployments | \
-            jq 'any(.[]; .state == "PENDING" or .state == "IN_PROGRESS") | not'
-        )
-        at_least_one_active_deployment=$(
-          echo $deployments | \
-            jq 'any(.[]; .state == "ACTIVE")'
-        )
-        if [ "$all_deployments_completed" = "true" ] && [ "$at_least_one_active_deployment" = "true" ]; then
-          last_updated_deployment=$(echo $deployments | jq '.[0]')
-          updated_at=$(echo $last_updated_deployment | jq -r .updatedAt)
-          deployment_id=$(echo $last_updated_deployment | jq -r .id)
-
-          # Get Pull Request actors:
-          #  - PR author login
-          #  - Logins that added preview labels for the last time
-          # Notes:
-          # - only the last 100 events are considered (best effort)
-          # - event timeline is sorted in asc order
-          pr_actors=$(
-            jq -n \
-              --arg author "$pr_author" \
-              --argjson labels "[\"${LABELS//,/\",\"}\"]"  \
-              --argjson timeline "$pr_labeled_event_timeline" \
-              '
-                (
-                  $labels | map(. as $l | $timeline | reverse | map(select(.label.name == $l))[0].actor.login)
-                ) + [$author] | unique
-              '
-            )
-
-          # Keep Pull Request
-          results=$(
-            echo $results | \
-            jq \
-              --argjson pr_actors "$pr_actors" \
-              --arg pr_id $pr_id \
-              --arg pr_number $pr_number \
-              --arg updated_at $updated_at \
-              --arg deployment_id $deployment_id \
-              --indent 0 \
-              '. += [{pullRequestId: $pr_id, pullRequestNumber: $pr_number, pullRequestActors: $pr_actors, lastDeployedAt: $updated_at, deploymentId: $deployment_id}]'
-          )
-        fi
-      done
-
-      echo results=$results >> $GITHUB_OUTPUT
-    shell: bash
-  - name: Process active preview environments
+  - name: Full cleanup cycle
+    if: inputs.pull-request == 0
     env:
       DRY_RUN: ${{ inputs.dry-run }}
-      GH_TOKEN: ${{ inputs.token || github.token }}
+      GH_REPO: ${{ inputs.repository || github.repository }}
+      GH_TOKEN: ${{ inputs.token }}
       LABELS: ${{ inputs.labels }}
-      PULL_REQUESTS: ${{ steps.pull-requests.outputs.results }}
-      REPOSITORY_NAME: ${{ steps.inputs.outputs.repository-name }}
-      REPOSITORY_OWNER: ${{ steps.inputs.outputs.repository-owner }}
       SHUTDOWN_MESSAGE: ${{ inputs.shutdown-message }}
       TTL: ${{ steps.inputs.outputs.ttl-seconds }}
       WARNING_MESSAGE: ${{ inputs.warning-message }}
       WARNING_TTL: ${{ steps.inputs.outputs.warning-ttl-seconds }}
     run: |
-      set -e
-
-      # Get current date (UTC) in seconds
-      now=$(date --utc '+%s')
-
-      # Candidate Pull Requests with active preview environment(s)
-      pull_requests=$(echo $PULL_REQUESTS | jq -c '.[]')
-
-      # Get the Id(s) of the preview environment label(s)
-      label_ids=""
-      for label in ${LABELS//,/ }; do
-        label_ids="$label_ids "$(
-          gh api graphql \
-            --paginate \
-            --field owner=$REPOSITORY_OWNER \
-            --field repo=$REPOSITORY_NAME \
-            --field label=$label \
-            --field query=@${{ github.action_path }}/graphql/query_get_label_id.gql \
-            --jq '.data.repository.label.id'
-        )
-      done
-
-      # Process each Pull Request with active preview environment(s)
-      for pr in $pull_requests; do
-        # Get Pull Request infos
-        deployment_id=$(echo $pr | jq -r .deploymentId)
-        pr_id=$(echo $pr | jq -r .pullRequestId)
-        pr_last_deployed_at=$(
-          date \
-            --date="$(echo $pr | jq -r .lastDeployedAt)" \
-            +%s
-        )
-        pr_number=$(echo $pr | jq -r .pullRequestNumber)
-        pr_actors=$(echo $pr | jq -r .pullRequestActors)
-
-        # Compute lifetime
-        # Time between now and last deployment activity, regardless of environment if more than one
-        lifetime=$(($now-$pr_last_deployed_at))
-
-        # Get existing comment if any
-        unique_comment_tag="<!-- preview-env -->"
-        existing_comment_id=$(
-          gh api \
-            --paginate \
-            /repos/$REPOSITORY_OWNER/$REPOSITORY_NAME/issues/$pr_number/comments | \
-          jq \
-            --arg unique_comment_tag "$unique_comment_tag" \
-            -r \
-            '(.[] | select(.body | contains($unique_comment_tag))).id'
-        )
-
-        # Comment content to be created or updated if necessary
-        new_comment_body=""
-
-        echo "Processing PR #$pr_id (lifetime=${lifetime}s,ttl=${TTL}s,warning-ttl=${WARNING_TTL}s)"
-
-        # If lifetime has been reached, shutdown preview environment(s)
-        if [ $lifetime -gt $TTL ]; then
-          echo Preview environement lifetime expired! Must be shudown
-          if [ "$DRY_RUN" = "true" ]; then
-            echo "[DRY-RUN]: Unlabeling PR #$pr_id"
-          else
-            echo "Unlabeling PR #$pr_id ..."
-            gh api graphql \
-              --field pullRequestId=$pr_id \
-              $(echo $label_ids | xargs -n 1 sh -c 'echo --field labelIds[]=$0') \
-              --field query=@${{ github.action_path }}/graphql/mutation_remove_label.gql \
-              --silent
-
-            # Generate shutdown message
-            actors=$(echo $pr_actors | jq -r 'map("@" + .) | join(" ")')
-            preview_labels=$LABELS
-            ttl_days=$(($TTL/(24*3600)))
-            new_comment_body=$(
-              echo -e "$unique_comment_tag\n$SHUTDOWN_MESSAGE" | \
-                sed "s,{actors},$actors,g" | \
-                sed "s/{preview-labels}/$preview_labels/g" | \
-                sed "s/{ttl-days}/$ttl_days/g"
-            )
-          fi
-        # If lifetime is about to be reached, warn users
-        elif [ $WARNING_TTL -gt 0 ] && [ $lifetime -gt $WARNING_TTL ]; then
-          echo Preview environement lifetime expires soon! Users must be warned
-
-          # Generate warning message
-          actors=$(echo $pr_actors | jq -r 'map("@" + .) | join(" ")')
-          checks_url=$(
-            gh pr view $pr_number \
-              --json url \
-              --jq '.url + "/checks"'
-          )
-          days_to_shutdown=$((($TTL-$lifetime)/(24*3600)))
-          preview_labels=$LABELS
-          shutdown_date=$(date -d@$(($pr_last_deployed_at+$TTL)) +'%b %d %Y at %I %p %Z')
-          ttl_days=$(($TTL/(24*3600)))
-          unique_comment_tag="$unique_comment_tag<!-- warning-message -->"
-          new_comment_body=$(
-            echo -e "$unique_comment_tag\n$WARNING_MESSAGE" | \
-              sed "s,{actors},$actors,g" | \
-              sed "s,{checks-url},$checks_url,g" | \
-              sed "s/{days-to-shutdown}/$days_to_shutdown/g" | \
-              sed "s/{preview-labels}/$preview_labels/g" | \
-              sed "s/{shutdown-date}/$shutdown_date/g" | \
-              sed "s/{ttl-days}/$ttl_days/g"
-          )
-        else
-          echo Preview environement lifetime has not expired!
-        fi
-
-        # Upsert comment if there is a message to publish, otherwise delete any existing comment
-        if [ ! -z "$new_comment_body" ]; then
-          if [ -z $existing_comment_id ]; then
-            # Create a new comment
-            if [ "$DRY_RUN" = "true" ]; then
-              echo [DRY-RUN]: Creating a new comment ...
-            else
-              echo Creating a new comment ...
-              gh pr comment $pr_number --body "$new_comment_body"
-            fi
-          else
-            # Update existing comment
-            if [ "$DRY_RUN" = "true" ]; then
-              echo [DRY-RUN]: Updating existing comment ...
-            else
-              echo Updating existing comment ...
-              gh api \
-                --method PATCH \
-                /repos/$REPOSITORY_OWNER/$REPOSITORY_NAME/issues/comments/$existing_comment_id \
-                --field body="$new_comment_body" \
-                --silent
-            fi
-          fi
-        else
-          # Delete existing comment if any
-          if [ ! -z $existing_comment_id ]; then
-            if [ "$DRY_RUN" = "true" ]; then
-              echo [DRY-RUN]: Deleting existing comment ...
-            else
-              echo Deleting existing comment ...
-              gh api \
-                --method DELETE \
-                /repos/$REPOSITORY_OWNER/$REPOSITORY_NAME/issues/comments/$existing_comment_id \
-                --silent
-            fi
-          fi
-        fi
-      done
+      bash ${{ github.action_path }}/cleanup.sh
     shell: bash
-  - name: Clean up Pull Request comments
+  - name: Limited cleanup (PR \#${{inputs.pull-request}})
+    if: inputs.pull-request != 0
     env:
       DRY_RUN: ${{ inputs.dry-run }}
-      GH_TOKEN: ${{ inputs.token || github.token }}
+      GH_REPO: ${{ inputs.repository || github.repository }}
+      GH_TOKEN: ${{ inputs.token }}
       LABELS: ${{ inputs.labels }}
-      REPOSITORY_NAME: ${{ steps.inputs.outputs.repository-name }}
-      REPOSITORY_OWNER: ${{ steps.inputs.outputs.repository-owner }}
+      PULL_REQUEST: ${{ inputs.pull-request }}
     run: |
-      set -e
-
-      comment_ids_to_delete=""
-
-      # Get all open Pull Requests with their comments.
-      open_pull_requests=$(
-        gh api graphql \
-          --paginate \
-          --field owner=$REPOSITORY_OWNER \
-          --field repo=$REPOSITORY_NAME \
-          --field states=OPEN \
-          --field query=@${{ github.action_path }}/graphql/query_get_pull_requests_with_comments.gql \
-          --jq '.data.repository.pullRequests.nodes'
-      )
-
-      # Get the 100 most recent closed or merged Pull Requests with their comments
-      # There's no need to scan the entire history every time. Retrieving the last 100 closed or merged Pull Requests is enough to clean them up at least once.
-      closed_merged_pull_requests=$(
-        gh api graphql \
-          --field owner=$REPOSITORY_OWNER \
-          --field repo=$REPOSITORY_NAME \
-          --field 'states[]=CLOSED' \
-          --field 'states[]=MERGED' \
-          --field query=@${{ github.action_path }}/graphql/query_get_pull_requests_with_comments.gql \
-          --jq '.data.repository.pullRequests.nodes'
-      )
-
-      # If Pull Request is not OPEN, any warning or shutdown comments must be removed
-      # If Pull Request is OPEN and has no deploy labels, any warning comments must be removed
-      comment_ids_to_delete=$(
-        jq -n -r \
-          --arg unique_comment_tag "<!-- preview-env -->" \
-          --arg unique_warning_comment_tag "<!-- warning-message -->" \
-          --argjson open_pull_requests "$open_pull_requests" \
-          --argjson closed_merged_pull_requests "$closed_merged_pull_requests" \
-          --argjson labels "[\"${LABELS//,/\",\"}\"]" \
-          '
-            (
-              $closed_merged_pull_requests |
-              [
-                .[].comments.nodes[] | select (.body | contains($unique_comment_tag)).databaseId
-              ]
-            )
-            +
-            (
-              $open_pull_requests |
-              [
-                .[] |
-                select (.labels | any(.nodes[]; .name | IN($labels[])) | not) |
-                .comments.nodes[] | select (.body | contains($unique_warning_comment_tag)).databaseId
-              ]
-            ) | .[]
-          '
-      )
-
-      # Remove identified comments (if any)
-      if [ ! -z "$comment_ids_to_delete" ];then
-        if [ "$DRY_RUN" = "true" ]; then
-          echo [DRY-RUN]: Cleaning old comments ...
-        else
-          echo Cleaning old comments ...
-          for comment_id in $comment_ids_to_delete; do
-            gh api \
-              --method DELETE \
-              /repos/$REPOSITORY_OWNER/$REPOSITORY_NAME/issues/comments/$comment_id \
-              --silent
-          done
-        fi
-      fi
+      bash ${{ github.action_path }}/limited-cleanup.sh
     shell: bash
