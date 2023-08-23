@@ -1,4 +1,4 @@
-query get_latest_environment_deployment ($owner:String!,$repo:String!,$environments:[String!],$endCursor:String) {
+query get_get_deployments_by_environments ($owner:String!,$repo:String!,$environments:[String!],$endCursor:String) {
 
   repository (name: $repo, owner: $owner) {
     deployments (

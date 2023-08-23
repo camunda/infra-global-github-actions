@@ -3,3 +3,5 @@
 actionlint 1.6.25
 
 pre-commit 3.3.3
+
+shellcheck 0.9.0
