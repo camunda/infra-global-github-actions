@@ -25,7 +25,7 @@ source "$RELATIVE_SCRIPT_PATH/common.sh"
 # shellcheck source=/dev/null
 source "$RELATIVE_SCRIPT_PATH/github.sh"
 
-# Get pull requests that have at least one active preview environment
+# Get pull requests that have at least one preview environment
 function get_pull_requests_with_preview_envrionments {
   set -e # subshells do not inherit the -e option
 
@@ -40,9 +40,9 @@ function get_pull_requests_with_preview_envrionments {
     get_pull_requests_by_labels_and_state "$labels" OPEN
   )
 
-  # For each pull request, check if at least one preview environment is active
-  # A preview environment is considered active if:
-  #  - at least one deployment is in ACTIVE state
+  # For each pull request, check if at least one preview environment is running
+  # A preview environment is considered running if:
+  #  - at least one deployment is not inactive (i.e. not in DESTROYED state. Can be ACTIVE,FAILURE, etc ...)
   #  - all deployments are complete (no ongoing deployments)
   for pr in $pull_requests; do
     # Pull request information
@@ -59,16 +59,16 @@ function get_pull_requests_with_preview_envrionments {
     # Check if all deployments are complete
     all_deployments_completed=$(
       echo "$deployments" |
-        jq 'any(.[]; .state == "PENDING" or .state == "IN_PROGRESS") | not'
+        jq 'any(.[]; .state == "IN_PROGRESS" or .state == "PENDING" or .state == "QUEUED") | not'
     )
-    # Check if at least one deployment is in active state
-    at_least_one_active_deployment=$(
+    # Check if at least one deployment is not inactive
+    at_least_one_deployment_not_inactive=$(
       echo "$deployments" |
-        jq 'any(.[]; .state == "ACTIVE")'
+        jq 'any(.[]; .state != "DESTROYED")'
     )
 
     # If conditions are met, keep pull request
-    if [ "$all_deployments_completed" = "true" ] && [ "$at_least_one_active_deployment" = "true" ]; then
+    if [ "$all_deployments_completed" = "true" ] && [ "$at_least_one_deployment_not_inactive" = "true" ]; then
       # Get last deployment id and update date
       last_updated_deployment=$(echo "$deployments" | jq '.[0]')
       updated_at=$(echo "$last_updated_deployment" | jq -r .updatedAt)
@@ -309,7 +309,7 @@ function cleanup_inconsistent_comments {
   log "$nb_comments_cleaned comment(s) cleaned!"
 }
 
-# Get OPEN Pull Requests that have at least one active preview envrionment
+# Get OPEN Pull Requests that have at least one preview envrionment
 pull_requests=$(
   get_pull_requests_with_preview_envrionments "$LABELS"
 )

@@ -97,7 +97,9 @@ runs:
     with:
       step: finish
       token: ${{ github.token }}
-      status: ${{ job.status }}
+      # If composite action has been cancelled (by a user action, tiemout etc.), we consider it a failure
+      # In that case, status must be set/changed explicitly to "failure", otherwise bobheadxi/deployments will define the deployment as inactive.
+      status: ${{ github.action_status != 'cancelled' && github.action_status || 'failure'}}
       deployment_id: ${{ steps.deployment.outputs.deployment_id }}
       env_url: ${{ inputs.app_url }}
       ref: ${{ inputs.revision }}
