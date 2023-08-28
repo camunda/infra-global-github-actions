@@ -3,6 +3,7 @@
   extends: ["github>camunda/infra-renovate-config:default.json5"],
   regexManagers: [
     {
+      customType: "regex",
       fileMatch: ["\.ya?ml$"],
       matchStrings: [
         "renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.* (?<currentValue>.*)\\s"
@@ -16,7 +17,7 @@
     // Renovate to ignore it via extractVersion when updating .tool-version file
     {
       matchManagers: ["regex"],
-      matchPaths: ["**/argocd-sync-applications/action.yml"],
+      matchFileNames: ["argocd-sync-applications/action.yml"],
       matchPackageNames: [
         "quay.io/argoproj/argocd",
       ],

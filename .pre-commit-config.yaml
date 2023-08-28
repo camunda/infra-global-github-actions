@@ -17,3 +17,9 @@ repos:
   rev: v1.6.25
   hooks:
   - id: actionlint
+
+- repo: https://github.com/renovatebot/pre-commit-hooks
+  rev: 36.68.0
+  hooks:
+  - id: renovate-config-validator
+    args: ["--strict"]
