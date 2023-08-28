@@ -16,7 +16,6 @@
     // "v1.2.3" and where the asdf plugin ignores the "v" prefix, we also tell
     // Renovate to ignore it via extractVersion when updating .tool-version file
     {
-      matchManagers: ["regex"],
       matchFileNames: ["argocd-sync-applications/action.yml"],
       matchPackageNames: [
         "quay.io/argoproj/argocd",
