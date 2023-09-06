@@ -15,7 +15,7 @@ jobs:
     runs-on: ${{ matrix.label }}
     timeout-minutes: 10
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Install if required common software tooling
       uses: ./common-tooling
     - name: Check that installed software is available
