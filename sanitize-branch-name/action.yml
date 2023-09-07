@@ -30,4 +30,4 @@ runs:
     id: sanitize
     shell: bash
     run: |
-      echo "branch_name=$(${{ github.action_path }}/sanitize.sh ${{ inputs.branch }} ${{ inputs.max_length }})" >> "$GITHUB_OUTPUT"
+      echo "branch_name=$(${{ github.action_path }}/sanitize.sh '${{ inputs.branch }}' ${{ inputs.max_length }})" >> "$GITHUB_OUTPUT"
