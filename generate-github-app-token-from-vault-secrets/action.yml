@@ -82,7 +82,7 @@ runs:
         }}
   - name: Generate a Github App token
     id: github-token
-    uses: tibdex/github-app-token@v1
+    uses: tibdex/github-app-token@v2
     with:
       app_id: ${{ steps.app-id.outputs.id }}
       private_key: ${{ steps.app-private-key.outputs.private-key }}
