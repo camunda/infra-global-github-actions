@@ -192,7 +192,7 @@ runs:
   - name: Set up QEMU
     if: ${{ inputs.qemu-enabled == 'true' }}
     id: qemu
-    uses: docker/setup-qemu-action@v2
+    uses: docker/setup-qemu-action@v3
     with:
       image: ${{ inputs.qemu-image }}
       platforms: ${{ inputs.qemu-platforms }}
