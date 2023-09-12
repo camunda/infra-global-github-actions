@@ -117,7 +117,7 @@ runs:
       driver: ${{ inputs.buildx_driver }}
 
   - name: Login to Docker registry
-    uses: docker/login-action@v2
+    uses: docker/login-action@v3
     # Only attempt login when we want to push. This avoids depending on a 3rd
     # party service when not needed. In case the registry is unavailable
     # the non-push builds will continue to be green.
