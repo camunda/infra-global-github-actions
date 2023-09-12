@@ -88,7 +88,7 @@ runs:
 
   - name: Calculate Docker image name
     id: meta
-    uses: docker/metadata-action@v4
+    uses: docker/metadata-action@v5
     with:
       images: |
         ${{ inputs.registry_host }}/${{ inputs.image_name }}
