@@ -80,7 +80,14 @@ runs:
     shell: bash
     run: |-
       echo "::group::wait for sync"
-      argocd app wait ${{ inputs.app_name }} --timeout 1200 --health
+      i=1
+      until argocd app wait ${{ inputs.app_name }} --timeout 1200 --health \
+        || [ $i -gt 5 ];
+      do
+        echo Retry $i ...
+        sleep 1
+        ((i++))
+      done
       echo "::endgroup::"
     env:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
