@@ -98,7 +98,7 @@ runs:
         fi
         echo "Retry $i ..."
         ((i++))
-        sleep 1
+        sleep 5
       done
       echo "::endgroup::"
     env:
