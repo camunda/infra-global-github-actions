@@ -80,13 +80,25 @@ runs:
     shell: bash
     run: |-
       echo "::group::wait for sync"
+      # Wait for the ArgoCD app to reach a synced and healthy state
+      # Retry if error code = PermissionDenied, as this may be a consistency problem
       i=1
-      until argocd app wait ${{ inputs.app_name }} --timeout 1200 --health \
-        || [ $i -gt 5 ];
+      until \
+        error=$(argocd app wait ${{ inputs.app_name }} --timeout 1200 --health 3>&2 2>&1 1>&3);
       do
-        echo Retry $i ...
-        sleep 1
+        error_code=$?
+        echo "$error" 1>&2
+        # Check if PermissionDenied error
+        if ! echo "$error" | grep "code = PermissionDenied" > /dev/null; then
+          exit $error_code
+        fi
+        # Exit after 5 attempts
+        if [ $i -ge 5 ]; then
+          exit $error_code
+        fi
+        echo "Retry $i ..."
         ((i++))
+        sleep 1
       done
       echo "::endgroup::"
     env:
