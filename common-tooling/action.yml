@@ -9,7 +9,7 @@ inputs:
     default: 'false'
   node-version:
     description: 'Version Spec of the version to use. Examples: 12.x, 10.15.1, >=10.15.0.'
-    default: '16' # used by a lot of actions as default
+    default: '20' # used by a lot of actions as default
   node-version-file:
     description: 'File containing the version Spec of the version to use.  Examples: .nvmrc, .node-version, .tool-versions.'
   node-architecture:
