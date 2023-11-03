@@ -13,16 +13,16 @@ This action is owned by Infra team.
 
 Here is the list of the possible inputs and whether they are required or not:
 
-| Input                | Description                                                                                                                | Required           | Default | Possible values        | Conditions                        |
-|----------------------|----------------------------------------------------------------------------------------------------------------------------|--------------------|---------|------------------------|-----------------------------------|
-| **gcp_credentials**  | The JSON key for accessing the bucket where to store the uploaded artifact. You need to approach Infra team to obtain it.  | :heavy_check_mark: |         |                        |                                   |
-| **ee**               | Boolean value, if `true` means that it is an `enterprise` artifact.                                                        | :x:                | `false` | `true`  `false`        |                                   |
-| **env**              | The DC environment to upload the artifact to.                                                                              | :x:                | `prod`  | `prod`  `stage`  `dev` |                                   |
-| **version**          | Version of the artifact.                                                                                                   | :x:                |         |                        |                                   |
-| **sub_version**      | Patch version of the artifact.                                                                                             | :x:                |         |                        |                                   |
-| **artifact_subpath** | Sub-path of the artifact in Download center.                                                                               | :x:                |         |                        | should not start or end with `/`. |
-| **artifact_file**    | The artifact(s). Can be a wildcard (*) or space separated list or single string                                                                                                              | :heavy_check_mark: |         |                        |                                   |
-
+| Input                | Description                                                                                                               | Required           | Default | Possible values        | Conditions                        |
+|----------------------|---------------------------------------------------------------------------------------------------------------------------|--------------------|---------|------------------------|-----------------------------------|
+| **gcp_credentials**  | The JSON key for accessing the bucket where to store the uploaded artifact. You need to approach Infra team to obtain it. | :heavy_check_mark: |         |                        |                                   |
+| **ee**               | Boolean value, if `true` means that it is an `enterprise` artifact.                                                       | :x:                | `false` | `true`  `false`        |                                   |
+| **env**              | The DC environment to upload the artifact to.                                                                             | :x:                | `prod`  | `prod`  `stage`  `dev` |                                   |
+| **version**          | Version of the artifact.                                                                                                  | :x:                |         |                        |                                   |
+| **sub_version**      | Patch version of the artifact.                                                                                            | :x:                |         |                        |                                   |
+| **artifact_subpath** | Sub-path of the artifact in Download center.                                                                              | :x:                |         |                        | should not start or end with `/`. |
+| **artifact_file**    | The artifact(s). Can be a wildcard (*) or space separated list or single string                                           | :heavy_check_mark: |         |                        |                                   |
+| **use_repo_name**    | Boolean value, if 'true' it included the repository name on the upload path                                               | :x:                | `true`  |  `true`  `false`       |                                   |
 
 ## Input usage
 
