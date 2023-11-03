@@ -25,11 +25,10 @@ inputs:
   artifact_file:
     description: Artifact(s) to upload. E.g. can contain a wildcard (*) or space separated string
     required: true
-  use_repo_name:
+  repo_name:
     description: Variable which indicates whether the name of the repository should be included in the upload subpath.
-    default: 'true'
-    required: true
-
+    default: ${{github.repository}}
+    required: false
 
 runs:
   using: "composite"
@@ -76,7 +75,7 @@ runs:
       echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       # DC main repository
-      dc_repo="$(echo ${{github.repository}} | cut -d'/' -f2)"
+      dc_repo="$(echo ${{inputs.repo_name}} | cut -d'/' -f2)"
       echo "dc_repo=${dc_repo}" >> "$GITHUB_OUTPUT"
 
   - name: Authenticate to Google Cloud
@@ -90,11 +89,8 @@ runs:
   - name: Upload files
     shell: bash
     run: |
-      if [[ "${{inputs.use_repo_name}}" == 'true' ]]; then
-        gsutil -m cp ${{ inputs.artifact_file }} gs://${{ steps.variables.outputs.bucket_name }}/${{ steps.variables.outputs.dc_repo }}/${{ steps.variables.outputs.subpath }}${{ steps.variables.outputs.version }}${{ steps.variables.outputs.subversion }}
-      else
-        gsutil -m cp ${{ inputs.artifact_file }} gs://${{ steps.variables.outputs.bucket_name }}/${{ steps.variables.outputs.subpath }}${{ steps.variables.outputs.version }}${{ steps.variables.outputs.subversion }}
-      fi
+      gsutil -m cp ${{ inputs.artifact_file }} gs://${{ steps.variables.outputs.bucket_name }}/${{ steps.variables.outputs.dc_repo }}/${{ steps.variables.outputs.subpath }}${{ steps.variables.outputs.version }}${{ steps.variables.outputs.subversion }}
+
 branding:
   icon: upload
   color: orange
