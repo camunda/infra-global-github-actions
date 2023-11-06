@@ -50,7 +50,7 @@ The action uses several inputs to determine the path to the uploaded artifact in
 
 The path construction takes into account the presence or absence of these inputs:
 
-1. If the inputs **artifact_subpath**, **version**, **sub_version** and **repo_name**  are set, the path follows this pattern:
+If the inputs **artifact_subpath**, **version**, **sub_version** and **repo_name**  are set, the path follows this pattern:
 
 ```bash
 # Pattern
@@ -137,11 +137,11 @@ steps:
       env: 'dev'
       version: 0.1
       sub_version: 0.1.1
-      artifact_subpath: 'camunda-bpm-rpa-bridge-ee/tomcat'
+      artifact_subpath: 'tomcat'
       artifact_file: 'file.txt'
       repo_name: 'cam-bpm'
 ```
 
-This request uploads the enterprise artifact ('file.txt') to the development environment in the Camunda Download Center under the specified path:
+This request uploads the enterprise artifact ('file.txt') to the development environment replacing the original repository name to **cam-bpm**. The file can be found in the the Camunda Download Center under the specified path:
 
 https://dev.downloads.camunda.cloud/enterprise-release/cam-bpm/tomcat/0.1/v0.1.1/file.txt
