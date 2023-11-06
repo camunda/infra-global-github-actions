@@ -26,7 +26,7 @@ inputs:
     description: Artifact(s) to upload. E.g. can contain a wildcard (*) or space separated string
     required: true
   repo_name:
-    description: Variable which indicates whether the name of the repository should be included in the upload subpath.
+    description: Variable which indicates the name of the repository which should be included in the upload subpath.
     default: ${{github.repository}}
     required: false
 
