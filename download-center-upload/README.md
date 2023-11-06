@@ -13,16 +13,16 @@ This action is owned by Infra team.
 
 Here is the list of the possible inputs and whether they are required or not:
 
-| Input                | Description                                                                                                               | Required           | Default | Possible values        | Conditions                        |
-|----------------------|---------------------------------------------------------------------------------------------------------------------------|--------------------|---------|------------------------|-----------------------------------|
-| **gcp_credentials**  | The JSON key for accessing the bucket where to store the uploaded artifact. You need to approach Infra team to obtain it. | :heavy_check_mark: |         |                        |                                   |
-| **ee**               | Boolean value, if `true` means that it is an `enterprise` artifact.                                                       | :x:                | `false` | `true`  `false`        |                                   |
-| **env**              | The DC environment to upload the artifact to.                                                                             | :x:                | `prod`  | `prod`  `stage`  `dev` |                                   |
-| **version**          | Version of the artifact.                                                                                                  | :x:                |         |                        |                                   |
-| **sub_version**      | Patch version of the artifact.                                                                                            | :x:                |         |                        |                                   |
-| **artifact_subpath** | Sub-path of the artifact in Download center.                                                                              | :x:                |         |                        | should not start or end with `/`. |
-| **artifact_file**    | The artifact(s). Can be a wildcard (*) or space separated list or single string                                           | :heavy_check_mark: |         |                        |                                   |
-| **use_repo_name**    | Boolean value, if 'true' it included the repository name on the upload path                                               | :x:                | `true`  |  `true`  `false`       |                                   |
+| Input            | Description                                                                                                               | Required           | Default                                            | Possible values        | Conditions                        |
+|------------------|---------------------------------------------------------------------------------------------------------------------------|--------------------|----------------------------------------------------|------------------------|-----------------------------------|
+| **gcp_credentials** | The JSON key for accessing the bucket where to store the uploaded artifact. You need to approach Infra team to obtain it. | :heavy_check_mark: |                                                    |                        |                                   |
+| **ee**           | Boolean value, if `true` means that it is an `enterprise` artifact.                                                       | :x:                | `false`                                            | `true`  `false`        |                                   |
+| **env**          | The DC environment to upload the artifact to.                                                                             | :x:                | `prod`                                             | `prod`  `stage`  `dev` |                                   |
+| **version**      | Version of the artifact.                                                                                                  | :x:                |                                                    |                        |                                   |
+| **sub_version**  | Patch version of the artifact.                                                                                            | :x:                |                                                    |                        |                                   |
+| **artifact_subpath** | Sub-path of the artifact in Download center.                                                                              | :x:                |                                                    |                        | should not start or end with `/`. |
+| **artifact_file** | The artifact(s). Can be a wildcard (*) or space separated list or single string                                           | :heavy_check_mark: |                                                    |                        |                                   |
+| **repo_name**    | The name of the repository of the project for which you wanna upload artifacts for.                                       | :x:                | The name of the repository which calls this action |        |                                   |
 
 ## Input usage
 
@@ -41,17 +41,20 @@ to Enterprise customers. Thus, we should be careful that nothing is accidentally
 
 The artifact itself will be passed to the action throw the `artifact_file` input.
 
-The path to the uploaded artifact in DC will be created from the following inputs:
+The action uses several inputs to determine the path to the uploaded artifact in the Camunda Download Center (DC). These inputs include:
 
 - artifact_subpath
 - version
 - sub_version
+- repo_name
 
-The path will be as following if all the mentioned inputs are set:
+The path construction takes into account the presence or absence of these inputs:
+
+1. If the inputs **artifact_subpath**, **version**, **sub_version** and **repo_name**  are set, the path follows this pattern:
 
 ```bash
 # Pattern
-github_repository_name/artifact_subpath/version/sub_version/artifact_file
+repo_name/artifact_subpath/version/sub_version/artifact_file
 # e.g
 camunda-bpm-rpa-bridge-ee/tomcat/0.1/0.1.1/artifact.zip
 ```
@@ -60,7 +63,7 @@ The path will be as following if none of the mentioned inputs are set:
 
 ```bash
 # Pattern
-github_repository_name/artifact_file
+default_github_repository_name/artifact_file
 # e.g
 camunda-bpm-rpa-bridge-ee/artifact.zip
 ```
@@ -81,7 +84,7 @@ secret/data/common/jenkins/downloads-camunda-cloud_google_sa_key DEV_DOWNLOAD_CE
 
 Please check the `Import Secrets` Step in the example below on how you will get the credential.
 
-## Example of using the action
+## Example 1: Upload Enterprise Artifact to Camunda Download Center (Dev)
 
 ```yaml
     steps:
@@ -110,3 +113,35 @@ Please check the `Import Secrets` Step in the example below on how you will get 
 
 Based on the previous example: you can find the
 artifact under this path [https://dev.downloads.camunda.cloud/enterprise-release/camunda-bpm-rpa-bridge-ee/tomcat/0.1/v0.1.1/file.txt]().
+
+## Example 2: Uploading an Enterprise Artifact with Custom Repository Name
+
+```yaml
+steps:
+  - name: Import Secrets
+    id: secrets
+    uses: hashicorp/vault-action@v2.5.0
+    with:
+      url: ${{ secrets.VAULT_ADDR }}
+      method: approle
+      roleId: ${{ secrets.VAULT_ROLE_ID }}
+      secretId: ${{ secrets.VAULT_SECRET_ID }}
+      secrets: |
+          secret/data/common/jenkins/downloads-camunda-cloud_google_sa_key DEV_DOWNLOAD_CENTER_GCLOUD_KEY_BYTES | GCP_CREDENTIALS_NAME;
+
+  - name: Upload Enterprise Artifact to Camunda Download Center (Dev)
+    uses: camunda/infra-global-github-actions/download-center-upload@main
+    with:
+      gcp_credentials: ${{ steps.secrets.outputs.GCP_CREDENTIALS_NAME }}
+      ee: 'true'
+      env: 'dev'
+      version: 0.1
+      sub_version: 0.1.1
+      artifact_subpath: 'camunda-bpm-rpa-bridge-ee/tomcat'
+      artifact_file: 'file.txt'
+      repo_name: 'cam-bpm'
+```
+
+This request uploads the enterprise artifact ('file.txt') to the development environment in the Camunda Download Center under the specified path:
+
+https://dev.downloads.camunda.cloud/enterprise-release/cam-bpm/tomcat/0.1/v0.1.1/file.txt
