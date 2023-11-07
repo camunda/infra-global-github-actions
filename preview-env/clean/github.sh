@@ -224,7 +224,8 @@ function get_pull_requests_by_states_with_last_100_comments {
       "${state_fields[@]}" \
       --field "query=@$RELATIVE_SCRIPT_PATH/graphql/query_get_pull_requests_by_states_with_last_100_comments.gql" |
       jq -s \
-        '[.[].data.repository.pullRequests.nodes[]]'
+        '[.[].data.repository.pullRequests.nodes[]] |
+         (.[].comments.nodes[] | select(.body | length > 1000)).body |= .[0:980] + " ... (truncated)"'
   )
 
   echo "$results"
