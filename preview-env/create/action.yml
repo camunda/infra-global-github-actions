@@ -69,9 +69,40 @@ runs:
   - name: Deploy
     shell: bash
     run: >-
-      argocd app create ${{ inputs.argocd_arguments }}
+      if argocd app create ${{ inputs.argocd_arguments }}; then
+        echo "Creating argo cd app with name ${{ inputs.app_name }}"
 
-      argocd app sync ${{ inputs.app_name }} --async --force || true
+        # Record the start time
+        start_time=$(date +%s)
+
+        # Wait for the app to be registered
+        while true; do
+          echo "Printing app info: "
+          app_info=$(argocd app get ${{ inputs.app_name }} --output json 2>/dev/null)
+          echo "$app_info"
+
+          if [ $? -eq 0 ]; then
+            echo "App registered successfully."
+            break
+          else
+            current_time=$(date +%s)
+            elapsed_time=$((current_time - start_time))
+
+            echo "Waiting for app registration... Elapsed time: $elapsed_time seconds"
+
+            # Check if 5 minutes (300 seconds) have passed
+            if [ $elapsed_time -ge 300 ]; then
+                echo "The argo cd app with name ${{ inputs.argocd_arguments }} failed to register within 5 minutes."
+                exit 1
+            fi
+          fi
+        done
+        echo "Syncing argo cd app..."
+        argocd app sync ${{ inputs.app_name }} --async --force || true
+      else
+        echo "argocd app creation failed. Exiting workflow."
+        exit 1
+      fi
     env:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
       ARGOCD_OPTS: "--grpc-web"
