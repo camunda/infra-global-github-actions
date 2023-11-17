@@ -80,6 +80,7 @@ runs:
             app_info=$(argocd app get ${{ inputs.app_name }} --output json 2>/dev/null)
             get_status_status=$?
             if [ $get_status_status -eq 0 ] && [ -n "$app_info" ]; then
+              echo "App Info: $app_info"
               echo "Syncing Argo CD app..."
 
               argocd app sync ${{ inputs.app_name }} --async --force || true
