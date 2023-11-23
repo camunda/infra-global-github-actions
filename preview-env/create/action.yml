@@ -74,7 +74,7 @@ runs:
           argocd app create ${{ inputs.argocd_arguments }}
           if [ $? -eq 0 ]; then
             echo "Creating Argo CD app with name ${{ inputs.app_name }}"
-            sleep 60
+            sleep 10
 
             # Fetch app information to make sure the app is registered
             app_info=$(argocd app get ${{ inputs.app_name }} --output json 2>/dev/null)
