@@ -127,5 +127,5 @@ runs:
       LABELS: ${{ inputs.labels }}
       PULL_REQUEST: ${{ inputs.pull-request }}
     run: |
-      bash ${{ github.action_path }}/limited-cleanup.sh
+      bash -x ${{ github.action_path }}/limited-cleanup.sh
     shell: bash
