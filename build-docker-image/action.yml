@@ -135,6 +135,7 @@ runs:
       context: ${{ inputs.build_context }}
       builder: ${{ steps.buildx.output.name }}
       build-args: ${{ inputs.build_args }}
+      provenance: false
       push: ${{ env.SHOULD_WE_PUSH }}
       tags: ${{ steps.meta.outputs.tags }}
       labels: ${{ steps.meta.outputs.labels }}
