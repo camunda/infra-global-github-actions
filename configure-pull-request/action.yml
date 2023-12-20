@@ -29,7 +29,7 @@ runs:
   steps:
     - name: Set labels
       if: ${{ inputs.labels != '' }}
-      uses: buildsville/add-remove-label@v2.0.0
+      uses: buildsville/add-remove-label@v2.0.1
       with:
         labels: ${{ inputs.labels }}
         token: ${{ inputs.github-token }}
