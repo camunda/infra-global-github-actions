@@ -250,7 +250,7 @@ runs:
       cache-path-add: ${{ inputs.java-cache-path-add }}
   # Install Python, it's absent on self-hosted runners
   - name: Install Python3
-    uses: actions/setup-python@v4
+    uses: actions/setup-python@v5
     if: ${{ inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:
       python-version: ${{ inputs.python-version }}
