@@ -1,8 +1,27 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: [
-    "github>camunda/infra-renovate-config:default.json5"
+    "config:recommended",
+    ":automergeDisabled",
+    ":semanticCommits",
+    ":dependencyDashboard",
+    ":enablePreCommit",
+    // cannot use shared config, it's in a private repo (https://github.com/renovatebot/renovate/discussions/26300):
+    // "github>camunda/infra-renovate-config:default.json5"
   ],
+  schedule: ["every weekend"],
+  platformAutomerge: false,
+  separateMajorMinor: false,
+  commitBodyTable: true,
+  major: {
+    enabled: true,
+  },
+  minor: {
+    enabled: true,
+  },
+  patch: {
+    enabled: true,
+  },
   customManagers: [
     {
       customType: "regex",
@@ -14,6 +33,12 @@
     },
   ],
   packageRules: [
+    {
+      matchUpdateTypes: ["minor", "patch"],
+      matchManagers: ["github-actions"],
+      addLabels: ["automerge"],
+      automerge: true,
+    },
     // For known Github repositories that use Github tags/releases of format
     // "v1.2.3" and where the asdf plugin ignores the "v" prefix, we also tell
     // Renovate to ignore it via extractVersion when updating .tool-version file
