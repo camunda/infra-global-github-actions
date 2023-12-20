@@ -56,12 +56,17 @@ runs:
 
   - name: Login to Google Cloud
     id: auth
-    uses: google-github-actions/auth@v1.1.1
+    uses: google-github-actions/auth@v2
     with:
       credentials_json: '${{ inputs.gcp_credentials_json }}'
 
   - name: Setup Google Cloud SDK
-    uses: google-github-actions/setup-gcloud@v1.1.1
+    uses: google-github-actions/setup-gcloud@v2
+
+  - name: Print Google Cloud SDK version used
+    shell: bash
+    run: |
+      gcloud info
 
   - name: Submit build status to CI Analytics
     shell: bash
