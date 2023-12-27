@@ -33,11 +33,28 @@
     },
   ],
   packageRules: [
+    // limit the PR creation for the Renovate pre-commit hook (it's released very frequently)
+    {
+      matchPackageNames: ["renovatebot/pre-commit-hooks"],
+      matchUpdateTypes: ["patch"],
+      enabled: false,
+    },
+    {
+      matchPackageNames: ["renovatebot/pre-commit-hooks"],
+      schedule: ["on Saturday"],
+    },
     {
       matchUpdateTypes: ["minor", "patch"],
       matchManagers: ["github-actions"],
       addLabels: ["automerge"],
       automerge: true,
+    },
+    {
+      matchUpdateTypes: ["major", "minor", "patch"],
+      matchManagers: ["pre-commit"],
+      groupName: "pre-commit hooks",
+      addLabels: ["automerge"],
+      automerge: true
     },
     // For known Github repositories that use Github tags/releases of format
     // "v1.2.3" and where the asdf plugin ignores the "v" prefix, we also tell
