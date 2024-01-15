@@ -9,12 +9,14 @@ inputs:
   repository-name:
     description: The name of the repository in which the job belongs.
     required: true
+    default: ${{github.repository}}
   run-id:
     description: The id of the job run.
     required: true
   repository-owner:
     description: The owner of the github repository.
     required: true
+    default: ${{github.repository_owner}}
 
 runs:
   using: 'composite'
