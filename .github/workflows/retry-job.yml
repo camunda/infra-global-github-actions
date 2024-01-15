@@ -19,17 +19,13 @@ jobs:
     - name: Print something
       if: ${{ cancelled() }}
       run: |
-        # Get the run ID of the workflow that just completed
-        RUN_ID=$(echo $GITHUB_EVENT_PATH | jq -r .workflow_run.id)
-
         # Fetch information about the workflow run
-        API_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${RUN_ID}"
+        API_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
         WORKFLOW_RUN=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" $API_URL)
 
         # Extract information needed for rerun
         REPO_OWNER=$(echo $WORKFLOW_RUN | jq -r .repository.owner.login)
-        REPO_NAME=$(echo $WORKFLOW_RUN | jq -r .repository.name)
 
         # Rerun failed jobs
-        RERUN_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/actions/runs/${RUN_ID}/rerun-failed-jobs"
+        RERUN_URL="https://api.github.com/repos/${GITHUB_REPOSITORY_OWNER}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/rerun-failed-jobs"
         curl -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" $RERUN_URL
