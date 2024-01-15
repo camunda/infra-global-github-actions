@@ -6,17 +6,6 @@ inputs:
   github-token:
     description: The token used for authentication to github.
     required: true
-  repository-name:
-    description: The name of the repository in which the job belongs.
-    required: true
-    default: ${{github.repository}}
-  run-id:
-    description: The id of the job run.
-    required: true
-  repository-owner:
-    description: The owner of the github repository.
-    required: true
-    default: ${{github.repository_owner}}
 
 runs:
   using: 'composite'
@@ -29,23 +18,23 @@ runs:
       run: |
         echo "github token"
         echo ${{ github.event.client_payload.github-token }}
+        echo $GITHUB_TOKEN
         
         echo "repo name"
-        echo ${{ github.event.client_payload.repository-name }}
+        echo $GITHUB_REPOSITORY
         
         echo "run id"
-        echo ${{ github.event.client_payload.run-id }}
         echo $GITHUB_RUN_ID
         
         echo "repo owner"
-        echo ${{ github.event.client_payload.repository-owner }}       
+        echo $GITHUB_REPOSITORY_OWNER      
         
         # Fetch information about the workflow run
         echo "Fetching current workflow run"
-        API_URL="https://api.github.com/repos/${{ inputs.repository-name }}/actions/runs/${{ inputs.run-id }}"
+        API_URL="https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
         WORKFLOW_RUN=$(curl -s -H "Authorization: Bearer ${{ inputs.github-token }}" $API_URL)
         
         # Rerun failed jobs
         echo "Rerunning failed job"
-        RERUN_URL="https://api.github.com/repos/${{ github.repository-owner }}/${{ github.repository-name }}/actions/runs/${{ inputs.run-id }}/rerun-failed-jobs"
+        RERUN_URL="https://api.github.com/repos/$GITHUB_REPOSITORY_OWNER/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/rerun-failed-jobs"
         curl -X POST -H "Authorization: Bearer ${{ inputs.github-token }}" $RERUN_URL
