@@ -20,12 +20,11 @@ jobs:
       if: ${{ cancelled() }}
       run: |
         # Fetch information about the workflow run
+        echo "fetching current workflow run"
         API_URL="https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
         WORKFLOW_RUN=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" $API_URL)
-
-        # Extract information needed for rerun
-        REPO_OWNER=$(echo $WORKFLOW_RUN | jq -r .repository.owner.login)
-
+        
         # Rerun failed jobs
+        echo "rerunning failed job"
         RERUN_URL="https://api.github.com/repos/${GITHUB_REPOSITORY_OWNER}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/rerun-failed-jobs"
         curl -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" $RERUN_URL
