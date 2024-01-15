@@ -13,6 +13,17 @@ runs:
     - name: Checkout repository
       uses: actions/checkout@v2
 
+    - name: Retry with api
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+      run:  |
+        gh api \
+        --method POST \
+        -H "Accept: application/vnd.github+json" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        /repos/$GITHUB_REPOSITORY_OWNER/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/rerun
+
     - name: Retry on Cancel
       shell: bash
       env:
