@@ -36,10 +36,9 @@ runs:
         API_URL="https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
         WORKFLOW_RUN=$(curl -s -H "Authorization: Bearer ${{ inputs.github-token }}" $API_URL)
         
-        # Rerun failed jobs
-        echo "Rerunning failed job" 
+        echo "Rerunning job" 
         gh api \
           --method POST \
           -H "Accept: application/vnd.github+json" \
           -H "X-GitHub-Api-Version: 2022-11-28" \
-          /repos/$GITHUB_REPOSITORY_OWNER/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/rerun-failed-jobs
+          /repos/$GITHUB_REPOSITORY_OWNER/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/rerun
