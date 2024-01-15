@@ -35,6 +35,7 @@ runs:
         
         echo "run id"
         echo ${{ github.event.client_payload.run-id }}
+        echo $GITHUB_RUN_ID
         
         echo "repo owner"
         echo ${{ github.event.client_payload.repository-owner }}       
