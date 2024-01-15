@@ -16,12 +16,9 @@ runs:
     - name: Retry on Cancel
       shell: bash
       env:
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ inputs.github-token }}
       run: |
-        echo "github token"
-        echo ${{ github.event.client_payload.github-token }}
-        echo $GITHUB_TOKEN
-        
+       
         echo "repo name"
         echo $GITHUB_REPOSITORY
         
