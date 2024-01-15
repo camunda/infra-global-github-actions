@@ -16,7 +16,7 @@ runs:
     - name: Retry with api
       shell: bash
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ inputs.github-token }}
       run:  |
           echo "repo name:"
           echo $GITHUB_REPOSITORY
