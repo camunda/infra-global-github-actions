@@ -12,9 +12,11 @@ jobs:
       uses: actions/checkout@v2
 
     - name: Print Hello World
-      run: echo "Hello, World!"
+      run: | 
+        echo "Hello, World!"
+        sleep 20
 
-    - name: Print Hello World
+    - name: Print something
       if: ${{ cancelled() }}
       run: |
         # Get the run ID of the workflow that just completed
