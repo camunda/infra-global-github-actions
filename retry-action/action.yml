@@ -18,26 +18,14 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github-token }}
       run:  |
-        gh api \
-        --method POST \
-        -H "Accept: application/vnd.github+json" \
-        -H "X-GitHub-Api-Version: 2022-11-28" \
-        /repos/$GITHUB_REPOSITORY_OWNER/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/rerun
-
-    - name: Retry on Cancel
-      shell: bash
-      env:
-        GH_TOKEN: ${{ inputs.github-token }}
-      run: |
-       
-        echo "repo name"
-        echo $GITHUB_REPOSITORY
-        
-        echo "run id"
-        echo $GITHUB_RUN_ID
-        
-        echo "repo owner"
-        echo $GITHUB_REPOSITORY_OWNER      
-        
-        echo "Rerunning job" 
-        gh run rerun $GITHUB_RUN_ID --failed
+          echo "repo name:"
+          echo $GITHUB_REPOSITORY
+          
+          echo "run id:"
+          echo $GITHUB_RUN_ID
+          
+          gh api \
+          --method POST \
+          -H "Accept: application/vnd.github+json" \
+          -H "X-GitHub-Api-Version: 2022-11-28" \
+          /repos/"$GITHUB_REPOSITORY"/actions/runs/"$GITHUB_RUN_ID"/rerun-failed-jobs
