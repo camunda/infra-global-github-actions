@@ -31,10 +31,5 @@ runs:
         echo "repo owner"
         echo $GITHUB_REPOSITORY_OWNER      
         
-        # Fetch information about the workflow run
-        echo "Fetching current workflow run"
-        API_URL="https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
-        WORKFLOW_RUN=$(curl -s -H "Authorization: Bearer ${{ inputs.github-token }}" $API_URL)
-        
         echo "Rerunning job" 
-        gh run rerun $GITHUB_RUN_ID
+        gh run rerun $GITHUB_RUN_ID --failed
