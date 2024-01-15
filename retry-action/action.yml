@@ -1,0 +1,27 @@
+name: 'Retry Failed Job'
+
+description: 'Rerun failed jobs if the workflow has failed.'
+
+inputs:
+  github-token:
+    description: 'GitHub Token'
+    required: true
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Retry on Cancel
+      shell: bash
+      run: |
+        # Fetch information about the workflow run
+        echo "Fetching current workflow run"
+        API_URL="https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+        WORKFLOW_RUN=$(curl -s -H "Authorization: Bearer ${{ inputs.github-token }}" $API_URL)
+        
+        # Rerun failed jobs
+        echo "Rerunning failed job"
+        RERUN_URL="https://api.github.com/repos/${{ github.repository_owner }}/${{ github.repository }}/actions/runs/${{ github.run_id }}/rerun-failed-jobs"
+        curl -X POST -H "Authorization: Bearer ${{ inputs.github-token }}" $RERUN_URL
