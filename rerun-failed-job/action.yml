@@ -23,6 +23,11 @@ inputs:
     description: The secret id for vault
     required: false
 
+outputs:
+  token:
+    description: The generated GitHub token
+    value: ${{ steps.github-token.outputs.token }}
+
 runs:
   using: composite
   steps:
@@ -35,7 +40,7 @@ runs:
       shell: bash
 
     - name: Import Secrets
-      id: secrets
+      id: vault-secrets
       uses: hashicorp/vault-action@affa6f04da5c2d55e6e115b7d1b044a6b1af8c74 # v2.7.4
       with:
         url: ${{ inputs.vault-addr }}
@@ -44,14 +49,24 @@ runs:
         secretId: ${{ inputs.vault-secret-id }}
         secrets: |
           secret/data/products/test RETRIGGER_APP_ID;
-          secret/data/products/test RETRIGGER_APP_KEY;      
+          secret/data/products/test RETRIGGER_APP_KEY;    
+          
+
+    - name: Echo
+      shell: bash
+      run: |
+        sleep 60
+        echo "secrets"
+        echo ${{ steps.vault-secrets }}
+        echo "outputs"
+        echo ${{ steps.vault-secrets.outputs }}
 
     - name: Generate a GitHub token
       id: github-token
       uses: tibdex/github-app-token@v2
       with:
-        app_id: ${{ steps.secrets.outputs.RETRIGER_APP_ID }}
-        private_key: ${{ steps.secrets.outputs.RETRIGGER_APP_KEY }}
+        app_id: ${{ steps.vault-secrets.outputs.RETRIGER_APP_ID }}
+        private_key: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_KEY }}
 
     - name: Retrigger run
       env:
