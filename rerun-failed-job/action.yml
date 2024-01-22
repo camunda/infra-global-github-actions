@@ -1,5 +1,18 @@
 ---
-name: Rerun failed job
+name: Rerun failed run
+
+description: Rerun a run which has failed
+
+inputs:
+  run-id:
+    description: The id of the run we wanna re-trigger.
+    required: true
+  repository:
+    description: The name of the repository in which the run exists.
+    required: true
+  error-message:
+    description: The error message which we want to test against
+    required: true
 
 runs:
   using: composite
@@ -29,4 +42,4 @@ runs:
       shell: bash
       run: |
         echo ${{ steps.github-token.outputs.token }} | gh auth login --with-token
-        gh workflow run rerunfailedjob.yml -R camunda/infra-test-retrying-failed-actions --ref=main -F run_id=${{ github.run_id }} -F repository=${{ github.repository }} -F error_message="Process completed with exit code 1."
+        gh workflow run rerunfailedjob.yml -R camunda/infra-test-retrying-failed-actions --ref=main -F run_id=${{ inputs.run-id }} -F repository=${{ inputs.repository }} -F error_message=${{ inputs.error-message }}
