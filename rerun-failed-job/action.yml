@@ -27,6 +27,9 @@ outputs:
   token:
     description: The generated GitHub token
     value: ${{ steps.github-token.outputs.token }}
+  RETRIGGER_APP_ID:
+    description: The generated GitHub token
+    value: ${{ steps.github-token.outputs.token }}
 
 runs:
   using: composite
@@ -50,7 +53,6 @@ runs:
         secrets: |
           secret/data/products/test RETRIGGER_APP_ID;
           secret/data/products/test RETRIGGER_APP_KEY;    
-          
 
     - name: Echo
       shell: bash
@@ -59,13 +61,13 @@ runs:
         echo "secrets"
         echo ${{ steps.vault-secrets }}
         echo "outputs"
-        echo ${{ steps.vault-secrets.outputs }}
+        echo ${{ steps.vault-secrets.outputs.RETRIGGER_APP_ID }}
 
     - name: Generate a GitHub token
       id: github-token
       uses: tibdex/github-app-token@v2
       with:
-        app_id: ${{ steps.vault-secrets.outputs.RETRIGER_APP_ID }}
+        app_id: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_ID }}
         private_key: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_KEY }}
 
     - name: Retrigger run
