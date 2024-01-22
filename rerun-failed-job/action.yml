@@ -36,7 +36,7 @@ runs:
         secretId: ${{ inputs.vault-secret-id }}
         secrets: |
           secret/data/products/infra/ci/team-infrastructure RETRIGGER_APP_ID;
-          secret/data/github.com/apps/retrigger-gha-workflow RETRIGGER_APP_KEY;      
+          secret/data/products/infra/ci/team-infrastructure RETRIGGER_APP_KEY;      
 
     - name: Generate a GitHub token
       id: github-token
