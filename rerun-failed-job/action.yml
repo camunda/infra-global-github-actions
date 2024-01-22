@@ -13,6 +13,9 @@ inputs:
   error-message:
     description: The error message which we want to test against
     required: true
+  secrets:
+    description: JSON wrapped secrets for easier secret passing
+    required: true
   vault-addr:
     description: The url of vault
     required: false
