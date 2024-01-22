@@ -36,7 +36,7 @@ runs:
         app_id: ${{ steps.secrets.outputs.RETRIGER_APP_ID }}
         private_key: ${{ steps.secrets.outputs.RETRIGGER_APP_KEY }}
 
-    - name:
+    - name: Retrigger run
       env:
         GH_DEBUG: api
       shell: bash
