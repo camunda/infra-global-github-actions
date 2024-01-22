@@ -34,14 +34,6 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Do the secrets get passed
-      run:
-        echo "vault address:"
-        echo  ${{ inputs.vault-addr }}
-        echo  ${{ inputs.vault-role-id }}
-        echo  ${{ inputs.vault-secret-id }}
-      shell: bash
-
     - name: Import Secrets
       id: vault-secrets
       uses: hashicorp/vault-action@affa6f04da5c2d55e6e115b7d1b044a6b1af8c74 # v2.7.4
@@ -53,15 +45,6 @@ runs:
         secrets: |
           secret/data/products/test RETRIGGER_APP_ID;
           secret/data/products/test RETRIGGER_APP_KEY;    
-
-    - name: Echo
-      shell: bash
-      run: |
-        sleep 60
-        echo "secrets"
-        echo ${{ steps.vault-secrets }}
-        echo "outputs"
-        echo ${{ steps.vault-secrets.outputs.RETRIGGER_APP_ID }}
 
     - name: Generate a GitHub token
       id: github-token
