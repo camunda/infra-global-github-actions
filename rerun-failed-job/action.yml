@@ -13,27 +13,24 @@ inputs:
   error-message:
     description: The error message which we want to test against
     required: true
-  vault-addr:
-    description: The error message which we want to test against
-    required: true
-  vault-role-id:
-    description: The error message which we want to test against
-    required: true
-  vault-secret-id:
-    description: The error message which we want to test against
-    required: true
 
 runs:
   using: composite
   steps:
+    - name: Do the secrets get passed
+      run:
+        echo "vault address:"
+        echo  ${{ fromJSON(inputs.secrets).VAULT_ADDR }}
+      shell: bash
+
     - name: Import Secrets
       id: secrets
       uses: hashicorp/vault-action@affa6f04da5c2d55e6e115b7d1b044a6b1af8c74 # v2.7.4
       with:
-        url: ${{ inputs.vault-addr }}
+        url: ${{ fromJSON(inputs.secrets).VAULT_ADDR }}
         method: approle
-        roleId: ${{ inputs.vault-role-id }}
-        secretId: ${{ inputs.vault-secret-id }}
+        roleId: ${{ fromJSON(inputs.secrets).VAULT_ROLE_ID }}
+        secretId: ${{ fromJSON(inputs.secrets).VAULT_ROLE_ID }}
         secrets: |
           secret/data/products/test RETRIGGER_APP_ID;
           secret/data/products/test RETRIGGER_APP_KEY;      
