@@ -1,0 +1,32 @@
+---
+name: Rerun failed job
+
+runs:
+  using: composite
+  steps:
+    - name: Import Secrets
+      id: secrets
+      uses: hashicorp/vault-action@affa6f04da5c2d55e6e115b7d1b044a6b1af8c74 # v2.7.4
+      with:
+        url: ${{ secrets.VAULT_ADDR }}
+        method: approle
+        roleId: ${{ secrets.VAULT_ROLE_ID }}
+        secretId: ${{ secrets.VAULT_SECRET_ID }}
+        secrets: |
+          secret/data/github.com/apps/retrigger-gha-workflow RETRIGGER_APP_ID;
+          secret/data/github.com/apps/retrigger-gha-workflow RETRIGGER_APP_KEY;      
+
+    - name: Generate a GitHub token
+      id: github-token
+      uses: tibdex/github-app-token@v2
+      with:
+        app_id: ${{ steps.secrets.outputs.RETRIGER_APP_ID }}
+        private_key: ${{ steps.secrets.outputs.RETRIGGER_APP_KEY }}
+
+    - name:
+      env:
+        GH_DEBUG: api
+      shell: bash
+      run: |
+        echo ${{ steps.github-token.outputs.token }} | gh auth login --with-token
+        gh workflow run rerunfailedjob.yml -R camunda/infra-test-retrying-failed-actions --ref=main -F run_id=${{ github.run_id }} -F repository=${{ github.repository }} -F error_message="Process completed with exit code 1."

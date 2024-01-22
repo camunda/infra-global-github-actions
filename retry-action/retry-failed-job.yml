@@ -9,9 +9,6 @@ on:
       error_message:
         description: Custom error message to look for in the logs.
         required: true
-      app_access_token:
-        description: Github App Access Token
-        required: true
       repository:
         description: Github repository
         required: true

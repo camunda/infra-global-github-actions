@@ -12,7 +12,7 @@ This composite Github Action (GHA) is aimed to be used by the Camunda Infrastruc
 
 ## Usage
 
-This composite GHA can be used in any repository and must be triggered on `pull_request` events.
+This composite GHA can be used in any repository and must be triggered on `pull_request` events.*
 
 ### Inputs
 
