@@ -35,8 +35,8 @@ runs:
         roleId: ${{ inputs.vault-role-id }}
         secretId: ${{ inputs.vault-secret-id }}
         secrets: |
-          secret/data/github.com/apps/retrigger-gha-workflow RETRIGGER_APP_ID;
-          secret/data/github.com/apps/retrigger-gha-workflow RETRIGGER_APP_KEY;      
+          secret/data/products/test RETRIGGER_APP_ID;
+          secret/data/products/test RETRIGGER_APP_KEY;      
 
     - name: Generate a GitHub token
       id: github-token
