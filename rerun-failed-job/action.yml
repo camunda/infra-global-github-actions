@@ -13,6 +13,15 @@ inputs:
   error-message:
     description: The error message which we want to test against
     required: true
+  vault-addr:
+    description: The url of vault
+    required: false
+  vault_role_id:
+    description: The role id for vault
+    required: false
+  vault_secret_id:
+    description: The secret id for vault
+    required: false
 
 runs:
   using: composite
@@ -30,7 +39,7 @@ runs:
         url: ${{ fromJSON(inputs.secrets).VAULT_ADDR }}
         method: approle
         roleId: ${{ fromJSON(inputs.secrets).VAULT_ROLE_ID }}
-        secretId: ${{ fromJSON(inputs.secrets).VAULT_ROLE_ID }}
+        secretId: ${{ fromJSON(inputs.secrets).VAULT_SECRET_ID }}
         secrets: |
           secret/data/products/test RETRIGGER_APP_ID;
           secret/data/products/test RETRIGGER_APP_KEY;      
