@@ -13,6 +13,15 @@ inputs:
   error-message:
     description: The error message which we want to test against
     required: true
+  vault-addr:
+    description: The error message which we want to test against
+    required: true
+  vault-role-id:
+    description: The error message which we want to test against
+    required: true
+  vault-secret-id:
+    description: The error message which we want to test against
+    required: true
 
 runs:
   using: composite
@@ -21,10 +30,10 @@ runs:
       id: secrets
       uses: hashicorp/vault-action@affa6f04da5c2d55e6e115b7d1b044a6b1af8c74 # v2.7.4
       with:
-        url: ${{ secrets.VAULT_ADDR }}
+        url: ${{ inputs.vault-addr }}
         method: approle
-        roleId: ${{ secrets.VAULT_ROLE_ID }}
-        secretId: ${{ secrets.VAULT_SECRET_ID }}
+        roleId: ${{ inputs.vault-role-id }}
+        secretId: ${{ inputs.vault-secret-id }}
         secrets: |
           secret/data/github.com/apps/retrigger-gha-workflow RETRIGGER_APP_ID;
           secret/data/github.com/apps/retrigger-gha-workflow RETRIGGER_APP_KEY;      
