@@ -29,7 +29,9 @@ runs:
     - name: Do the secrets get passed
       run:
         echo "vault address:"
-        echo  ${{ fromJSON(inputs.secrets).VAULT_ADDR }}
+        echo  ${{ inputs.vault-addr }}
+        echo  ${{ inputs.vault-role-id }}
+        echo  ${{ inputs.vault-secret-id }}
       shell: bash
 
     - name: Import Secrets
