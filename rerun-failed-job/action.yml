@@ -13,16 +13,13 @@ inputs:
   error-message:
     description: The error message which we want to test against
     required: true
-  secrets:
-    description: JSON wrapped secrets for easier secret passing
-    required: true
   vault-addr:
     description: The url of vault
     required: false
-  vault_role_id:
+  vault-role-id:
     description: The role id for vault
     required: false
-  vault_secret_id:
+  vault-secret-id:
     description: The secret id for vault
     required: false
 
@@ -39,10 +36,10 @@ runs:
       id: secrets
       uses: hashicorp/vault-action@affa6f04da5c2d55e6e115b7d1b044a6b1af8c74 # v2.7.4
       with:
-        url: ${{ fromJSON(inputs.secrets).VAULT_ADDR }}
+        url: ${{ inputs.addr }}
         method: approle
-        roleId: ${{ fromJSON(inputs.secrets).VAULT_ROLE_ID }}
-        secretId: ${{ fromJSON(inputs.secrets).VAULT_SECRET_ID }}
+        roleId: ${{ inputs.vault-role-id }}
+        secretId: ${{ inputs.vault-secret-id }}
         secrets: |
           secret/data/products/test RETRIGGER_APP_ID;
           secret/data/products/test RETRIGGER_APP_KEY;      
