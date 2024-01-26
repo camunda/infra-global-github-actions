@@ -20,16 +20,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Import Secrets
-        uses: hashicorp/vault-action@v2.7.4
+        id: vault-secrets
+        uses: hashicorp/vault-action@affa6f04da5c2d55e6e115b7d1b044a6b1af8c74 # v2.7.4
         with:
-          url: ${{ secrets.DEV_VAULT_ADDR }}
+          url: ${{ inputs.vault-addr }}
           method: approle
-          roleId: ${{ secrets.DEV_VAULT_ROLE_ID }}
-          secretId: ${{ secrets.DEV_VAULT_SECRET_ID }}
-          exportEnv: false  # we rely on step outputs, no need for environment variables
+          roleId: ${{ inputs.vault-role-id }}
+          secretId: ${{ inputs.vault-secret-id }}
           secrets: |
-            secret/data/github.com/apps/retrigger-gha-workflow RETRIGGER_APP_KEY;
-            secret/data/github.com/apps/retrigger-gha-workflow RETRIGGER_APP_ID; 
+            secret/data/products/test RETRIGGER_APP_ID;
+            secret/data/products/test RETRIGGER_APP_KEY;    
 
       - name: Generate a GitHub token
         id: github-token
