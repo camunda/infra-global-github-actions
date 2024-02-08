@@ -1,0 +1,54 @@
+---
+name: Rerun failed run
+
+description: Rerun a run which has failed
+
+inputs:
+  run-id:
+    description: The id of the run we wanna re-trigger.
+    required: true
+  repository:
+    description: The name of the repository in which the run exists.
+    required: true
+  error-message:
+    description: The error message which we want to test against
+    required: true
+  vault-addr:
+    description: The url of vault
+    required: false
+  vault-role-id:
+    description: The role id for vault
+    required: false
+  vault-secret-id:
+    description: The secret id for vault
+    required: false
+
+runs:
+  using: composite
+  steps:
+    - name: Import Secrets
+      id: vault-secrets
+      uses: hashicorp/vault-action@affa6f04da5c2d55e6e115b7d1b044a6b1af8c74 # v2.7.4
+      with:
+        url: ${{ inputs.vault-addr }}
+        method: approle
+        roleId: ${{ inputs.vault-role-id }}
+        secretId: ${{ inputs.vault-secret-id }}
+        secrets: |
+          secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_ID;
+          secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY;
+
+    - name: Generate a GitHub token
+      id: github-token
+      uses: tibdex/github-app-token@v2
+      with:
+        app_id: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_ID }}
+        private_key: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_KEY }}
+
+    - name: Retrigger run
+      env:
+        GH_DEBUG: api
+      shell: bash
+      run: |
+        echo ${{ steps.github-token.outputs.token }} | gh auth login --with-token
+        gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=main -F run_id=${{ inputs.run-id }} -F repository=${{ inputs.repository }} -F error_message=${{ inputs.error-message }}

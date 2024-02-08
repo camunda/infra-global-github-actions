@@ -35,7 +35,7 @@ jobs:
  rerun-failed-jobs:
     needs:
       - job1
-    if: failure() && fromJSON(github.run_attempt) < 3 #This limit the job to only be retried two times
+    if: failure() && fromJSON(github.run_attempt) < 3 #This limits the job to only be retried two times
     runs-on: ubuntu-latest
     steps:
       - name: Import secrets
