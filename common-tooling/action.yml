@@ -240,7 +240,7 @@ runs:
   # Setup Maven
   - name: Setup Maven Action
     if: ${{ inputs.java-enabled == 'true' && ( env.java_missing == 'true' || inputs.overwrite == 'true' ) }}
-    uses: s4u/setup-maven-action@v1.11.0
+    uses: s4u/setup-maven-action@v1.12.0
     with:
       java-version: ${{ inputs.java-version }}
       java-distribution: ${{ inputs.java-distribution }}
