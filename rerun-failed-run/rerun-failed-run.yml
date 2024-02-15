@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       run_id:
-        description: The id of the run which we want to retrigger
+        description: The ID of the workflow run to retrigger
         required: true
       error_message:
-        description: Custom error message to look for in the logs.
+        description: Custom error message to look for in the logs
         required: true
       repository:
-        description: Github repository
+        description: GitHub repository (ORG/REPO_NAME)
         required: true
 jobs:
   rerun:
@@ -43,23 +43,17 @@ jobs:
           echo ${{ steps.github-token.outputs.token }} | gh auth login --with-token
           echo "Fetching logs for run with id: ${{ inputs.run_id }} from ${{ inputs.repository }} repository."
           # Fetch the logs from the previous run
-          logs=$(gh run view ${{ inputs.run_id }} -R ${{ inputs.repository }} --log)
+          gh config set pager cat
+          logs=$(gh run view ${{ inputs.run_id }} -R ${{ inputs.repository }} --exit-status || true)
           echo "Logs coming from run with id: ${{ inputs.run_id }}"
           echo "$logs"
-          echo "end logs"
-          # Check if the desired string is present in the logs
-          if echo "$logs" | grep -F "${{ inputs.error_message }}" >/dev/null; then
-            count=$(echo "$logs" | grep -F "${{ inputs.error_message }}" | wc -l)
-            echo "count: $count"
-            if [ "$count" -gt 2 ]; then
-                echo "::set-output name=rerun::true"
-                echo "Error message ${{ inputs.error_message }} found more than two times in logs so the previous run has finished with that error."
-            else
-                echo "::set-output name=rerun::false"
-                echo "Error message ${{ inputs.error_message }} found in logs, but not more than one time"
-            fi
+          error_count=$(echo "$logs" | grep -F "${{ inputs.error_message }}" | wc -l)
+          echo "error_count: $error_count"
+          if [ "$error_count" -gt 0 ]; then
+              echo "rerun=true" >>  $GITHUB_OUTPUT
+              echo "Error message ${{ inputs.error_message }} found more than two times in logs so the previous run has finished with that error."
           else
-              echo "::set-output name=rerun::false"
+              echo "rerun=false" >>  $GITHUB_OUTPUT
               echo "Error message $error_message not found in logs"
           fi
 
@@ -69,5 +63,4 @@ jobs:
           GH_DEBUG: api
         run: |
           echo ${{ steps.github-token.outputs.token }} | gh auth login --with-token
-          gh run watch ${{ inputs.run_id }} -R ${{ inputs.repository }} > /dev/null 2>&1
           gh run rerun ${{ inputs.run_id }} -R ${{ inputs.repository }} --failed
