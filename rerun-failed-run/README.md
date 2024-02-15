@@ -8,6 +8,7 @@ id of a run as well as the error message which needs to be targeted.
 The workflow can be invoked with the aid of the github cli from another workflow. In case the calling workflow does not belong in the same repository a
 Github App Token should be generated in order to allow the invokation. For that purpose, a github app is already set up and the necessary `app id` and
 `app key` can be found in the following paths in Vault:
+
 ```
 secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY; 
 secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_ID;
