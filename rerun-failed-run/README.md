@@ -1,14 +1,13 @@
 # rerun-failed-run
 
-This reusable workflow is aimed to target runs which have failed due to a specific error message and retrigger them. To do so, the workflow utilizes the 
-id of a run as well as the error message which needs to be targeted. 
+This reusable workflow is aimed to target runs which have failed due to a specific error message and retrigger them. To do so, the workflow utilizes the
+id of a run as well as the error message which needs to be targeted.
 
 ## Usage
 
-The workflow can be invoked with the aid of the github cli from another workflow. In case the calling workflow does not belong in the same repository a 
-Github App Token should be generated in order to allow the invokation. For that purpose, a github app is already set up and the necessary `app id` and 
+The workflow can be invoked with the aid of the github cli from another workflow. In case the calling workflow does not belong in the same repository a
+Github App Token should be generated in order to allow the invokation. For that purpose, a github app is already set up and the necessary `app id` and
 `app key` can be found in the following paths in Vault:
-
 ```
 secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY; 
 secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_ID;
@@ -67,5 +66,4 @@ below for more information.
         run: |
           echo ${{ steps.github-token.outputs.token }} | gh auth login --with-token
           gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=main -F repository=${{ github.repository }} -F error_message="The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled." -F run_id=${{ github.run_id }}
-
 ```
