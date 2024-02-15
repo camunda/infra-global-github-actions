@@ -10,7 +10,7 @@ Github App Token should be generated in order to allow the invokation. For that 
 `app key` can be found in the following paths in Vault:
 
 ```
-secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY; 
+secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY;
 secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_ID;
 ```
 
@@ -68,6 +68,3 @@ below for more information.
           echo ${{ steps.github-token.outputs.token }} | gh auth login --with-token
           gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=main -F repository=${{ github.repository }} -F error_message="The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled." -F run_id=${{ github.run_id }}
 ```
-
-
-
