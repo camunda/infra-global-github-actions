@@ -68,3 +68,6 @@ below for more information.
           echo ${{ steps.github-token.outputs.token }} | gh auth login --with-token
           gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=main -F repository=${{ github.repository }} -F error_message="The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled." -F run_id=${{ github.run_id }}
 ```
+
+
+
