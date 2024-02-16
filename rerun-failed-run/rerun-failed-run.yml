@@ -50,11 +50,11 @@ jobs:
           error_count=$(echo "$logs" | grep -F "${{ inputs.error_message }}" | wc -l)
           echo "error_count: $error_count"
           if [ "$error_count" -gt 0 ]; then
-              echo "rerun=true" >>  $GITHUB_OUTPUT
-              echo "Error message ${{ inputs.error_message }} found more than two times in logs so the previous run has finished with that error."
+              echo "rerun=true" >> $GITHUB_OUTPUT
+              echo "Error message ${{ inputs.error_message }} found in logs so the previous run has finished with that error."
           else
-              echo "rerun=false" >>  $GITHUB_OUTPUT
-              echo "Error message $error_message not found in logs"
+              echo "rerun=false" >> $GITHUB_OUTPUT
+              echo "Error message ${{ inputs.error_message } not found in logs"
           fi
 
       - name: Rerun run with id ${{ inputs.run_id }} for ${{ inputs.repository }} repository
