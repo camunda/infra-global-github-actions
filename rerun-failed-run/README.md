@@ -11,8 +11,8 @@ secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY;
 secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_ID;
 ```
 
-You can specify how many times you want the workflow to retrigger your job by configuring the number of attempts at the job level. It is crucial to always specify the retry limit to avoid the risk of running in a loop. See the example provided
-below for more information.
+It is crucial to always specify the retry limit to avoid the risk of running in a loop. You can specify how many times you want the workflow to retrigger your job by configuring the number of attempts at the job level.
+See the example provided below for more information.
 
 ## Inputs
 
