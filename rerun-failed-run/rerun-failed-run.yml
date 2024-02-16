@@ -54,7 +54,7 @@ jobs:
               echo "Error message ${{ inputs.error_message }} found in logs so the previous run has finished with that error."
           else
               echo "rerun=false" >> $GITHUB_OUTPUT
-              echo "Error message ${{ inputs.error_message } not found in logs"
+              echo "Error message ${{ inputs.error_message }} not found in logs"
           fi
 
       - name: Rerun run with id ${{ inputs.run_id }} for ${{ inputs.repository }} repository
