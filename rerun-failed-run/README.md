@@ -1,17 +1,17 @@
 # rerun-failed-run
 
-This reusable workflow can be used to retrigger in GitHub Actions workflows to automatically retrigger them if they failed and contain a specific error message in their build logs.
+This reusable workflow can be used in GitHub Actions workflows to automatically retrigger them if they failed and contain a specific error message in their build logs.
 
 ## Usage
 
-The workflow can be invoked with the aid of the GitHub CLI from another workflow. In case the calling workflow does not belong in the same repository the designated GitHub App Token should be generated in order to allow the invocation. For that purpose, a github app is already set up, and its credentials can be found in the following Vault secret paths:
+The workflow can be invoked with the aid of the GitHub CLI from another workflow. In case the calling workflow is not in the same repository, the designated GitHub App Token should be generated to allow the invocation. For that purpose, a GitHub app is already set up, and its credentials can be found in the following Vault secret paths:
 
 ```
 secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY;
 secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_ID;
 ```
 
-You can customize how many times you want the workflow to retrigger your job by configuring the number of attempts in the job level. See th example provided
+You can specify how many times you want the workflow to retrigger your job by configuring the number of attempts at the job level. It is crucial to always specify the retry limit to avoid the risk of running in a loop. See the example provided
 below for more information.
 
 ## Inputs
@@ -26,7 +26,7 @@ below for more information.
 ```yaml
 ---
 jobs:
- rerun:
+ job1:
   runs-on: gcp-core-2-default
   steps:
     - name: Echo dummy text
@@ -35,7 +35,7 @@ jobs:
  rerun-failed-jobs:
     needs:
       - job1
-    if: failure() && fromJSON(github.run_attempt) < 3
+    if: failure() && fromJSON(github.run_attempt) < 3 #This limit the job to only be retried two times
     runs-on: ubuntu-latest
     steps:
       - name: Import secrets
