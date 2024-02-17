@@ -46,7 +46,7 @@ runs:
   steps:
   - name: Import the GitHub App ID from vault
     id: app-id
-    uses: hashicorp/vault-action@v2.8.0
+    uses: hashicorp/vault-action@v3.0.0
     with:
       url: ${{ inputs.vault-url }}
       method: ${{ inputs.vault-auth-method }}
@@ -64,7 +64,7 @@ runs:
         }}
   - name: Import the GitHub App secret key from vault
     id: app-private-key
-    uses: hashicorp/vault-action@v2.8.0
+    uses: hashicorp/vault-action@v3.0.0
     with:
       url: ${{ inputs.vault-url }}
       method: ${{ inputs.vault-auth-method }}
