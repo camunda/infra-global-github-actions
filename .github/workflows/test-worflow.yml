@@ -1,0 +1,43 @@
+name: An action to test how to rerun jobs
+
+on:
+  pull_request
+
+jobs:
+  doesntfail:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Does fail
+        run: echo $(date +"%T")
+
+  fails:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    - name: Fail
+      run: exit 2
+
+  rerun-failed-jobs:
+    needs:
+    - doesntfail
+    - fails
+    if: failure() && fromJSON(github.run_attempt) < 3
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrigger job
+        uses: camunda/infra-global-github-actions/rerun-failed-run@gh-672
+        with:
+          error-messages: |
+            The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled.
+            Process completed with exit code 2
+          run-id: ${{ github.run_id }}
+          repository: ${{ github.repository }}
+          vault-addr: ${{ secrets.VAULT_ADDR }}
+          vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+          vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}

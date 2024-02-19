@@ -6,8 +6,8 @@ on:
       run_id:
         description: The ID of the workflow run to retrigger
         required: true
-      error_message:
-        description: Custom error message to look for in the logs
+      error_messages:
+        description: Custom error messages to look for in the logs
         required: true
       repository:
         description: GitHub repository (ORG/REPO_NAME)
@@ -46,16 +46,22 @@ jobs:
           gh config set pager cat
           logs=$(gh run view ${{ inputs.run_id }} -R ${{ inputs.repository }} --exit-status || true)
           echo "Logs coming from run with id: ${{ inputs.run_id }}"
-          echo "$logs"
-          error_count=$(echo "$logs" | grep -c "${{ inputs.error_message }}")
-          echo "error_count: $error_count"
-          if [ "$error_count" -gt 0 ]; then
-              echo "rerun=true" >> "$GITHUB_OUTPUT"
-              echo "Error message ${{ inputs.error_message }} found in logs so the previous run has finished with that error."
-          else
-              echo "rerun=false" >> "$GITHUB_OUTPUT"
-              echo "Error message ${{ inputs.error_message }} not found in logs"
-          fi
+          echo "Inputted error messages: ${{ inputs.error_messages }}"
+          readarray -t array < <(echo '${{ inputs.error_messages }}' | jq -r '.[]')
+          for element in "${array[@]}"
+          do
+              echo "Current error message to search for in the logs: $element"
+              error_count=$(echo "$logs" | grep -c "$element" || true)
+              echo "error_count: $error_count"
+              if [ "$error_count" -gt 0 ]; then
+                echo "rerun=true" >> "$GITHUB_OUTPUT"
+                echo "Error message $element found in logs so the previous run has finished with that error."
+                break;
+              else
+                echo "rerun=false" >> "$GITHUB_OUTPUT"
+                echo "Error message $element not found in logs"
+              fi
+          done
 
       - name: Rerun run with id ${{ inputs.run_id }} for ${{ inputs.repository }} repository
         if: steps.check_logs.outputs.rerun == 'true'
