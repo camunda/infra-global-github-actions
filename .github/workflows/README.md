@@ -16,11 +16,11 @@ See the example provided below for more information.
 
 ## Inputs
 
-| Input name               | Description                                                                                                                   |
-|--------------------------|-------------------------------------------------------------------------------------------------------------------------------|
-| run_id (required)        | The ID of the workflow run to retrigger.                                                                                      |
-| error_message (required) | Custom error message to look for in the logs                                                                                  |
-| repository (required)    | GitHub repository calling this reusable workflow, in the format ORG/REPO_NAME (example: `camunda/infra-global-github-action`) |
+| Input name                | Description                                                                                                                                              |
+|---------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| run_id (required)         | The ID of the workflow run to retrigger.                                                                                                                 |
+| error_messages (required) | A string representing the error messages to look for in the logs in the format of an array (example: `"["First error message", "Second error message"]"` |
+| repository (required)     | GitHub repository calling this reusable workflow, in the format ORG/REPO_NAME (example: `camunda/infra-global-github-action`)                            |
 
 ### Workflow Example
 ```yaml
@@ -62,5 +62,6 @@ jobs:
         shell: bash
         run: |
           echo ${{ steps.github-token.outputs.token }} | gh auth login --with-token
-          gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=main -F repository=${{ github.repository }} -F error_message="The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled." -F run_id=${{ github.run_id }}
+          error_messages="[\"First error message\", \"Second error message\"]"
+          gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=main -F repository=${{ github.repository }} -F error_messages="The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled." -F run_id=${{ github.run_id }}
 ```

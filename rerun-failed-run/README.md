@@ -16,7 +16,7 @@ If these secrets are not present, please contact the infrastructure team to set 
 | Input name                 | Description                                                                                                                                  |
 |----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
 | run-id (required)          | The ID of the failed workflow run to be retried.                                                                                             |
-| error-message (required)   | Custom error message to search for in the logs.                                                                                              |
+| error-messages (required)  | Custom error messages to search for in the logs.                                                                                             |
 | repository (required)      | The name of the repository containing the workflow to be retried in the format ORG/REPO_NAME (example: `camunda/infra-global-github-action`) |
 | vault-addr (required)      | The Vault URL.                                                                                                                               |
 | vault-role-id (required)   | The Vault Role ID.                                                                                                                           |
@@ -36,9 +36,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Retrigger job
-        uses: camunda/infra-global-github-actions/rerun-failed-run@main
+        uses: camunda/infra-global-github-actions/rerun-failed-run
         with:
-          error-message: "Process completed with exit code 1."
+          error-messages: |
+            Process completed with exit code 1.
+            Process completed with exit code 99
           run-id: ${{ github.run_id }}
           repository: ${{ github.repository }}
           vault-addr: ${{ secrets.VAULT_ADDR }}
