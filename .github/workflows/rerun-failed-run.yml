@@ -63,4 +63,4 @@ jobs:
           GH_DEBUG: api
         run: |
           echo ${{ steps.github-token.outputs.token }} | gh auth login --with-token
-          gh run rerun ${{ inputs.run_id }} -R ${{ inputs.repository }} --failed
+          gh run rerun ${{ inputs.run_id }} -R ${{ inputs.repository }} --failed --f
