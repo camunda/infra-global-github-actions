@@ -13,7 +13,7 @@ To employ this action, provide the ID of the failed run you wish to retry, along
 | run-id (required)          | The ID of the failed workflow run to be retried.                                                                                             |
 | error-message (required)   | Custom error message to search for in the logs.                                                                                              |
 | repository (required)      | The name of the repository containing the workflow to be retried in the format ORG/REPO_NAME (example: `camunda/infra-global-github-action`) |
-| vault-addr (required)      | The vault URL.                                                                                                                               |
+| vault-addr (required)      | The Vault URL.                                                                                                                               |
 | vault-role-id (required)   | The Vault Role ID.                                                                                                                           |
 | vault-secret-id (required) | The Vault Secret ID.                                                                                                                         |
 

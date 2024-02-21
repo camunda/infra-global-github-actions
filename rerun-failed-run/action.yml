@@ -20,7 +20,7 @@ inputs:
     description: The Vault role ID for fetching secrets
     required: true
   vault-secret-id:
-    description: The secret id for vault
+    description: The Vault secret ID for fetching secrets
     required: true
 
 runs:
