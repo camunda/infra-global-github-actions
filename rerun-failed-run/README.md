@@ -4,7 +4,12 @@ This composite Github Action can be used to retrigger runs which have failed.
 
 ### Usage
 
-To employ this action, provide the ID of the failed run you wish to retry, along with the specific error message you aim to address. This targeted approach helps rerun only those actions that failed due to the specified error, rather than all runs. Furthermore, ensure that the repository from which you invoke this composite action has the following secrets configured: VAULT_ADDR, VAULT_ROLE_ID, and VAULT_SECRET_ID. If these secrets are not configured, please contact the infrastructure team to set them up for you.
+To call this action, you need to provide:
+- the ID of a failed GitHub Action workflow run to rerun
+- an error message that needs to be present in the workflow run logs
+This targeted approach helps retrigger only those runs that failed due to the specified error.
+You also need ensure that the repository from which you invoke this composite action has the following secrets configured: `VAULT_ADDR`, `VAULT_ROLE_ID`, and `VAULT_SECRET_ID`.
+If these secrets are not present, please contact the infrastructure team to set them up for you.
 
 ### Inputs
 
@@ -31,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Retrigger job
-        uses: camunda/infra-global-github-actions/rerun-failed-job
+        uses: camunda/infra-global-github-actions/rerun-failed-run
         with:
           error-message: "Process completed with exit code 1."
           run-id: ${{ github.run_id }}
