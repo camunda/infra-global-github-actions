@@ -1,34 +1,34 @@
 ---
 name: Rerun failed run
 
-description: Rerun a run which has failed
+description: Retrigger a GitHub Actions workflow run that has failed with a specific error message
 
 inputs:
   run-id:
-    description: The id of the run we wanna re-trigger.
+    description: The id of the workflow run to re-trigger
     required: true
   repository:
-    description: The name of the repository in which the run exists.
+    description: The name of the repository to which the workflow run belongs
     required: true
   error-message:
-    description: The error message which we want to test against
+    description: The error message to check for in the workflow run logs. Only if the message is found the failed jobs of the workflow run will be retriggered
     required: true
   vault-addr:
-    description: The url of vault
-    required: false
+    description: The Vault URL for fetching secrets
+    required: true
   vault-role-id:
-    description: The role id for vault
-    required: false
+    description: The Vault role ID for fetching secrets
+    required: true
   vault-secret-id:
     description: The secret id for vault
-    required: false
+    required: true
 
 runs:
   using: composite
   steps:
     - name: Import Secrets
       id: vault-secrets
-      uses: hashicorp/vault-action@affa6f04da5c2d55e6e115b7d1b044a6b1af8c74 # v2.7.4
+      uses: hashicorp/vault-action@3.0.0
       with:
         url: ${{ inputs.vault-addr }}
         method: approle

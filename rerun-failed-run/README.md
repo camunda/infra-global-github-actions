@@ -10,7 +10,7 @@ To employ this action, provide the ID of the failed run you wish to retry, along
 
 | Input name                 | Description                                                                                                                                  |
 |----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| run-id (required)          | The ID of the failed run to be retried.                                                                                                      |
+| run-id (required)          | The ID of the failed workflow run to be retried.                                                                                             |
 | error-message (required)   | Custom error message to search for in the logs.                                                                                              |
 | repository (required)      | The name of the repository containing the workflow to be retried in the format ORG/REPO_NAME (example: `camunda/infra-global-github-action`) |
 | vault-addr (required)      | The vault URL.                                                                                                                               |
@@ -18,6 +18,7 @@ To employ this action, provide the ID of the failed run you wish to retry, along
 | vault-secret-id (required) | The Vault Secret ID.                                                                                                                         |
 
 ### Workflow Example
+```yaml
 jobs:
   build:
     runs-on: gcp-core-2-default
@@ -38,3 +39,4 @@ jobs:
           vault-addr: ${{ secrets.VAULT_ADDR }}
           vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
           vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+```
