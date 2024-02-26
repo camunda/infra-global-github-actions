@@ -32,7 +32,11 @@ inputs:
     default: '.'
   build_allow:
     description: Extra privilege entitlements to give builder.
-    requried: false
+    required: false
+  build_platforms:
+    description: List of [target platforms](https://docs.docker.com/engine/reference/commandline/buildx_build/#platform) for build
+    required: false
+    default: 'linux/amd64'
   buildx_driver:
     description: Driver for buildx builder.
     required: false
@@ -43,6 +47,14 @@ inputs:
     description: Whether load docker image from build into local Docker Images
     required: false
     default: 'false'
+  qemu_image:
+    description: QEMU static binaries Docker image
+    required: false
+    default: 'tonistiigi/binfmt:latest'
+  qemu_platforms:
+    description: Platforms to install (e.g., `arm64,riscv64,arm`)
+    required: false
+    default: 'all'
 
 outputs:
   image_digest:
@@ -70,9 +82,12 @@ runs:
       echo "Image name:      ${{ inputs.image_name }}"
       echo "Build-Args:      ${{ inputs.build_args }}"
       echo "Context:         ${{ inputs.build_context }}"
-      echo "Allow:          ${{ inputs.build_allow }}"
+      echo "Platforms:       ${{ inputs.build_platforms }}"
+      echo "Allow:           ${{ inputs.build_allow }}"
       echo "Buildx Driver:   ${{ inputs.buildx_driver }}"
       echo "Buildx Version:  ${{ inputs.buildx_version }}"
+      echo "QEMU Image:      ${{ inputs.qemu_image }}"
+      echo "QEMU Platforms:  ${{ inputs.qemu_platforms }}"
 
   - name: Validate inputs
     shell: bash
@@ -109,6 +124,14 @@ runs:
     run: |
       echo "SHOULD_WE_PUSH=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) || startsWith(github.ref, 'refs/tags/') || endsWith(github.ref, '-push') || inputs.force_push == 'true' }}" | tee -a "$GITHUB_ENV" "$GITHUB_OUTPUT"
 
+    # https://github.com/docker/setup-qemu-action
+  - name: Set up QEMU
+    id: qemu
+    uses: docker/setup-qemu-action@v1
+    with:
+      image: ${{ inputs.qemu_image }}
+      platforms: ${{ inputs.qemu_platforms }}
+
   - name: Set up Docker Buildx
     id: buildx
     uses: docker/setup-buildx-action@v3
@@ -135,11 +158,13 @@ runs:
       context: ${{ inputs.build_context }}
       builder: ${{ steps.buildx.output.name }}
       build-args: ${{ inputs.build_args }}
+      platforms: ${{ inputs.build_platforms }}
       provenance: false
       push: ${{ env.SHOULD_WE_PUSH }}
       tags: ${{ steps.meta.outputs.tags }}
       labels: ${{ steps.meta.outputs.labels }}
       load: ${{ inputs.docker_load }}
+
   - id: get-image-names
     shell: bash
     run: |
