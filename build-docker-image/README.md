@@ -19,9 +19,12 @@ This composite GHA can be used in any non-public repository with a `Dockerfile` 
 | force_push        | Allows overwriting the image push behaviour, by setting to 'true' as input |
 | build_context     | Docker build context location                      |
 | build_allow       | Extra privilege entitlements to give builder       |
+| build_platforms   | List of [target platforms](https://docs.docker.com/engine/reference/commandline/buildx_build/#platform) for build        |
 | buildx_driver     | Driver to use for buildx builder                   |
 | buildx_version    | Which release version of a buildx action to use    |
 | docker_load       | Whether or not to load docker image builds into the local Docker Images |
+| qemu_image        | QEMU static binaries Docker image                  |
+| qemu_platforms    | Platforms to install (e.g., `arm64,riscv64,arm`)   |
 
 For the above example inputs the resulting Docker image would be named `gcr.io/example/image`.
 
