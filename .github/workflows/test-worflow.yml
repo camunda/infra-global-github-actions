@@ -35,7 +35,8 @@ jobs:
         with:
           error-messages: |
             The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled.
-            Process completed with exit code 3
+            Process completed with exit code 2
+            Process completed with exit code 1
           run-id: ${{ github.run_id }}
           repository: ${{ github.repository }}
           vault-addr: ${{ secrets.VAULT_ADDR }}
