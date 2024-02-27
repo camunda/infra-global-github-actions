@@ -50,7 +50,7 @@ inputs:
   qemu_image:
     description: QEMU static binaries Docker image
     required: false
-    default: 'tonistiigi/binfmt:latest'
+    default: 'tonistiigi/binfmt:master'
   qemu_platforms:
     description: Platforms to install (e.g., `arm64,riscv64,arm`)
     required: false
