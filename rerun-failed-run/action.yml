@@ -61,4 +61,4 @@ runs:
         result=$(echo $result | sed '$ s/,$//g')
         result+="]"
         echo "result: $result"
-        gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=gh-672 -F run_id=${{ inputs.run-id }} -F repository=${{ inputs.repository }} -F error_messages=$result
+        gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=main -F run_id=${{ inputs.run-id }} -F repository=${{ inputs.repository }} -F error_messages=$result
