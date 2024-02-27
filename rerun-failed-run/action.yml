@@ -55,6 +55,7 @@ runs:
         result="["
         IFS=$'\n'
         for line in $error_messages
+        echo "line: $line"
         do
           result+="\"$line\","
         done
