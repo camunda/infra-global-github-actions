@@ -33,10 +33,7 @@ jobs:
       - name: Retrigger job
         uses: camunda/infra-global-github-actions/rerun-failed-run@gh-672
         with:
-          error-messages: |
-            The runner has received a shutdown signal. This can happen when the runner service is stopped, or a manually started runner is canceled.
-            Process completed with exit code 2
-            Process completed with exit code 1
+          error-messages: Process completed with exit code 2
           run-id: ${{ github.run_id }}
           repository: ${{ github.repository }}
           vault-addr: ${{ secrets.VAULT_ADDR }}
