@@ -10,9 +10,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Does fail
-        run: echo $(date +"%T")
-
   fails:
     runs-on: ubuntu-latest
 
