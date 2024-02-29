@@ -34,7 +34,7 @@ jobs:
         uses: camunda/infra-global-github-actions/rerun-failed-run@gh-672
         with:
           error-messages: |
-            Process completed with exit code 1.
+            Process completed with exit code 2.
             Process completed, with exit code 99
           run-id: ${{ github.run_id }}
           repository: ${{ github.repository }}
