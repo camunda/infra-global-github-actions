@@ -11,7 +11,7 @@ inputs:
     description: The name of the repository to which the workflow run belongs
     required: true
   error-messages:
-    description: The error messages to check for in the workflow run logs. Only if the messages are found in the failed jobs of the workflow run will be retriggered
+    description: The error messages to check for in the workflow run logs. The workflow will be rerun only if at least one of the given messages is found in the logs of a failed job.
     required: true
   vault-addr:
     description: The Vault URL for fetching secrets
@@ -48,17 +48,10 @@ runs:
     - name: Retrigger run
       env:
         GH_DEBUG: api
+        GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
       shell: bash
       run: |
-        echo ${{ steps.github-token.outputs.token }} | gh auth login --with-token
         error_messages="${{ inputs.error-messages }}"
-        result="["
-        IFS=$'\n'
-        for line in $error_messages
-        do
-          result+="\"$line\","
-        done
-        result=$(echo $result | sed '$ s/,$//g')
-        result+="]"
+        result=$(echo "$error_messages" | jq -c -n -R '[inputs | select(length > 0)]')
         echo "result: $result"
-        gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=main -F run_id=${{ inputs.run-id }} -F repository=${{ inputs.repository }} -F error_messages=$result
+        gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=gh-672 -F run_id=${{ inputs.run-id }} -F repository=${{ inputs.repository }} -F error_messages="$result"
