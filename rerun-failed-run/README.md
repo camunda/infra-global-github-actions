@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Retrigger job
-        uses: camunda/infra-global-github-actions/rerun-failed-run
+        uses: camunda/infra-global-github-actions/rerun-failed-run@main
         with:
           error-messages: |
             Process completed with exit code 1.
