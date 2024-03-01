@@ -58,7 +58,7 @@ jobs:
         fi
         if ! command -v python3 &> /dev/null
         then
-            echo "python could not be found"
+            echo "python3 could not be found"
             exit 1
         else
             python --version
