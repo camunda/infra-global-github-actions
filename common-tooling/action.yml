@@ -253,7 +253,7 @@ runs:
   - name: Install Python3 (std install)
     uses: actions/setup-python@v5
     # actions/setup-python doesn't yet support ARM
-    if: ${{ !contains(runner.name, '-arm') }} && ${{ inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
+    if: ${{ !contains(runner.arch, 'arm') && inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:
       python-version: ${{ inputs.python-version }}
       python-version-file: ${{ inputs.python-version-file }}
@@ -268,7 +268,7 @@ runs:
   - name: Install Python3 (ubuntu-arm install)
     uses: deadsnakes/action@v3.1.0
     # actions/setup-python doesn't yet support ARM, see https://github.com/actions/setup-python/issues/705#issuecomment-1756948951
-    if: ${{ contains(runner.name, '-arm') }} && ${{ inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
+    if: ${{ contains(runner.arch, 'arm') && contains(runner.name, 'ubuntu') && inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:
       python-version: ${{ inputs.python-version }}
       python-version-file: ${{ inputs.python-version-file }}
