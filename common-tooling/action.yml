@@ -288,7 +288,7 @@ runs:
 
       : # install pip
       curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-      python3 get-pip.py
+      /usr/bin/python get-pip.py
 
   - name: Unset Environment variables
     shell: bash
