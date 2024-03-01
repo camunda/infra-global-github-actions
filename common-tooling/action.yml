@@ -280,10 +280,11 @@ runs:
       update-environment: ${{ inputs.python-update-environment }}
       allow-prereleases: ${{ inputs.python-allow-prereleases }}
 
-  - name: Add Python3 Shortcut (ARM)
+  - name: Add Python3 Shortcut and add pip (ARM)
     if: ${{ contains(runner.arch, 'arm') }}
     shell: bash
     run: |
+      sudo apt install python3-pip -y
       sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
 
   - name: Unset Environment variables
