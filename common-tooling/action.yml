@@ -248,10 +248,12 @@ runs:
       cache-prefix: ${{ inputs.java-cache-prefix }}
       cache-path: ${{ inputs.java-cache-path }}
       cache-path-add: ${{ inputs.java-cache-path-add }}
+
   # Install Python, it's absent on self-hosted runners
-  - name: Install Python3
+  - name: Install Python3 (std install)
     uses: actions/setup-python@v5
-    if: ${{ inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
+    # actions/setup-python doesn't yet support ARM
+    if: ${{ !endsWith(matrix.os, '-arm') }} && ${{ inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:
       python-version: ${{ inputs.python-version }}
       python-version-file: ${{ inputs.python-version-file }}
@@ -262,6 +264,23 @@ runs:
       cache-dependency-path: ${{ inputs.python-cache-dependency-path }}
       update-environment: ${{ inputs.python-update-environment }}
       allow-prereleases: ${{ inputs.python-allow-prereleases }}
+
+  - name: Install Python3 (ubuntu-arm install)
+    uses: deadsnakes/action@3.1.0
+    # actions/setup-python doesn't yet support ARM, see https://github.com/actions/setup-python/issues/705#issuecomment-1756948951
+    if: ${{ matrix.os == 'ubuntu-arm' }} && ${{ inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
+    with:
+      python-version: ${{ inputs.python-version }}
+      python-version-file: ${{ inputs.python-version-file }}
+      cache: ${{ inputs.python-cache }}
+      architecture: ${{ inputs.python-architecture }}
+      check-latest: ${{ inputs.python-check-latest }}
+      token: ${{ inputs.python-token }}
+      cache-dependency-path: ${{ inputs.python-cache-dependency-path }}
+      update-environment: ${{ inputs.python-update-environment }}
+      allow-prereleases: ${{ inputs.python-allow-prereleases }}
+
+
   - name: Unset Environment variables
     shell: bash
     run: |
