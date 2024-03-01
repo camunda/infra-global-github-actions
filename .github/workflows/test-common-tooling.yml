@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        label: ["ubuntu-latest", "gcp-core-2-default"]
+        label: ["ubuntu-latest", "gcp-core-2-default", "arm64"]
     runs-on: ${{ matrix.label }}
     timeout-minutes: 10
     steps:
