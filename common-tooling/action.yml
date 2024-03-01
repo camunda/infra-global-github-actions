@@ -282,9 +282,9 @@ runs:
 
   - name: Add Python3 Shortcut (ARM)
     if: ${{ contains(runner.arch, 'arm') }}
+    shell: bash
     run: |
       sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
-
 
   - name: Unset Environment variables
     shell: bash
