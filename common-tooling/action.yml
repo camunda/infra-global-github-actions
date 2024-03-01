@@ -284,10 +284,11 @@ runs:
     if: ${{ contains(runner.arch, 'arm') }}
     shell: bash
     run: |
-      : # install pip (missing from arm64 base install)
-      sudo apt install -y python3-pip
-
       sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
+
+      : # install pip
+      curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+      /usr/bin/python get-pip.py
 
   - name: Unset Environment variables
     shell: bash
