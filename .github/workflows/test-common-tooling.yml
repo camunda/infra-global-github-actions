@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        label: ["ubuntu-latest", "gcp-core-2-default", "arm64"]
+        label: ["ubuntu-latest", "gcp-core-2-default", "aws-arm-core-2-default"]
     runs-on: ${{ matrix.label }}
     timeout-minutes: 10
     steps:
@@ -61,7 +61,7 @@ jobs:
             echo "python3 could not be found"
             exit 1
         else
-            python --version
+            python3 --version
         fi
         if ! command -v python &> /dev/null
         then
