@@ -284,7 +284,7 @@ runs:
       nogil: ${{ inputs.python-deadsnakes-nogil }}
 
   - name: Add Python3 Shortcut and add pip (ARM)
-    if: ${{ contains(runner.arch, 'arm') }}
+    if: ${{ contains(runner.arch, 'arm') && inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
     shell: bash
     run: |
       sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
