@@ -123,29 +123,38 @@ inputs:
     description: "Version range or exact version of Python or PyPy to use, using SemVer's version range syntax. Reads from .python-version if unset."
     default: "3.11"
   python-version-file:
-    description: "File containing the Python version to use. Example: .python-version"
+    description: "File containing the Python version to use. Example: .python-version (not supported on arm)"
   python-cache:
-    description: "Used to specify a package manager for caching in the default directory. Supported values: pip, pipenv, poetry."
+    description: "Used to specify a package manager for caching in the default directory. Supported values: pip, pipenv, poetry. (not supported on arm)"
     required: false
   python-architecture:
-    description: "The target architecture (x86, x64) of the Python or PyPy interpreter."
+    description: "The target architecture (x86, x64) of the Python or PyPy interpreter. (not supported on arm)"
   python-check-latest:
-    description: "Set this option if you want the action to check for the latest available version that satisfies the version spec."
+    description: "Set this option if you want the action to check for the latest available version that satisfies the version spec. (not supported on arm)"
     default: "false"
   python-token:
-    description: "The token used to authenticate when fetching Python distributions from https://github.com/actions/python-versions. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting."
+    description: "The token used to authenticate when fetching Python distributions from https://github.com/actions/python-versions. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting. (not supported on arm)"
     default: ${{ github.server_url == 'https://github.com' && github.token || '' }}
   python-cache-dependency-path:
-    description: "Used to specify the path to dependency files. Supports wildcards or a list of file names for caching multiple dependencies."
+    description: "Used to specify the path to dependency files. Supports wildcards or a list of file names for caching multiple dependencies. (not supported on arm)"
   python-update-environment:
-    description: "Set this option if you want the action to update environment variables."
+    description: "Set this option if you want the action to update environment variables. (not supported on arm)"
     default: 'true'
   python-allow-prereleases:
-    description: "When 'true', a version range passed to 'python-version' input will match prerelease versions if no GA versions are found. Only 'x.y' version range is supported for CPython."
+    description: "When 'true', a version range passed to 'python-version' input will match prerelease versions if no GA versions are found. Only 'x.y' version range is supported for CPython. (not supported on arm)"
     default: "false"
   python-enabled:
     description: 'Whether to install python or not'
     default: 'true'
+  python-deadsnakes-debug:
+    description: 'Whether to use debug version of python (deadnakes arm only)'
+    required: false
+    default: false
+  python-deadsnakes-nogil:
+    description: 'Whether to use free-threaded version of python (deadnakes arm only)'
+    required: false
+    default: false
+
   # misc
   overwrite:
     description: 'Defines whether on hosted runners the present version should be overwritten'
@@ -271,14 +280,8 @@ runs:
     if: ${{ contains(runner.arch, 'arm') && inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:
       python-version: ${{ inputs.python-version }}
-      python-version-file: ${{ inputs.python-version-file }}
-      cache: ${{ inputs.python-cache }}
-      architecture: ${{ inputs.python-architecture }}
-      check-latest: ${{ inputs.python-check-latest }}
-      token: ${{ inputs.python-token }}
-      cache-dependency-path: ${{ inputs.python-cache-dependency-path }}
-      update-environment: ${{ inputs.python-update-environment }}
-      allow-prereleases: ${{ inputs.python-allow-prereleases }}
+      debug: ${{ inputs.python-deadsnakes-debug }}
+      nogil: ${{ inputs.python-deadsnakes-nogil }}
 
   - name: Add Python3 Shortcut and add pip (ARM)
     if: ${{ contains(runner.arch, 'arm') }}

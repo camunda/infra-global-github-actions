@@ -68,15 +68,17 @@ e.g.
 | java-maven-version | The Maven version to set up |
 | java-enabled | Whether to install java or not |
 | python-version | Version range or exact version of Python or PyPy to use, using SemVer's version range syntax. Reads from .python-version if unset. | 3.11 |
-| python-version-file | File containing the Python version to use. Example: .python-version |
-| python-cache | Used to specify a package manager for caching in the default directory. Supported values: pip, pipenv, poetry. |
-| python-architecture | The target architecture (x86, x64) of the Python or PyPy interpreter. |
-| python-check-latest | Set this option if you want the action to check for the latest available version that satisfies the version spec. |
-| python-token | The token used to authenticate when fetching Python distributions from https://github.com/actions/python-versions. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting. |
-| python-cache-dependency-path | Used to specify the path to dependency files. Supports wildcards or a list of file names for caching multiple dependencies. |
-| python-update-environment | Set this option if you want the action to update environment variables. |
-| python-allow-prereleases | When 'true', a version range passed to 'python-version' input will match prerelease versions if no GA versions are found. Only 'x.y' version range is supported for CPython. |
+| python-version-file | File containing the Python version to use. Example: .python-version (not supported on arm) |
+| python-cache | Used to specify a package manager for caching in the default directory. Supported values: pip, pipenv, poetry. (not supported on arm) |
+| python-architecture | The target architecture (x86, x64) of the Python or PyPy interpreter. (not supported on arm) |
+| python-check-latest | Set this option if you want the action to check for the latest available version that satisfies the version spec. (not supported on arm) |
+| python-token | The token used to authenticate when fetching Python distributions from https://github.com/actions/python-versions. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting. (not supported on arm) |
+| python-cache-dependency-path | Used to specify the path to dependency files. Supports wildcards or a list of file names for caching multiple dependencies. (not supported on arm) |
+| python-update-environment | Set this option if you want the action to update environment variables. (not supported on arm) |
+| python-allow-prereleases | When 'true', a version range passed to 'python-version' input will match prerelease versions if no GA versions are found. Only 'x.y' version range is supported for CPython. (not supported on arm) |
 | python-enabled | Whether to install python or not |
+| python-deadsnakes-debug | Whether to use debug version of python (deadnakes arm only) | false |
+| python-deadsnakes-nogil | Whether to use free-threaded version of python (deadnakes arm only) | false |
 | overwrite | Defines whether on hosted runners the present version should be overwritten | false |
 
 ### Workflow Example
