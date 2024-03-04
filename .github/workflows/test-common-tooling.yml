@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        label: ["ubuntu-latest", "gcp-core-2-default"]
+        label: ["ubuntu-latest", "gcp-core-2-default", "aws-arm-core-2-default"]
     runs-on: ${{ matrix.label }}
     timeout-minutes: 10
     steps:
@@ -56,6 +56,13 @@ jobs:
         else
             mvn --version
         fi
+        if ! command -v python3 &> /dev/null
+        then
+            echo "python3 could not be found"
+            exit 1
+        else
+            python3 --version
+        fi
         if ! command -v python &> /dev/null
         then
             echo "python could not be found"
@@ -82,5 +89,5 @@ jobs:
         node-version: 20 # see https://github.com/actions/setup-node#supported-version-syntax for supported syntax
         java-version: 20 # see https://github.com/marketplace/actions/setup-java-jdk#supported-version-syntax for supported syntax
         java-distribution: adopt # see https://github.com/marketplace/actions/setup-java-jdk#supported-distributions for supported distros
-        python-version: 3 # see https://github.com/actions/setup-python#supported-version-syntax for supported syntax
+        python-version: "3.11" # see https://github.com/actions/setup-python#supported-version-syntax for supported syntax
         overwrite: 'true'
