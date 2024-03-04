@@ -89,5 +89,5 @@ jobs:
         node-version: 20 # see https://github.com/actions/setup-node#supported-version-syntax for supported syntax
         java-version: 20 # see https://github.com/marketplace/actions/setup-java-jdk#supported-version-syntax for supported syntax
         java-distribution: adopt # see https://github.com/marketplace/actions/setup-java-jdk#supported-distributions for supported distros
-        python-version: 3 # see https://github.com/actions/setup-python#supported-version-syntax for supported syntax
+        python-version: "3.11" # see https://github.com/actions/setup-python#supported-version-syntax for supported syntax
         overwrite: 'true'

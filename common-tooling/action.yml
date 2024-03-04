@@ -120,7 +120,7 @@ inputs:
     default: 'true'
   # Python
   python-version:
-    description: "Version range or exact version of Python or PyPy to use, using SemVer's version range syntax. Reads from .python-version if unset."
+    description: "Version range or exact version of Python or PyPy to use, specified using SemVer's version range syntax. If unset, it reads from .python-version. Please note that on ARM, the list of available versions differs, and you can find the list of Python distributions at https://launchpad.net/~deadsnakes/+archive/ubuntu/ppa/+packages."
     default: "3.11"
   python-version-file:
     description: "File containing the Python version to use. Example: .python-version (not supported on arm)"
