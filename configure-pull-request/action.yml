@@ -36,7 +36,7 @@ runs:
         type: add
     - name: Set project
       if: ${{ inputs.project-url != '' }}
-      uses: actions/add-to-project@v0.6.1
+      uses: actions/add-to-project@v1.0.0
       with:
         github-token: ${{ inputs.github-token }}
         project-url: ${{ inputs.project-url }}
