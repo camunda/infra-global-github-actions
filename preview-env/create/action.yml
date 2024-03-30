@@ -58,7 +58,7 @@ runs:
     #########################################################################
     # Create a GitHub deployment that points to the URL we're going to deploy to.
     # If a Pull Request exists, it will show the status of this deployment.
-  - uses: bobheadxi/deployments@v1.4.0
+  - uses: bobheadxi/deployments@v1.5.0
     name: Create GitHub deployment
     id: deployment
     with:
@@ -122,7 +122,7 @@ runs:
     # `always()` ensures that the deployment status
     # is updated regardless of previous steps failing.
     if: always()
-    uses: bobheadxi/deployments@v1.4.0
+    uses: bobheadxi/deployments@v1.5.0
     with:
       step: finish
       token: ${{ github.token }}
