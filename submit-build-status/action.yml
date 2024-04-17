@@ -76,6 +76,8 @@ runs:
 
   - name: Submit build status to CI Analytics
     shell: bash
+    env:
+      BUILD_BASE_REF: "${{ github.base_ref && format('refs/heads/{0}', github.base_ref) || github.event.merge_group.base_ref }}"
     run: |
       cat <<EOF | tr '\n' ' ' | bq insert "${{ inputs.big_query_table_name }}"
       {
@@ -86,7 +88,11 @@ runs:
         "build_id": "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT",
         "build_trigger": "$GITHUB_EVENT_NAME",
         "build_status": "${{ inputs.build_status }}",
-        "build_ref": "$GITHUB_REF"
+        "build_ref": "$GITHUB_REF",
+        "runner_name": "$(echo $RUNNER_NAME | tr '[:upper:]' '[:lower:]')",
+        "runner_arch": "$(echo $RUNNER_ARCH | tr '[:upper:]' '[:lower:]')",
+        "runner_os": "$(echo $RUNNER_OS | tr '[:upper:]' '[:lower:]')"
+        ${{ (env.BUILD_BASE_REF == '') && ' ' || format(', "build_base_ref": "{0}"', env.BUILD_BASE_REF) }}
         ${{ (inputs.user_reason == '') && ' ' || format(', "user_reason": "{0}"', inputs.user_reason) }}
         ${{ (inputs.user_description == '') && ' ' || format(', "user_description": "{0}"', inputs.user_description) }}
       }
