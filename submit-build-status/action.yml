@@ -20,6 +20,11 @@ inputs:
     description: Credentials for a Google Clout ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file.
     required: true
 
+  big_query_table_name:
+    description: Use only for infrastructure testing purposes to target e.g. dev environment.
+    required: false
+    default: 'ci-30-162810:prod_ci_analytics.build_status_v2'
+
 runs:
   using: composite
   steps:
@@ -31,6 +36,7 @@ runs:
       echo "Build status: ${{ inputs.build_status }}"
       echo "User reason: ${{ inputs.user_reason }}"
       echo "User description: ${{ inputs.user_description }}"
+      echo "BQ table name (for testing): ${{ inputs.big_query_table_name }}"
 
   - name: Validate inputs
     shell: bash
@@ -70,10 +76,8 @@ runs:
 
   - name: Submit build status to CI Analytics
     shell: bash
-    env:
-      BIG_QUERY_TABLE_NAME: ci-30-162810:prod_ci_analytics.build_status_v2
     run: |
-      cat <<EOF | tr '\n' ' ' | bq insert "$BIG_QUERY_TABLE_NAME"
+      cat <<EOF | tr '\n' ' ' | bq insert "${{ inputs.big_query_table_name }}"
       {
         "report_time": "$(date '+%Y-%m-%d %H:%M:%S')",
         "ci_url": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY",
