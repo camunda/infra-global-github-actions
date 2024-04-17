@@ -79,7 +79,7 @@ runs:
         "ci_url": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY",
         "workflow_name": "$GITHUB_WORKFLOW",
         "job_name": "$GITHUB_JOB",
-        "build_id": "$GITHUB_RUN_ID",
+        "build_id": "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT",
         "build_trigger": "$GITHUB_EVENT_NAME",
         "build_status": "${{ inputs.build_status }}",
         "build_ref": "$GITHUB_REF"
