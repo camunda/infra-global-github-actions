@@ -20,6 +20,11 @@ inputs:
     description: Credentials for a Google Clout ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file.
     required: true
 
+  job_name_override:
+    description: Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB` useful e.g. for matrix builds
+    required: false
+    default: ''
+
   big_query_table_name:
     description: Use only for infrastructure testing purposes to target e.g. dev environment.
     required: false
@@ -36,6 +41,7 @@ runs:
       echo "Build status: ${{ inputs.build_status }}"
       echo "User reason: ${{ inputs.user_reason }}"
       echo "User description: ${{ inputs.user_description }}"
+      echo "Job name override: ${{ inputs.job_name_override }} (default job name: $GITHUB_JOB)"
       echo "BQ table name (for testing): ${{ inputs.big_query_table_name }}"
 
   - name: Validate inputs
@@ -77,15 +83,15 @@ runs:
   - name: Submit build status to CI Analytics
     shell: bash
     env:
-      BUILD_BASE_REF: "${{ github.base_ref && format('refs/heads/{0}', github.base_ref) || github.event.merge_group.base_ref }}"
       BG_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
+      BUILD_BASE_REF: "${{ github.base_ref && format('refs/heads/{0}', github.base_ref) || github.event.merge_group.base_ref }}"
     run: |
       cat <<EOF | tr '\n' ' ' | $BG_COMMAND insert "${{ inputs.big_query_table_name }}"
       {
         "report_time": "$(date '+%Y-%m-%d %H:%M:%S')",
         "ci_url": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY",
         "workflow_name": "$GITHUB_WORKFLOW",
-        "job_name": "$GITHUB_JOB",
+        "job_name": "${{ (inputs.job_name_override == '') && '$GITHUB_JOB' || inputs.job_name_override }}",
         "build_id": "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT",
         "build_trigger": "$GITHUB_EVENT_NAME",
         "build_status": "${{ inputs.build_status }}",
