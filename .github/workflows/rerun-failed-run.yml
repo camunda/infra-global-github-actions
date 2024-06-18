@@ -58,4 +58,6 @@ jobs:
           GH_DEBUG: api
           GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
         run: |
+          : # wait until the job is completed
+          gh run watch ${{ inputs.run_id }} -R ${{ inputs.repository }} > /dev/null 2>&1
           gh run rerun ${{ inputs.run_id }} -R ${{ inputs.repository }} --failed
