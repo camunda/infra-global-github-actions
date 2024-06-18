@@ -51,6 +51,9 @@ runs:
         GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
       shell: bash
       run: |
+        : # wait until the job is completed
+        gh run watch -R ${{ inputs.repository }} ${{ inputs.run_id }} > /dev/null 2>&1
+
         error_messages="${{ inputs.error-messages }}"
         result=$(echo "$error_messages" | jq -c -n -R '[inputs | select(length > 0)]')
         echo "result: $result"
