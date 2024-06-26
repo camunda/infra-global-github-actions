@@ -133,3 +133,21 @@ runs:
       env_url: ${{ inputs.app_url }}
       ref: ${{ inputs.revision }}
       env: ${{ inputs.app_name }}
+  - name: Create deployment status artifact
+    if: always()
+    shell: bash
+    run: |
+      if [[ "${{ github.action_status }}" == "success" ]]; then
+        echo ":full_moon_with_face: [${{ inputs.app_name }}](${{ inputs.app_url }}): ${{ github.action_status }}\n" > status_${{ inputs.app_name }}.md
+      elif [[ "${{ github.action_status }}" == "failure" ]]; then
+        echo ":boom: ${{ inputs.app_name }}: ${{ github.action_status }} :arrow_right: see [ArgoCD](https://${{ inputs.argocd_server }}/applications?health=Degraded&search=${{ inputs.revision }})\n" > status_${{ inputs.app_name }}.md
+      else
+        echo ":grey_exclamation: ${{ inputs.app_name }}: ${{ github.action_status }}\n" > status_${{ inputs.app_name }}.md
+      fi
+  - name: Upload deployment status as artifact
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: deployment-status-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.app_name }}
+      path: status_${{ inputs.app_name }}.md
+      retention-days: 1
