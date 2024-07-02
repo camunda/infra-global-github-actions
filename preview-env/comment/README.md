@@ -21,11 +21,6 @@ A failure text contains the `app_name` and a link to the `argocd_server` (defaul
 
 > :boom: `app_name`: failure :arrow_right: see [ArgoCD Dummy URL](https://argo-cd.readthedocs.io/en/stable/operator-manual/health/)
 
-### Cancelled
-When the workflow gets cancelled, the text will look like this:
-
-> :grey_exclamation: `app_name`: cancelled
-
 ## Usage
 
 > [!NOTE]
