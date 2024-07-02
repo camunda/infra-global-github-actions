@@ -1,0 +1,39 @@
+---
+name: Create Deployment Result Summary
+description: |
+  Creates a deployment result summary as comment in the current PR when deployment deployment artifacts have been uploaded during this run.
+
+runs:
+  using: composite
+  steps:
+    - name: Download Deployment Status Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: deployment_status
+        pattern: deployment-status-${{ github.run_id }}-${{ github.run_attempt }}-*
+
+    - name: Check for deployment artifacts
+      shell: bash
+      run: |
+        if [ -d deployment_status ] && find deployment_status -type f -name '*.md' | grep -q .; then
+          echo "artifacts_found=true" >> $GITHUB_ENV
+        else
+          echo "artifacts_found=false" >> $GITHUB_ENV
+        fi
+    - name: Create deployment status summary
+      if: env.artifacts_found == 'true'
+      shell: bash
+      run: |
+        summary="# :rocket: Deployment Results :rocket:\n"
+        for file in deployment_status/**/*.md; do
+          result=$(cat "$file")
+          summary+=$(cat "$file")
+        done
+        echo -e "$summary" > summary.md
+        echo -e "$summary"
+    - name: Upsert Deployment Result Summary
+      if: env.artifacts_found == 'true'
+      uses: mshick/add-pr-comment@v2
+      with:
+        message-path: summary.md
+        refresh-message-position: true
