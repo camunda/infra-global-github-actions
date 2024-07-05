@@ -12,7 +12,7 @@ on:
       repository:
         description: GitHub repository (ORG/REPO_NAME)
         required: true
-      notify_back_on_error:
+      notify-back-on-error:
         description: \
           When the error message does not match with the expected one,
           re-trigger the workflow with the parameter `notify_back_error_message`.
@@ -58,7 +58,7 @@ jobs:
           inputted_errors='${{ inputs.error_messages }}'
           echo "Inputted errors: $inputted_errors"
           rerun=$(echo "$logs" | jq -c -n -R --argjson errors "$inputted_errors" '[inputs] | any(test($errors | join("|")))')
-          echo "Notify back: ${{ inputs.notify_back_on_error }}"
+          echo "Notify back: ${{ inputs.notify-back-on-error }}"
           echo "Rerun: $rerun"
           echo "rerun=$rerun" >> "$GITHUB_OUTPUT"
 
@@ -73,7 +73,7 @@ jobs:
           gh run rerun ${{ inputs.run_id }} -R ${{ inputs.repository }} --failed
 
       - name: Notify back error for run with id ${{ inputs.run_id }} for ${{ inputs.repository }} repository
-        if: steps.check_logs.outputs.rerun == 'false' && inputs.notify_back_on_error == 'true'
+        if: steps.check_logs.outputs.rerun == 'false' && inputs.notify-back-on-error == 'true'
         env:
           GH_DEBUG: api
           GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}

@@ -22,6 +22,14 @@ inputs:
   vault-secret-id:
     description: The Vault secret ID for fetching secrets
     required: true
+  notify-back-on-error:
+    description: \
+      When the error message does not match with the expected one,
+      re-trigger the workflow with the parameter `notify_back_error_message`.
+      Your calling workflow must implement the `notify_back_error_message` parameter
+      and foward the error.
+      This allows you to capture failures that are not related to a specific error.
+    default: "false"
 
 runs:
   using: composite
@@ -55,4 +63,4 @@ runs:
         result=$(echo "$error_messages" | jq -c -n -R '[inputs | select(length > 0)]')
         echo "result: $result"
         : # TODO: revert this
-        gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=feature/rerun-notify-on-error -F run_id=${{ inputs.run-id }} -F repository=${{ inputs.repository }} -F error_messages="$result"
+        gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=feature/rerun-notify-on-error -F run_id=${{ inputs.run-id }} -F repository=${{ inputs.repository }} -F error_messages="$result" -F notify-back-on-error=${{ inputs.notify-back-on-error }}
