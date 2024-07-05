@@ -12,6 +12,15 @@ on:
       repository:
         description: GitHub repository (ORG/REPO_NAME)
         required: true
+      notify_back_on_error:
+        description: \
+          When the error message does not match with the expected one,
+          re-trigger the workflow with the parameter `notify_back_error_message`.
+          Your calling workflow must implement the `notify_back_error_message` parameter
+          and foward the error.
+          This allows you to capture failures that are not related to a specific error.
+        default: "false"
+
 jobs:
   rerun:
     runs-on: ubuntu-latest
@@ -61,3 +70,18 @@ jobs:
           : # wait until the job is completed
           gh run watch ${{ inputs.run_id }} -R ${{ inputs.repository }} > /dev/null 2>&1
           gh run rerun ${{ inputs.run_id }} -R ${{ inputs.repository }} --failed
+
+      - name: Notify back error for run with id ${{ inputs.run_id }} for ${{ inputs.repository }} repository
+        if: steps.check_logs.outputs.rerun != 'true' && inputs.notify_back_on_error == 'true'
+        env:
+          GH_DEBUG: api
+          GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
+          # TODO: change ref
+        run: |
+          : # retrieve workflow details
+          WORKFLOW_URL="${{ github.server_url }}/${{ inputs.repository }}/actions/runs/${{ inputs.run_id }}"
+          notify_back_error_message="This workflow attempted a retry but there was no match on the log message, so it was not retried. Please check: $WORKFLOW_URL"
+          WORKFLOW_NAME=$(gh run view ${{ inputs.run_id }} --json workflowName --jq '.workflowName')
+
+          : # trigger a new run with the error notify
+          gh workflow run "${WORKFLOW_NAME}.yml" -R ${{ inputs.repository }} -f notify_back_error_message="$notify_back_error_message" -f ref="feature/retry-failed-actions"
