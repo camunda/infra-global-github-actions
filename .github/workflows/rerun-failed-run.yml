@@ -58,6 +58,7 @@ jobs:
           inputted_errors='${{ inputs.error_messages }}'
           echo "Inputted errors: $inputted_errors"
           rerun=$(echo "$logs" | jq -c -n -R --argjson errors "$inputted_errors" '[inputs] | any(test($errors | join("|")))')
+          echo "Notify back: ${{ inputs.notify_back_on_error }}"
           echo "Rerun: $rerun"
           echo "rerun=$rerun" >> "$GITHUB_OUTPUT"
 
@@ -72,7 +73,7 @@ jobs:
           gh run rerun ${{ inputs.run_id }} -R ${{ inputs.repository }} --failed
 
       - name: Notify back error for run with id ${{ inputs.run_id }} for ${{ inputs.repository }} repository
-        if: steps.check_logs.outputs.rerun != 'true' && inputs.notify_back_on_error == 'true'
+        if: steps.check_logs.outputs.rerun == 'false' && inputs.notify_back_on_error == 'true'
         env:
           GH_DEBUG: api
           GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
