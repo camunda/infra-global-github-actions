@@ -50,3 +50,29 @@ jobs:
           vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
           notify-back-on-error: "true"
 ```
+
+
+### Integration Example on the Calling Side
+
+To handle the custom error notification, you can use the following workflow configuration:
+
+```yaml
+  workflow_dispatch:
+    inputs:
+      notify_back_error_message:
+        description: \
+          Error message if retry was not successful.
+          This parameter is used for internal call back actions.
+        required: false
+        default: ''
+
+jobs:
+  triage:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Display notify_back_error_message if present
+        if: ${{ inputs.notify_back_error_message != '' }}
+        run: |
+          echo "A previous workflow failed but has attempted to retry: ${{ inputs.notify_back_error_message }}"
+          exit 1
+```
