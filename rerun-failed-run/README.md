@@ -1,6 +1,7 @@
+
 ### Retrigger Failed Run Action
 
-This composite Github Action can be used to retrigger runs which have failed.
+This composite GitHub Action can be used to retrigger runs which have failed.
 
 ### Usage
 
@@ -8,7 +9,7 @@ To call this action, you need to provide:
 - the ID of a failed GitHub Action workflow run to rerun
 - an error message that needs to be present in the workflow run logs
 This targeted approach helps retrigger only those runs that failed due to the specified error.
-You also need ensure that the repository from which you invoke this composite action has the following secrets configured: `VAULT_ADDR`, `VAULT_ROLE_ID`, and `VAULT_SECRET_ID`.
+You also need to ensure that the repository from which you invoke this composite action has the following secrets configured: `VAULT_ADDR`, `VAULT_ROLE_ID`, and `VAULT_SECRET_ID`.
 If these secrets are not present, please contact the infrastructure team to set them up for you.
 
 ### Inputs
@@ -21,6 +22,7 @@ If these secrets are not present, please contact the infrastructure team to set 
 | vault-addr (required)      | The Vault URL.                                                                                                                               |
 | vault-role-id (required)   | The Vault Role ID.                                                                                                                           |
 | vault-secret-id (required) | The Vault Secret ID.                                                                                                                         |
+| notify-back-on-error       | When the error message does not match with the expected one, re-trigger the workflow with the parameter `notify_back_error_message`. Your calling workflow must implement the `notify_back_error_message` parameter and forward the error. This allows you to capture failures that are not related to a specific error. Default is `"false"`. |
 
 ### Workflow Example
 ```yaml
@@ -32,7 +34,7 @@ jobs:
   # rerun the failed job
   rerun-failed-jobs:
     needs: build
-    if: failure() && fromJSON(github.run_attempt) < 3 #This limits the job to only be retried two times
+    if: failure() && fromJSON(github.run_attempt) < 3 # This limits the job to only be retried two times
     runs-on: ubuntu-latest
     steps:
       - name: Retrigger job
@@ -46,4 +48,5 @@ jobs:
           vault-addr: ${{ secrets.VAULT_ADDR }}
           vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
           vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+          notify-back-on-error: "true"
 ```

@@ -80,7 +80,6 @@ jobs:
         env:
           GH_DEBUG: api
           GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
-          # TODO: change ref
         run: |
           : # retrieve workflow details
           WORKFLOW_URL="${{ github.server_url }}/${{ inputs.repository }}/actions/runs/${{ inputs.run_id }}"
@@ -88,4 +87,4 @@ jobs:
           WORKFLOW_NAME=$(gh run view ${{ inputs.run_id }} -R ${{ inputs.repository }} --json workflowName --jq '.workflowName')
           echo "WORKFLOW_NAME=${WORKFLOW_NAME}"
           : # trigger a new run with the error notify
-          gh workflow run "${WORKFLOW_NAME}.yml" -R ${{ inputs.repository }} -F notify_back_error_message="$notify_back_error_message" --ref="feature/retry-failed-actions"
+          gh workflow run "${WORKFLOW_NAME}.yml" -R ${{ inputs.repository }} -F notify_back_error_message="$notify_back_error_message" --ref="main"
