@@ -82,7 +82,7 @@ jobs:
           : # retrieve workflow details
           WORKFLOW_URL="${{ github.server_url }}/${{ inputs.repository }}/actions/runs/${{ inputs.run_id }}"
           notify_back_error_message="This workflow attempted a retry but there was no match on the log message, so it was not retried. Please check: $WORKFLOW_URL"
-          WORKFLOW_NAME=$(gh run view ${{ inputs.run_id }} --json workflowName --jq '.workflowName')
+          WORKFLOW_NAME=$(gh run view ${{ inputs.run_id }} -R ${{ inputs.repository }} --json workflowName --jq '.workflowName')
 
           : # trigger a new run with the error notify
           gh workflow run "${WORKFLOW_NAME}.yml" -R ${{ inputs.repository }} -f notify_back_error_message="$notify_back_error_message" -f ref="feature/retry-failed-actions"
