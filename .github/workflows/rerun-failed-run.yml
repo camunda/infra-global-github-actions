@@ -12,14 +12,17 @@ on:
       repository:
         description: GitHub repository (ORG/REPO_NAME)
         required: true
-      notify-back-on-error:
-        description: \
-          When the error message does not match with the expected one,
-          re-trigger the workflow with the parameter `notify_back_error_message`.
+      notify_back_on_error:
+        description: |-
+          When the error messages (`error_messages`) are not found, the workflow will
+          re-trigger your calling workflow with the parameter `notify_back_error_message`.
           Your calling workflow must implement the `notify_back_error_message` parameter
-          and foward the error.
+          and forward the error.
           This allows you to capture failures that are not related to a specific error.
         default: "false"
+      notify_back_git_ref:
+        description: The Git reference to use when notifying back a workflow.
+        default: main
 
 jobs:
   rerun:
@@ -61,7 +64,7 @@ jobs:
           inputted_errors='${{ inputs.error_messages }}'
           echo "Inputted errors: $inputted_errors"
           rerun=$(echo "$logs" | jq -c -n -R --argjson errors "$inputted_errors" '[inputs] | any(test($errors | join("|")))')
-          echo "Notify back: ${{ inputs.notify-back-on-error }}"
+          echo "Notify back: ${{ inputs.notify_back_on_error }}"
           echo "Rerun: $rerun"
           echo "rerun=$rerun" >> "$GITHUB_OUTPUT"
 
@@ -76,7 +79,7 @@ jobs:
           gh run rerun ${{ inputs.run_id }} -R ${{ inputs.repository }} --failed
 
       - name: Notify back error for run with id ${{ inputs.run_id }} for ${{ inputs.repository }} repository
-        if: steps.check_logs.outputs.rerun == 'false' && inputs.notify-back-on-error == 'true'
+        if: steps.check_logs.outputs.rerun == 'false' && inputs.notify_back_on_error == 'true'
         env:
           GH_DEBUG: api
           GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
@@ -87,4 +90,4 @@ jobs:
           WORKFLOW_NAME=$(gh run view ${{ inputs.run_id }} -R ${{ inputs.repository }} --json workflowName --jq '.workflowName')
           echo "WORKFLOW_NAME=${WORKFLOW_NAME}"
           : # trigger a new run with the error notify
-          gh workflow run "${WORKFLOW_NAME}.yml" -R ${{ inputs.repository }} -F notify_back_error_message="$notify_back_error_message" --ref="main"
+          gh workflow run "${WORKFLOW_NAME}.yml" -R ${{ inputs.repository }} -F notify_back_error_message="$notify_back_error_message" --ref="${{ inputs.notify_back_git_ref }}"

@@ -1,4 +1,3 @@
-
 ### Retrigger Failed Run Action
 
 This composite GitHub Action can be used to retrigger runs which have failed.
@@ -24,7 +23,10 @@ If these secrets are not present, please contact the infrastructure team to set 
 | vault-secret-id (required) | The Vault Secret ID.                                                                                                                         |
 | notify-back-on-error       | When the error message does not match with the expected one, re-trigger the workflow with the parameter `notify_back_error_message`. Your calling workflow must implement the `notify_back_error_message` parameter and forward the error. This allows you to capture failures that are not related to a specific error. Default is `"false"`. |
 
-### Workflow Example
+### Workflow Example without error propagation
+
+This example shows how you can call this GitHub Action (GHA) from your CI without handling cases where a non-captured error is not propagated.
+
 ```yaml
 jobs:
   build:
@@ -48,19 +50,20 @@ jobs:
           vault-addr: ${{ secrets.VAULT_ADDR }}
           vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
           vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
-          notify-back-on-error: "true"
 ```
 
 
-### Integration Example on the Calling Side
+### Workflow Example with error propagation
 
-To handle the custom error notification, you can use the following workflow configuration:
+This example shows you how to propagate an error that is not supposed to be captured by the retry action.
+
+It requires you to implement a `workflow_dispatch` event with a `notify_back_error_message` input and a `triage` step that displays the error.
 
 ```yaml
   workflow_dispatch:
     inputs:
       notify_back_error_message:
-        description: \
+        description: |-
           Error message if retry was not successful.
           This parameter is used for internal call back actions.
         required: false
@@ -75,4 +78,28 @@ jobs:
         run: |
           echo "A previous workflow failed but has attempted to retry: ${{ inputs.notify_back_error_message }}"
           exit 1
+
+  build:
+    runs-on: gcp-core-2-default
+    ...
+
+  # rerun the failed job
+  rerun-failed-jobs:
+    needs: build
+    if: failure() && fromJSON(github.run_attempt) < 3 # This limits the job to only be retried two times
+    runs-on: ubuntu-latest
+    steps:
+      - name: Retrigger job
+        uses: camunda/infra-global-github-actions/rerun-failed-run@main
+        with:
+          error-messages: |
+            Process completed with exit code 1.
+            Process completed with exit code 99
+          run-id: ${{ github.run_id }}
+          repository: ${{ github.repository }}
+          vault-addr: ${{ secrets.VAULT_ADDR }}
+          vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+          vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+
+          notify-back-on-error: "true" # <--- In case of an error not captured by the GHA, the same workflow will be called again, and the triage step will show the error.
 ```
