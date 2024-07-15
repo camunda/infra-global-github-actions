@@ -64,4 +64,4 @@ runs:
         echo "result: $result"
 
         : # TODO: revert this --ref to main
-        gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=feature/retry-failed-actions -F run_id=${{ inputs.run-id }} -F repository=${{ inputs.repository }} -F error_messages="$result" -F notify_back_on_error=${{ inputs.notify-back-on-error }} -F notify_back_git_ref=${{ github.ref_name }}
+        gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=feature/rerun-notify-on-error -F run_id=${{ inputs.run-id }} -F repository=${{ inputs.repository }} -F error_messages="$result" -F notify_back_on_error=${{ inputs.notify-back-on-error }} -F notify_back_git_ref=${{ github.ref_name }}
