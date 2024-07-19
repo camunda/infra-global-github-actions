@@ -87,3 +87,33 @@ jobs:
     steps:
       - uses: camunda/infra-global-github-actions/preview-env/comment@main
 ```
+
+### Artifact Production
+The usage scenarios above only apply, when your workflow has produced artifacts beforehands which follow this naming convention:
+```
+# Artifact naming convention
+deployment-status-${{ github.run_id }}-${{ github.run_attempt }}-*
+```
+
+The [`create` action](../create/action.yml) got that part built-in like so:
+```yaml
+- name: Create deployment status artifact
+    if: always()
+    shell: bash
+    run: |
+      if [[ "${{ github.action_status }}" == "success" ]]; then
+        echo ":full_moon_with_face: [\`${{ inputs.app_name }}\`](${{ inputs.app_url }}): ${{ github.action_status }}\n" > status_${{ inputs.app_name }}.md
+      else
+        echo ":boom: \`${{ inputs.app_name }}\`: ${{ github.action_status }} :arrow_right: see [ArgoCD](https://${{ inputs.argocd_server }}/applications?health=Progressing%2CDegraded&search=${{ inputs.app_name }})\n" > status_${{ inputs.app_name }}.md
+      fi
+  - name: Upload deployment status as artifact
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: deployment-status-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.app_name }}
+      path: status_${{ inputs.app_name }}.md
+      retention-days: 1
+```
+
+> [!TIP]
+> The content of each markdown doesn't matter to the `comment` action, since it's blindly accumulating all artifacts it can find for the same run attempt.
