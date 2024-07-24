@@ -105,11 +105,11 @@ runs:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server }}
-  - name: Wait for sync (up to 1 minutes)
+  - name: Wait for sync (up to 20 minutes)
     shell: bash
     run: |-
       echo "::group::wait for sync"
-      argocd app wait ${{ inputs.app_name }} --timeout 60 --health
+      argocd app wait ${{ inputs.app_name }} --timeout 1200 --health
       echo "::endgroup::"
     env:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
