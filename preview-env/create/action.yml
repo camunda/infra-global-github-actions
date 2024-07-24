@@ -136,15 +136,15 @@ runs:
   - name: Create deployment status artifact
     if: always()
     env:
-      TEMPLATE_SUCCESS: '__SUCCESS__ :white_check_mark: [ArgoCD](https://${{ inputs.argocd_server }}/applications?search=${{ inputs.app_name }}) :link: [`${{ inputs.app_name }}`](${{ inputs.app_url }})\n'
-      TEMPLATE_FAILURE: '__FAILURE__ :x: [ArgoCD](https://${{ inputs.argocd_server }}/applications?search=${{ inputs.app_name }}) :name_badge: `${{ inputs.app_name }}`\n'
+      TEMPLATE_SUCCESS: '__SUCCESS__ :white_check_mark: [ArgoCD](https://${{ inputs.argocd_server }}/applications?search=${{ inputs.app_name }}) :link: [`${{ inputs.app_name }}`](${{ inputs.app_url }})'
+      TEMPLATE_FAILURE: '__FAILURE__ :x: [ArgoCD](https://${{ inputs.argocd_server }}/applications?search=${{ inputs.app_name }}) :name_badge: `${{ inputs.app_name }}`'
     shell: bash
     run: |
       if [[ "${{ github.action_status }}" == "success" ]]; then
-        echo "$TEMPLATE_SUCCESS" > status_${{ inputs.app_name }}.md
+        echo "${TEMPLATE_SUCCESS}\n" > status_${{ inputs.app_name }}.md
         echo "$TEMPLATE_SUCCESS" >> $GITHUB_STEP_SUMMARY
       else
-        echo "$TEMPLATE_FAILURE" > status_${{ inputs.app_name }}.md
+        echo "${TEMPLATE_FAILURE}\n" > status_${{ inputs.app_name }}.md
         echo "$TEMPLATE_FAILURE" >> $GITHUB_STEP_SUMMARY
       fi
   - name: Upload deployment status as artifact
