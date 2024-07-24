@@ -105,11 +105,11 @@ runs:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server }}
-  - name: Wait for sync (up to 2 minutes)
+  - name: Wait for sync (up to 1 minutes)
     shell: bash
     run: |-
       echo "::group::wait for sync"
-      argocd app wait ${{ inputs.app_name }} --timeout 120 --health
+      argocd app wait ${{ inputs.app_name }} --timeout 60 --health
       echo "::endgroup::"
     env:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
@@ -142,8 +142,10 @@ runs:
     run: |
       if [[ "${{ github.action_status }}" == "success" ]]; then
         echo "$TEMPLATE_SUCCESS" > status_${{ inputs.app_name }}.md
+        echo "$TEMPLATE_SUCCESS" >> $GITHUB_STEP_SUMMARY
       else
         echo "$TEMPLATE_FAILURE" > status_${{ inputs.app_name }}.md
+        echo "$TEMPLATE_FAILURE" >> $GITHUB_STEP_SUMMARY
       fi
   - name: Upload deployment status as artifact
     if: always()
