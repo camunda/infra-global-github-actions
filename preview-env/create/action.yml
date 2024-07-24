@@ -136,8 +136,8 @@ runs:
   - name: Create deployment status artifact
     if: always()
     env:
-      TEMPLATE_SUCCESS: '__SUCCESS__ :white_check_mark: [ArgoCD](https://${{ inputs.argocd_server }}/applications?health=Progressing%2CDegraded&search=${{ inputs.app_name }}) :link: [`${{ inputs.app_name }}`](${{ inputs.app_url }})\n'
-      TEMPLATE_FAILURE: '__FAILURE__ :x: [ArgoCD](https://${{ inputs.argocd_server }}/applications?health=Progressing%2CDegraded&search=${{ inputs.app_name }}) :name_badge: `${{ inputs.app_name }}`\n'
+      TEMPLATE_SUCCESS: '__SUCCESS__ :white_check_mark: [ArgoCD](https://${{ inputs.argocd_server }}/applications?search=${{ inputs.app_name }}) :link: [`${{ inputs.app_name }}`](${{ inputs.app_url }})\n'
+      TEMPLATE_FAILURE: '__FAILURE__ :x: [ArgoCD](https://${{ inputs.argocd_server }}/applications?search=${{ inputs.app_name }}) :name_badge: `${{ inputs.app_name }}`\n'
     shell: bash
     run: |
       if [[ "${{ github.action_status }}" == "success" ]]; then
