@@ -1,8 +1,10 @@
 ---
-name: Create Deployment Result Summary
+name: Manage Deployment Result Summary
 description: |
-  Creates a deployment result summary as comment in the current PR when deployment deployment artifacts have been uploaded during this run.
-
+  Manages a deployment result summary as comment in the current PR based on deployment artifacts.
+  If deployment artifacts have been uploaded, the action upserts the summary.
+  If there are no deployment artifacts, the summary will be deleted.
+  The deployment artifact name pattern: `deployment-status-<runID>-<runAttempt>-*`
 runs:
   using: composite
   steps:
@@ -11,28 +13,25 @@ runs:
       with:
         path: deployment_status
         pattern: deployment-status-${{ github.run_id }}-${{ github.run_attempt }}-*
-
     - name: Check for deployment artifacts
+      id: check_artifacts
       shell: bash
       run: |
         if [ -d deployment_status ] && find deployment_status -type f -name '*.md' | grep -q .; then
-          echo "artifacts_found=true" >> $GITHUB_ENV
+          echo "::set-output name=artifacts_found::true"
         else
-          echo "artifacts_found=false" >> $GITHUB_ENV
+          echo "::set-output name=artifacts_found::false"
         fi
     - name: Create deployment status summary
-      if: env.artifacts_found == 'true'
+      if: steps.check_artifacts.outputs.artifacts_found == 'true'
       shell: bash
       run: |
+        shopt -s globstar   # enables the `**` wildcard
         summary="# :rocket: Deployment Results :rocket:\n"
-        for file in deployment_status/**/*.md; do
-          result=$(cat "$file")
-          summary+=$(cat "$file")
-        done
-        echo -e "$summary" > summary.md
-        echo -e "$summary"
+        summary+=$(cat deployment_status/**/*.md)
+        echo -e "$summary" | tee summary.md
     - name: Upsert Deployment Result Summary
-      if: env.artifacts_found == 'true'
+      if: steps.check_artifacts.outputs.artifacts_found == 'true'
       uses: mshick/add-pr-comment@v2
       with:
         message-path: summary.md
