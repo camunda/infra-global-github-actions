@@ -24,7 +24,7 @@ A failure text contains the `app_name` and a link to the `argocd_server` (defaul
 ## Usage
 
 > [!NOTE]
-> To take effect, this action needs to be run after at least one call to `preview-env-create`. Otherwise you won't receive any results and no comment will be upserted.
+> To take effect, this action needs to be run after at least one call to `preview-env-create`. Otherwise you won't receive any results and the comment even gets deleted!
 
 ### Simple Job
 In a job which isn't part of any matrix the summary can be appended like this:
@@ -48,6 +48,7 @@ jobs:
     #########################################################################
     # Summarize Deployment results
     - name: Summarize Deployment Results
+      if: always() && needs.deploy-preview.result != 'skipped'
       uses: camunda/infra-global-github-actions/preview-env/comment@main
     ...
 ```
@@ -81,12 +82,16 @@ jobs:
   summarize:
     name: summarize-deployment-results
     runs-on: ubuntu-22.04
-    if: always()
+    if: always() && needs.deploy-preview.result != 'skipped'
     needs:
     - deploy-preview
     steps:
       - uses: camunda/infra-global-github-actions/preview-env/comment@main
 ```
+
+### Delete Summary
+If you want to delete the summary comment you can simply call it (like outlined above) in a different context where no matching workflow artifacts have been uploaded.
+A good example can be found in [`preview-env-destroy`](../destroy/action.yml).
 
 ### Artifact Production
 The usage scenarios above only apply, when your workflow has produced artifacts beforehands which follow this naming convention:

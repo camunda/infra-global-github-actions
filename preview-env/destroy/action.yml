@@ -55,6 +55,9 @@ runs:
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server  }}
 
+  - name: Summarize Deployment Results
+    uses: camunda/infra-global-github-actions/preview-env/comment@gha-459-preview-env-ux
+
   - uses: bobheadxi/deployments@v1.5.0
     if: always()
     name: Deactivate GitHub Deployment environment
