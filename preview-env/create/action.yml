@@ -109,7 +109,7 @@ runs:
     shell: bash
     run: |-
       echo "::group::wait for sync"
-      argocd app wait ${{ inputs.app_name }} --timeout 1200 --health
+      argocd app wait ${{ inputs.app_name }} --timeout 60 --health
       echo "::endgroup::"
     env:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
@@ -135,18 +135,17 @@ runs:
       env: ${{ inputs.app_name }}
   - name: Create deployment status artifact
     if: always()
-    env:
-      TEMPLATE_SUCCESS: '__SUCCESS__ :white_check_mark: [ArgoCD](https://${{ inputs.argocd_server }}/applications?search=${{ inputs.app_name }}) :link: [`${{ inputs.app_name }}`](${{ inputs.app_url }})'
-      TEMPLATE_FAILURE: '__FAILURE__ :x: [ArgoCD](https://${{ inputs.argocd_server }}/applications?search=${{ inputs.app_name }}) :name_badge: `${{ inputs.app_name }}`'
     shell: bash
+    env:
+      APP_NAME: ${{ inputs.app_name }}
+      APP_URL: ${{ inputs.app_url }}
+      ARGOCD_SERVER: ${{ inputs.argocd_server }}
+      REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.run_id }}
     run: |
-      if [[ "${{ github.action_status }}" == "success" ]]; then
-        echo "${TEMPLATE_SUCCESS}\n" > status_${{ inputs.app_name }}.md
-        echo "$TEMPLATE_SUCCESS" >> $GITHUB_STEP_SUMMARY
-      else
-        echo "${TEMPLATE_FAILURE}\n" > status_${{ inputs.app_name }}.md
-        echo "$TEMPLATE_FAILURE" >> $GITHUB_STEP_SUMMARY
-      fi
+      template=$(envsubst < ${{ github.action_path }}/comment_template_${{ github.action_status }}.md)
+      echo "$template" > status_${{ inputs.app_name }}.md
+      echo "$template" >> $GITHUB_STEP_SUMMARY
   - name: Upload deployment status as artifact
     if: always()
     uses: actions/upload-artifact@v4

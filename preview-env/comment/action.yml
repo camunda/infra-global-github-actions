@@ -27,8 +27,12 @@ runs:
       shell: bash
       run: |
         shopt -s globstar   # enables the `**` wildcard
-        summary="# :rocket: Deployment Results :rocket:\n"
+        summary="## :rocket: Deployment Results :rocket:\n"
+        summary+="Please find below the results of the latest deployments.\n"
         summary+=$(cat deployment_status/**/*.md)
+        summary+="\n## :wrench: Troubleshooting :wrench:\n"
+        summary+="The :link: \`ArgoCD\` link can be used to check the state and configuration of all the services deployed as part of the preview environments and get logs.\n\n"
+        summary+="In case of error, please check :writing_hand: \`Deployment Logs\` and :link: \`ArgoCD\` to debug, and check our (yet to come) troubleshooting page"
         echo -e "$summary" | tee summary.md
     - name: Upsert Deployment Result Summary
       if: steps.check_artifacts.outputs.ARTIFACTS_FOUND == 'true'
@@ -37,10 +41,8 @@ runs:
         message-path: summary.md
         refresh-message-position: true
     - name: Delete Summary
-      # this action will cause a warning:
-      # `Unexpected input(s) 'owner', 'repo', 'issue_number', valid inputs are ['route', 'mediaType']`
-      # This is expected and further info can be found here: https://github.com/octokit/request-action?tab=readme-ov-file#warnings
       if: steps.check_artifacts.outputs.ARTIFACTS_FOUND == 'true'
       uses: aki77/delete-pr-comments-action@v2
       with:
-        bodyContains: '<!-- add-pr-comment:add-pr-comment -->'
+        bodyContains: |-
+          [add-pr-comment]

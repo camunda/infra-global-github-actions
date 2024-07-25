@@ -27,7 +27,7 @@ A failure text contains the `app_name` and a link to the `argocd_server` (defaul
 > To take effect, this action needs to be run after at least one call to `preview-env-create`. Otherwise you won't receive any results and the comment even gets deleted!
 
 ### Simple Job
-In a job which isn't part of any matrix the summary can be appended like this:
+In a simple workflow the summary can be appended like this:
 ```yaml
 ...
 jobs:
@@ -90,8 +90,39 @@ jobs:
 ```
 
 ### Delete Summary
-If you want to delete the summary comment you can simply call it (like outlined above) in a different context where no matching workflow artifacts have been uploaded.
-A good example can be found in [`preview-env-destroy`](../destroy/action.yml).
+If you want to delete the summary comment you can simply call it (like outlined above) in a different context where no matching workflow artifacts have been uploaded (e.g. your `teardown` workflow).
+Again, 2 examples:
+
+```yaml
+#################
+# Simple Workflow
+
+...
+jobs:
+  teardown:
+    ...
+    - name: Delete Deployment Results
+      if: always() && needs.deploy-preview.result != 'skipped'
+      uses: camunda/infra-global-github-actions/preview-env/comment@main
+    ...
+
+#################
+# Matrix Workflow
+...
+jobs:
+  ...
+  teardown-stuff: ...
+  ...
+  comment:
+    name: delete-deployment-results
+    runs-on: ubuntu-22.04
+    if: always() && needs.teardown.result != 'skipped'
+    needs:
+    - teardown
+    steps:
+      - uses: camunda/infra-global-github-actions/preview-env/comment@gha-459-preview-env-ux
+  ...
+```
 
 ### Artifact Production
 The usage scenarios above only apply, when your workflow has produced artifacts beforehands which follow this naming convention:
