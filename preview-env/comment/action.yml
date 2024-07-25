@@ -40,7 +40,7 @@ runs:
       # this action will cause a warning:
       # `Unexpected input(s) 'owner', 'repo', 'issue_number', valid inputs are ['route', 'mediaType']`
       # This is expected and further info can be found here: https://github.com/octokit/request-action?tab=readme-ov-file#warnings
-      if: steps.check_artifacts.outputs.ARTIFACTS_FOUND == 'false'
+      if: steps.check_artifacts.outputs.ARTIFACTS_FOUND == 'true'
       uses: aki77/delete-pr-comments-action@v2
       with:
         bodyContains: '<!-- add-pr-comment:add-pr-comment -->'
