@@ -109,7 +109,7 @@ runs:
     shell: bash
     run: |-
       echo "::group::wait for sync"
-      argocd app wait ${{ inputs.app_name }} --timeout 60 --health
+      argocd app wait ${{ inputs.app_name }} --timeout 1200 --health
       echo "::endgroup::"
     env:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}

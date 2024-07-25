@@ -32,7 +32,7 @@ runs:
         summary+=$(cat deployment_status/**/*.md)
         summary+="\n## :wrench: Troubleshooting :wrench:\n"
         summary+="The :link: \`ArgoCD\` link can be used to check the state and configuration of all the services deployed as part of the preview environments and get logs.\n\n"
-        summary+="In case of error, please check :writing_hand: \`Deployment Logs\` and :link: \`ArgoCD\` to debug, and check our (yet to come) troubleshooting page"
+        summary+="In case of error, please check :clipboard: \`Deployment Jobs\` and :link: \`ArgoCD\` to debug, and check our (yet to come) troubleshooting page"
         echo -e "$summary" | tee summary.md
     - name: Upsert Deployment Result Summary
       if: steps.check_artifacts.outputs.ARTIFACTS_FOUND == 'true'
@@ -41,8 +41,11 @@ runs:
         message-path: summary.md
         refresh-message-position: true
     - name: Delete Summary
-      if: steps.check_artifacts.outputs.ARTIFACTS_FOUND == 'true'
-      uses: aki77/delete-pr-comments-action@v2
-      with:
-        bodyContains: |-
-          [add-pr-comment]
+      if: steps.check_artifacts.outputs.ARTIFACTS_FOUND == 'false'
+      env:
+        COMMENT_BODY: '<!-- add-pr-comment:add-pr-comment -->'
+        GH_REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ github.token }}
+        PULL_REQUEST: ${{ github.event.pull_request.number }}
+      run: ${{ github.action_path }}/delete.sh
+      shell: bash
