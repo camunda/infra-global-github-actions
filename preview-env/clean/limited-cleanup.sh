@@ -5,7 +5,7 @@
 ## A script that performs a minimal cleanup.
 ## It removes any comments from a pull request that might be inconsistent with the deployment status of its associated preview environment(s).
 ## This is very useful for quickly updating a pull request and eliminating any potential inconsistencies just after
-## an operation on associated preview environment(s) (deploy or teradown), while waiting for the full cleanup script to be executed.
+## an operation on associated preview environment(s) (deploy or teardown), while waiting for the full cleanup script to be executed.
 ##
 ## If pull request is in MERGED or CLOSED state, any warning or shutdown comments can be safely removed.
 ## If pull request is in OPEN state and NO preview label is attached, warning comments can be safely removed.

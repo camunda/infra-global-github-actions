@@ -133,3 +133,23 @@ runs:
       env_url: ${{ inputs.app_url }}
       ref: ${{ inputs.revision }}
       env: ${{ inputs.app_name }}
+  - name: Create deployment status artifact
+    if: always()
+    shell: bash
+    env:
+      APP_NAME: ${{ inputs.app_name }}
+      APP_URL: ${{ inputs.app_url }}
+      ARGOCD_SERVER: ${{ inputs.argocd_server }}
+      REPO: ${{ github.repository }}
+      RUN_ID: ${{ github.run_id }}
+    run: |
+      template=$(envsubst < ${{ github.action_path }}/templates/comment-${{ github.action_status }}.md)
+      echo "$template" > status_${{ inputs.app_name }}.md
+      echo "$template" >> $GITHUB_STEP_SUMMARY
+  - name: Upload deployment status as artifact
+    if: always()
+    uses: actions/upload-artifact@v4
+    with:
+      name: deployment-status-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.app_name }}
+      path: status_${{ inputs.app_name }}.md
+      retention-days: 1

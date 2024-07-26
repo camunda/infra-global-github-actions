@@ -1,0 +1,42 @@
+---
+name: Manage Deployment Result Summary
+description: |
+  Manages a deployment result summary as comment in the current PR based on deployment artifacts.
+  If deployment artifacts have been uploaded, the action upserts the summary.
+  If there are no deployment artifacts, the summary will get deleted.
+  The deployment artifact name pattern: `deployment-status-<runID>-<runAttempt>-*`
+runs:
+  using: composite
+  steps:
+    - name: Download Deployment Status Artifacts
+      uses: actions/download-artifact@v4
+      with:
+        path: deployment_status
+        pattern: deployment-status-${{ github.run_id }}-${{ github.run_attempt }}-*
+    - name: Check for Deployment Status Artifacts
+      id: deployment-status-artifacts
+      shell: bash
+      run: |
+        if [ -d deployment_status ] && find deployment_status -type f -name '*.md' | grep -q .; then
+          echo "found=true" >> $GITHUB_OUTPUT
+        else
+          echo "found=false" >> $GITHUB_OUTPUT
+        fi
+    - name: Upsert Deployment Result Summary
+      if: steps.deployment-status-artifacts.outputs.found == 'true'
+      uses: mshick/add-pr-comment@v2
+      with:
+        message-path: |
+          ${{ github.action_path }}/templates/comment-header.md
+          deployment_status/**/*.md
+          ${{ github.action_path }}/templates/comment-footer.md
+        refresh-message-position: true
+    - name: Delete Deployment Result Summary
+      if: steps.deployment-status-artifacts.outputs.found == 'false'
+      env:
+        TAG_IN_COMMENT_BODY: '<!-- add-pr-comment:add-pr-comment -->'
+        GH_REPO: ${{ github.repository }}
+        GH_TOKEN: ${{ github.token }}
+        PULL_REQUEST: ${{ github.event.pull_request.number }}
+      run: ${{ github.action_path }}/delete.sh
+      shell: bash
