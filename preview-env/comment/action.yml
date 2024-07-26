@@ -13,37 +13,28 @@ runs:
       with:
         path: deployment_status
         pattern: deployment-status-${{ github.run_id }}-${{ github.run_attempt }}-*
-    - name: Check for deployment artifacts
-      id: check_artifacts
+    - name: Check for Deployment Status Artifacts
+      id: deployment-status-artifacts
       shell: bash
       run: |
         if [ -d deployment_status ] && find deployment_status -type f -name '*.md' | grep -q .; then
-          echo "ARTIFACTS_FOUND=true" >> $GITHUB_OUTPUT
+          echo "found=true" >> $GITHUB_OUTPUT
         else
-          echo "ARTIFACTS_FOUND=false" >> $GITHUB_OUTPUT
+          echo "found=false" >> $GITHUB_OUTPUT
         fi
-    - name: Create deployment status summary
-      if: steps.check_artifacts.outputs.ARTIFACTS_FOUND == 'true'
-      shell: bash
-      run: |
-        shopt -s globstar   # enables the `**` wildcard
-        summary="## :rocket: Deployment Results :rocket:\n"
-        summary+="Please find below the results of the latest deployments.\n"
-        summary+=$(cat deployment_status/**/*.md)
-        summary+="\n## :wrench: Troubleshooting :wrench:\n"
-        summary+="The :link: \`ArgoCD\` link can be used to check the state and configuration of all the services deployed as part of the preview environments and get logs.\n\n"
-        summary+="In case of error, please check :clipboard: \`Deployment Jobs\` and :link: \`ArgoCD\` to debug, and check our (yet to come) troubleshooting page"
-        echo -e "$summary" | tee summary.md
     - name: Upsert Deployment Result Summary
-      if: steps.check_artifacts.outputs.ARTIFACTS_FOUND == 'true'
+      if: steps.deployment-status-artifacts.outputs.found == 'true'
       uses: mshick/add-pr-comment@v2
       with:
-        message-path: summary.md
+        message-path: |
+          ${{ github.action_path }}/templates/comment-header.md
+          deployment_status/**/*.md
+          ${{ github.action_path }}/templates/comment-footer.md
         refresh-message-position: true
-    - name: Delete Summary
-      if: steps.check_artifacts.outputs.ARTIFACTS_FOUND == 'false'
+    - name: Delete Deployment Result Summary
+      if: steps.deployment-status-artifacts.outputs.found == 'false'
       env:
-        COMMENT_BODY: '<!-- add-pr-comment:add-pr-comment -->'
+        TAG_IN_COMMENT_BODY: '<!-- add-pr-comment:add-pr-comment -->'
         GH_REPO: ${{ github.repository }}
         GH_TOKEN: ${{ github.token }}
         PULL_REQUEST: ${{ github.event.pull_request.number }}

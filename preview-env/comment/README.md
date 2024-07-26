@@ -11,15 +11,16 @@ All of the following deployment results will be collected in a comment with a he
 
 > # :rocket: Deployment Results :rocket:
 
-### Success
-A success text contains the `app_name` and `app_url` handed to `preview-env-create` and looks like this:
+For `preview-env-create` we have 3 different deployment result templates:
 
-> :full_moon_with_face: [app_name](https://argo-cd.readthedocs.io): success
+### Success
+Please see [this template](../create/templates/comment_template_success.md).
 
 ### Failure
-A failure text contains the `app_name` and a link to the `argocd_server` (defaults to: `argocd.int.camunda.com`) with prefiltered results (status: degraded, search: `revision`)
+Please see [this template](../create/templates/comment_template_failure.md).
 
-> :boom: `app_name`: failure :arrow_right: see [ArgoCD Dummy URL](https://argo-cd.readthedocs.io/en/stable/operator-manual/health/)
+### Cancelled
+Please see [this template](../create/templates/comment_template_cancelled.md).
 
 ## Usage
 
@@ -131,25 +132,7 @@ The usage scenarios above only apply, when your workflow has produced artifacts 
 deployment-status-${{ github.run_id }}-${{ github.run_attempt }}-*
 ```
 
-The [`create` action](../create/action.yml) got that part built-in like so:
-```yaml
-- name: Create deployment status artifact
-    if: always()
-    shell: bash
-    run: |
-      if [[ "${{ github.action_status }}" == "success" ]]; then
-        echo ":full_moon_with_face: [\`${{ inputs.app_name }}\`](${{ inputs.app_url }}): ${{ github.action_status }}\n" > status_${{ inputs.app_name }}.md
-      else
-        echo ":boom: \`${{ inputs.app_name }}\`: ${{ github.action_status }} :arrow_right: see [ArgoCD](https://${{ inputs.argocd_server }}/applications?health=Progressing%2CDegraded&search=${{ inputs.app_name }})\n" > status_${{ inputs.app_name }}.md
-      fi
-  - name: Upload deployment status as artifact
-    if: always()
-    uses: actions/upload-artifact@v4
-    with:
-      name: deployment-status-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.app_name }}
-      path: status_${{ inputs.app_name }}.md
-      retention-days: 1
-```
+See steps `Create deployment status artifact` and `Upload deployment status as artifact` in the [`create` action](../create/action.yml) on how to upload artifacts properly.
 
 > [!TIP]
-> The content of each markdown doesn't matter to the `comment` action, since it's blindly accumulating all artifacts it can find for the same run attempt.
+> The content of each markdown doesn't matter to the `comment` action, since it's blindly accumulating all artifacts it can find for the same run attempt into a single markdown file.

@@ -12,7 +12,7 @@ set -o nounset
 set -o pipefail
 
 RELATIVE_SCRIPT_PATH=$(dirname "$0")
-COMMENT_BODY=${COMMENT_BODY?}
+TAG_IN_COMMENT_BODY=${TAG_IN_COMMENT_BODY?}
 PULL_REQUEST=${PULL_REQUEST?}
 
 # shellcheck source=/dev/null
@@ -21,7 +21,7 @@ source "$RELATIVE_SCRIPT_PATH/../clean/github.sh"
 comment_ids_to_delete=$(
 get_comments_by_pull_request_and_tag \
     "$PULL_REQUEST" \
-    "$COMMENT_BODY" |
+    "$TAG_IN_COMMENT_BODY" |
     jq -r \
     '.[].id'
 )
