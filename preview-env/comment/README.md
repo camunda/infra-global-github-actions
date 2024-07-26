@@ -14,13 +14,13 @@ All of the following deployment results will be collected in a comment with a he
 For `preview-env-create` we have 3 different deployment result templates:
 
 ### Success
-Please see [this template](../create/templates/comment_template_success.md).
+Please see [this template](../create/templates/comment-success.md).
 
 ### Failure
-Please see [this template](../create/templates/comment_template_failure.md).
+Please see [this template](../create/templates/comment-failure.md).
 
 ### Cancelled
-Please see [this template](../create/templates/comment_template_cancelled.md).
+Please see [this template](../create/templates/comment-cancelled.md).
 
 ## Usage
 
