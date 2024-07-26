@@ -7,6 +7,9 @@ inputs:
   build_status:
     description: String representing the build status that should be submitted to CI Analytics, e.g. "success", "failed", "cancelled".
     required: true
+  build_duration_millis:
+    description: Optional number (positive) that indicates the duration of the build in milliseconds.
+    required: false
   user_reason:
     description: Optional string (200 chars max) the user can submit to indicate the reason why a build has ended with a certain build status , e.g. "flaky-tests".
     required: false
@@ -39,6 +42,7 @@ runs:
       echo "Inputs"
       echo "-----"
       echo "Build status: ${{ inputs.build_status }}"
+      echo "Build duration (in ms): ${{ inputs.build_duration_millis }}"
       echo "User reason: ${{ inputs.user_reason }}"
       echo "User description: ${{ inputs.user_description }}"
       echo "Job name override: ${{ inputs.job_name_override }} (default job name: $GITHUB_JOB)"
@@ -100,6 +104,7 @@ runs:
         "runner_arch": "$(echo $RUNNER_ARCH | tr '[:upper:]' '[:lower:]')",
         "runner_os": "$(echo $RUNNER_OS | tr '[:upper:]' '[:lower:]')"
         ${{ (env.BUILD_BASE_REF == '') && ' ' || format(', "build_base_ref": "{0}"', env.BUILD_BASE_REF) }}
+        ${{ (inputs.build_duration_millis == '') && ' ' || format(', "build_duration_milliseconds": "{0}"', inputs.build_duration_millis) }}
         ${{ (inputs.user_reason == '') && ' ' || format(', "user_reason": "{0}"', inputs.user_reason) }}
         ${{ (inputs.user_description == '') && ' ' || format(', "user_description": "{0}"', inputs.user_description) }}
       }
