@@ -47,6 +47,10 @@ inputs:
     description: Whether load docker image from build into local Docker Images
     required: false
     default: 'false'
+  job_summary:
+    description: Enable GitHub job summary
+    required: false
+    default: 'false'
   qemu_image:
     description: QEMU static binaries Docker image
     required: false
@@ -153,6 +157,8 @@ runs:
   - name: Build and push Docker image
     id: build-push
     uses: docker/build-push-action@v6
+    env:
+      DOCKER_BUILD_SUMMARY: ${{ inputs.job_summary }}
     with:
       allow: ${{ inputs.build_allow }}
       context: ${{ inputs.build_context }}
