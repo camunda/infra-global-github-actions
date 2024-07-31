@@ -11,9 +11,11 @@ This composite GHA can be used in any repository that was set up to provide cred
 | Input name           | Description                                        |
 |----------------------|----------------------------------------------------|
 | build_status         | String representing the build status that should be submitted to CI Analytics, e.g. `"success"`, `"failed"`, `"cancelled"` |
+| build_duration_millis | Optional number (positive) that indicates the duration of the build in milliseconds |
 | user_reason          | Optional string (200 chars max) the user can submit to indicate the reason why a build has ended with a certain build status , e.g. `"flaky-tests"` |
 | user_description     | Optional string (1000 chars max) the user can submit to provide details on the user_reason, e.g. a list of flaky tests |
 | gcp_credentials_json | Credentials for a Google Clout ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file |
+| job_name_override    | Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB`, useful e.g. for matrix builds |
 
 Please check out Camunda's [Github Actions Recipes](https://github.com/camunda/github-actions-recipes#secrets=) for how to retrieve secrets from Vault.
 
@@ -28,11 +30,16 @@ All data submitted by this action is stored as one record in the Big Query table
 | report_time      | TIMESTAMP  | REQUIRED   | Time of record submission |
 | ci_url           | STRING     | REQUIRED   | Github repository URL from `"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"` |
 | workflow_name    | STRING     | NULLABLE   | GHA workflow name from `"$GITHUB_WORKFLOW"` |
-| job_name         | STRING     | REQUIRED   | GHA workflow job name from `"$GITHUB_JOB"` |
-| build_id         | STRING     | REQUIRED   | GHA workflow run ID from `"$GITHUB_RUN_ID"` |
+| job_name         | STRING     | REQUIRED   | GHA workflow job ID from `"$GITHUB_JOB"` |
+| build_id         | STRING     | REQUIRED   | GHA workflow run ID from `"$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT"` |
 | build_trigger    | STRING     | NULLABLE   | Github event name from `"$GITHUB_EVENT_NAME"` |
 | build_status     | STRING     | REQUIRED   | Based on user input |
 | build_ref        | STRING     | NULLABLE   | Git object reference from `"$GITHUB_REF"` |
+| build_base_ref   | STRING     | NULLABLE   | Git object reference of target branch for PRs or GH merge queue |
+| build_duration_milliseconds | INTEGER | NULLABLE | Based on user input (time a job needed from start to finish) |
+| runner_name      | STRING     | NULLABLE   | Lowercase name of the runner executing the GHA workflow job |
+| runner_arch      | STRING     | NULLABLE   | Lowercase name of the runner's CPU architecture executing the GHA workflow job |
+| runner_os        | STRING     | NULLABLE   | Lowercase name of the runner's operating system executing the GHA workflow job |
 | user_reason      | STRING     | NULLABLE   | Based on user input |
 | user_description | STRING     | NULLABLE   | Based on user input |
 
