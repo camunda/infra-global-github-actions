@@ -20,7 +20,7 @@ inputs:
     default: ''
 
   gcp_credentials_json:
-    description: Credentials for a Google Clout ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file.
+    description: Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file.
     required: true
 
   job_name_override:
