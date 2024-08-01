@@ -1,0 +1,73 @@
+
+---
+name: Submit Aborted GHA Status
+
+description: Checks failed jobs of a GHA workflow for runner problems and submits https://confluence.camunda.com/display/HAN/CI+Analytics data on their behalf
+
+inputs:
+  gcp_credentials_json:
+    description: Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file.
+    required: true
+
+  big_query_table_name:
+    description: Use only for infrastructure testing purposes to target e.g. dev environment.
+    required: false
+    default: 'ci-30-162810:prod_ci_analytics.build_status_v2'
+
+runs:
+  using: composite
+  steps:
+  - name: Echo inputs
+    shell: bash
+    run: |
+      echo "Inputs"
+      echo "-----"
+      echo "BQ table name (for testing): ${{ inputs.big_query_table_name }}"
+
+  - name: Login to Google Cloud
+    id: auth
+    uses: google-github-actions/auth@v2
+    with:
+      credentials_json: '${{ inputs.gcp_credentials_json }}'
+
+  - name: Setup Google Cloud SDK
+    uses: google-github-actions/setup-gcloud@v2
+
+  - name: Print Google Cloud SDK version used
+    shell: bash
+    run: |
+      gcloud info
+
+  - name: Submit build status to CI Analytics
+    shell: bash
+    env:
+      BG_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
+      BUILD_BASE_REF: "${{ github.base_ref && format('refs/heads/{0}', github.base_ref) || github.event.merge_group.base_ref }}"
+      GH_TOKEN: ${{ github.token }}
+    run: |
+      gh api -X GET "repos/camunda/camunda/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" --jq '.jobs[] | select(.conclusion=="failure") .id' | while read job_id; do
+        echo "Checking failed job $job_id for abort due to runner problem..."
+        if gh api -X GET "/repos/camunda/camunda/check-runs/$job_id/annotations" --jq '.[] | select(.message | contains("lost communication with the server") or contains("runner has received a shutdown signal"))' | grep -q message; then
+          job_name=$(gh api "repos/camunda/camunda/actions/jobs/$job_id" --jq '.name')
+          runner_name=$(gh api "repos/camunda/camunda/actions/jobs/$job_id" --jq '.runner_name' | tr '[:upper:]' '[:lower:]')
+          echo "Job $job_id got aborted due to problem with runner $runner_name! Sending CI Analytics data..."
+
+          cat <<EOF | tr '\n' ' ' | $BG_COMMAND insert "${{ inputs.big_query_table_name }}"
+      {
+        "report_time": "$(date '+%Y-%m-%d %H:%M:%S')",
+        "ci_url": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY",
+        "workflow_name": "$GITHUB_WORKFLOW",
+        "job_name": "$job_name",
+        "build_id": "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT",
+        "build_trigger": "$GITHUB_EVENT_NAME",
+        "build_status": "aborted",
+        "build_ref": "$GITHUB_REF",
+        "runner_name": "$runner_name",
+        "user_reason": "agent-disconnected"
+        ${{ (env.BUILD_BASE_REF == '') && ' ' || format(', "build_base_ref": "{0}"', env.BUILD_BASE_REF) }}
+      }
+      EOF
+        fi
+      done
+
+    # See https://github.com/actions/runner/issues/409#issuecomment-1013325196 for above ternary operator!

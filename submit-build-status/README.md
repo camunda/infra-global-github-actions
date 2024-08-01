@@ -14,7 +14,7 @@ This composite GHA can be used in any repository that was set up to provide cred
 | build_duration_millis | Optional number (positive) that indicates the duration of the build in milliseconds |
 | user_reason          | Optional string (200 chars max) the user can submit to indicate the reason why a build has ended with a certain build status , e.g. `"flaky-tests"` |
 | user_description     | Optional string (1000 chars max) the user can submit to provide details on the user_reason, e.g. a list of flaky tests |
-| gcp_credentials_json | Credentials for a Google Clout ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file |
+| gcp_credentials_json | Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file |
 | job_name_override    | Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB`, useful e.g. for matrix builds |
 
 Please check out Camunda's [Github Actions Recipes](https://github.com/camunda/github-actions-recipes#secrets=) for how to retrieve secrets from Vault.
@@ -64,25 +64,23 @@ on: [pull_request]
 
 jobs:
   successful-job:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     # Needed to create a workspace so submit-build-status can store files!
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     # This step is user-defined and does the actual testing/linting.
-    # It needs to have an ID to allow getting failed/success outcome later.
     - name: Testing
-      id: hello
       run: |
         echo Hello World
         exit 0  # <- experiment with setting this to 1
 
     # Always submit build status to CI Analytics
     - uses: camunda/infra-global-github-actions/submit-build-status@main
-      if: always()
+      if: always()  # run even in case of failures
       continue-on-error: true  # prevent failure here of marking the job as failed
       with:
-        build_status: "${{ steps.hello.outcome }}"
+        build_status: "${{ job.status }}"
         gcp_credentials_json: "${{ secrets.YOUR_GCP_CREDENTIALS }}"
         # user_reason: "maybe-flaky-tests"
         # user_description: "test1,test2,test23,test42"
