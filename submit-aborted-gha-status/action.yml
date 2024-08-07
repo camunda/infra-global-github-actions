@@ -47,10 +47,17 @@ runs:
     run: |
       gh api -X GET "repos/camunda/camunda/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" --jq '.jobs[] | select(.conclusion=="failure") .id' | while read job_id; do
         echo "Checking failed job $job_id for abort due to runner problem..."
-        if gh api -X GET "/repos/camunda/camunda/check-runs/$job_id/annotations" --jq '.[] | select(.message | contains("lost communication with the server") or contains("runner has received a shutdown signal"))' | grep -q message; then
+
+        job_annotations=$(gh api -X GET "/repos/camunda/camunda/check-runs/$job_id/annotations" --jq '.[] | select(.message | contains("lost communication with the server") or contains("runner has received a shutdown signal"))')
+
+        if echo "$job_annotations" | grep -q message; then
           job_name=$(gh api "repos/camunda/camunda/actions/jobs/$job_id" --jq '.name')
           runner_name=$(gh api "repos/camunda/camunda/actions/jobs/$job_id" --jq '.runner_name' | tr '[:upper:]' '[:lower:]')
-          echo "Job $job_id got aborted due to problem with runner $runner_name! Sending CI Analytics data..."
+          if [ "$runner_name" == "" ]; then
+            runner_name=$(echo "$job_annotations" | grep -oP '(?<=The self-hosted runner: )\S+')
+          fi
+
+          echo "Job $job_id got aborted due to problem with runner '$runner_name'. Sending CI Analytics data..."
 
           cat <<EOF | tr '\n' ' ' | $BG_COMMAND insert "${{ inputs.big_query_table_name }}"
       {
