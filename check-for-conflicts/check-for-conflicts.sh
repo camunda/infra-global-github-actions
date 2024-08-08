@@ -10,9 +10,7 @@
 set -o pipefail
 set -o errexit
 
-# FIXME put these into the env section of the action itself
-COMMENT_BODY_TEMPLATE_PATH=templates/comment-body.md
-export REPOSITORY=camunda/infra-global-github-actions
+export GH_REPO=camunda/infra-global-github-actions
 
 RELATIVE_SCRIPT_PATH=$(dirname "$0")
 COMMENT_TAG="<!-- MERGE CONFLICT DETECTED -->" # used for sticky comments
@@ -24,7 +22,7 @@ source "$RELATIVE_SCRIPT_PATH/../preview-env/clean/github.sh"
 if [ -z "$PR_ID" ]; then
   # scan all PRs in repository
   echo "🌐  Checking all PRs with label 'deploy-preview' for merge conflicts..."
-  PR_IDS=$(gh pr list -R $REPOSITORY --state open --label deploy-preview --json number --jq '.[].number')
+  PR_IDS=$(gh pr list -R $GH_REPO --state open --label deploy-preview --json number --jq '.[].number')
 else
   # use only input to limit scope
   echo "📍  Checking PR #$PR_ID for merge conflicts..."
@@ -39,7 +37,7 @@ conflicted_prs=
 mergeable_prs=
 for id in $PR_IDS; do
   echo -n "  Checking PR #$id ... "
-  if gh pr view "$id" -R "$REPOSITORY" --json mergeable --jq '.mergeable' | grep -q CONFLICTING; then
+  if gh pr view "$id" -R "$GH_REPO" --json mergeable --jq '.mergeable' | grep -q CONFLICTING; then
     echo " 💥 CONFLICTED!"
     conflicted_prs="$conflicted_prs $id"
   else
@@ -55,7 +53,7 @@ if [ -n "$conflicted_prs" ]; then
   for pr in $conflicted_prs; do
     export pr
     echo "Upserting comment in PR #$pr ..."
-    comment_body=$(envsubst < $COMMENT_BODY_TEMPLATE_PATH)
+    comment_body=$(envsubst < "$COMMENT_BODY_TEMPLATE_PATH")
     upsert_comment "$pr" "$COMMENT_TAG" "$comment_body"
   done
 fi
