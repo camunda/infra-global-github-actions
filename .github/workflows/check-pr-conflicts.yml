@@ -1,0 +1,19 @@
+---
+  name: Check for PR conflicts
+
+  on:
+    schedule:
+    - cron: 23 1 * * 1-5
+    pull_request:
+      # TODO remove after first successful run
+      branches:
+        - "main"
+    workflow_dispatch:
+
+  jobs:
+    check-pr-conflicts:
+      runs-on: ubuntu-latest
+      steps:
+      - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
+      - name: Check all PRs for conflict
+        uses: camunda/infra-global-github-actions/check-for-conflicts@gh-566-check-merge-conflicts
