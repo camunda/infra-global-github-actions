@@ -22,3 +22,8 @@ jobs:
     - uses: pre-commit/action@v3.0.1
       with:
         extra_args: --all-files --verbose
+    - name: Check all PRs for conflict
+      if: github.event_name == 'pull_request'
+      uses: camunda/infra-global-github-actions/check-for-conflicts@gh-566-check-merge-conflicts
+      with:
+        pull-request-id: ${{ github.event.pull_request.number }}
