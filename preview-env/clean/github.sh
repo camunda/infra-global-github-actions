@@ -20,6 +20,7 @@ function delete_pull_request_comment {
   set -e # subshells do not inherit the -e option
 
   id=$1
+  exit_code=0
 
   result=$(
     gh api \
@@ -27,16 +28,45 @@ function delete_pull_request_comment {
       "/repos/{owner}/{repo}/issues/comments/$id"
   ) || exit_code=$?
 
-  if [ "${exit_code:-0}" != 0 ]; then
+  if [ "$exit_code" != 0 ]; then
     not_found=$(
       echo "$result" | jq '.message == "Not Found"'
     )
     if [ "$not_found" = true ]; then
       return 44
     else
-      return "$exit_code"
+      return $exit_code
     fi
   fi
+}
+
+# Deletes all comments from a pull request containing a tag (in the body)
+function delete_comments_by_pull_request_and_tag {
+  set -e # subshells do not inherit the -e option
+
+  pr_number=$1
+  comment_tag=$2
+
+  # Get existing comment IDs if any (should be only one)
+  comment_ids=$(
+    get_comments_by_pull_request_and_tag \
+      "$pr_number" \
+      "$comment_tag" |
+        jq -r \
+          '.[].id | select(. != null)'
+  )
+
+  if [ -z "$comment_ids" ]; then
+    echo "No comments matching tag '$comment_tag' found on PR #$pr_number"
+  fi
+
+
+  # delete comments
+  for id in $comment_ids; do
+    echo -ne "🗑️\tDeleting comment (id: $id) on pr #$pr_number ... "
+    delete_pull_request_comment "$id" || [ $? = 44 ] # 44 -> Comment not found
+    echo -e "✔️"
+  done
 }
 
 # Remove label(s) from a pull request
@@ -78,6 +108,35 @@ function get_comments_by_pull_request_and_tag {
   )
 
   echo "$comments"
+}
+
+# Upserts a comment identified by pr_id and tag in body
+#
+# To have a sticky comment (at the very end)
+# AND to get a cleanup of eventually multipliple comments with the same ID
+# all comments with the given `comment_tag` will be deleted before a new one is created.
+# So an update is actually a "delete & create"
+# args:
+#   $1: pr_number
+#   $2: comment_tag (to identify comment in pr)
+#   $3: comment_body (actual readable payload)
+function upsert_comment {
+  set -e # subshells do not inherit the -e option
+
+  pr_number=$1
+  comment_tag=$2
+  comment_body="$2
+  $3" # composite body of tag and actual comment body
+
+  # Delete existing comments
+  delete_comments_by_pull_request_and_tag \
+      "$pr_number" \
+      "$comment_tag"
+
+  # Create a new comment
+  echo -ne "💬\tCreating a new comment on PR #$pr_number ... "
+  create_pull_request_comment "$pr_number" "$comment_body" > /dev/null
+  echo -e " ✔️"
 }
 
 # Get deployments associated to a Git ref.
