@@ -38,7 +38,7 @@ IFS=$DEFAULT_IFS
 if [ -z "$PR_ID" ]; then
   # scan all PRs in repository
   echo -e "🌐\tChecking all PRs with label filter '${FILTER_STRING}' for merge conflicts..."
-  PR_IDS=$(gh pr list -R "${GH_REPO}" --state open "${FILTER_STRING}" --json number --jq '.[].number')
+  PR_IDS=$(eval gh pr list -R "${GH_REPO}" --state open "${FILTER_STRING}" --json number --jq '.[].number')
 else
   # use only input to limit scope
   echo -e "📍\tChecking PR #${PR_ID} for merge conflicts..."
