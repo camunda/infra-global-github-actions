@@ -7,7 +7,10 @@ description: |
   It also cleans up existing comments, if there's no conflict (e.g. it got resolved)
 
 inputs:
-
+  label-filters:
+    default: "deploy-preview"
+    description: Comma separated list of PR labels to narrow down the scan.
+    required: false
   pull-request-id:
     description: Limits the scan to the given PR-ID
     requried: false
@@ -22,6 +25,7 @@ runs:
       COMMENT_BODY_TEMPLATE_PATH: ${{ github.action_path }}/templates/comment-body.md
       GH_REPO: ${{ github.repository }}
       GH_TOKEN: ${{ github.token }}
+      LABEL_FILTERS: ${{ inputs.label-filters }}
       PR_ID: ${{ inputs.pull-request-id }}
     run: |
       ${{ github.action_path }}/check-for-conflicts.sh

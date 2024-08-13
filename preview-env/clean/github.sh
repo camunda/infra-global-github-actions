@@ -63,9 +63,9 @@ function delete_comments_by_pull_request_and_tag {
 
   # delete comments
   for id in $comment_ids; do
-    echo -n "Deleting comment with id: $id on pr #$pr_number ... "
+    echo -ne "🗑️\tDeleting comment (id: $id) on pr #$pr_number ... "
     delete_pull_request_comment "$id" || [ $? = 44 ] # 44 -> Comment not found
-    echo "🗑️  DELETED"
+    echo -e "✔️"
   done
 }
 
@@ -134,9 +134,9 @@ function upsert_comment {
       "$comment_tag"
 
   # Create a new comment
-  echo -n "Creating a new comment on PR #$pr_number ... "
+  echo -ne "💬\tCreating a new comment on PR #$pr_number ... "
   create_pull_request_comment "$pr_number" "$comment_body" > /dev/null
-  echo "💬  CREATED"
+  echo -e " ✔️"
 }
 
 # Get deployments associated to a Git ref.
