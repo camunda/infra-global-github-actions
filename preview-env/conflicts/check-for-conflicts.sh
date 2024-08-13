@@ -73,6 +73,7 @@ if [ -n "$conflicted_prs" ]; then
   echo "Found conflicted PRs. Will post comment on: #${conflicted_prs}"
   for pr in $conflicted_prs; do
     echo "Upserting comment in PR #$pr ..."
+    export pr # required for envsubst
     comment_body=$(envsubst < "$COMMENT_BODY_TEMPLATE_PATH")
     upsert_comment "$pr" "$COMMENT_TAG" "$comment_body"
   done
