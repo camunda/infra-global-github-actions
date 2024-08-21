@@ -9,10 +9,10 @@ inputs:
     required: true
   registry_username:
     description: Registry username used for authenticating to registry host.
-    required: true
+    required: false
   registry_password:
     description: Registry password used for authenticating to registry host.
-    required: true
+    required: false
   image_name:
     description: Docker image name WITHOUT registry and WITHOUT Docker tag, e.g. example/image.
     required: true
@@ -43,6 +43,12 @@ inputs:
     description: Whether load docker image from build into local Docker Images
     required: false
     default: 'false'
+  workload_identity_provider:
+    description: The google workload identity provider used for GAR authentication
+    required: false
+  google_service_account:
+    description: The google service account used for GAR authentication
+    required: false
 
 outputs:
   image_digest:
@@ -121,7 +127,18 @@ runs:
     # Only attempt login when we want to push. This avoids depending on a 3rd
     # party service when not needed. In case the registry is unavailable
     # the non-push builds will continue to be green.
-    if: ${{ env.SHOULD_WE_PUSH == 'true' }}
+    if: ${{ env.SHOULD_WE_PUSH == 'true' && !inputs.workload_identity_provider }}
+    with:
+      registry: ${{ inputs.registry_host }}
+      username: ${{ inputs.registry_username }}
+      password: ${{ inputs.registry_password }}
+
+  - name: Login to Docker registry in Google
+    uses: docker/login-action@v3
+    # Only attempt login when we want to push. This avoids depending on a 3rd
+    # party service when not needed. In case the registry is unavailable
+    # the non-push builds will continue to be green.
+    if: ${{ env.SHOULD_WE_PUSH == 'true' && inputs.workload_identity_provider }}
     with:
       registry: ${{ inputs.registry_host }}
       username: ${{ inputs.registry_username }}
@@ -140,6 +157,7 @@ runs:
       tags: ${{ steps.meta.outputs.tags }}
       labels: ${{ steps.meta.outputs.labels }}
       load: ${{ inputs.docker_load }}
+
   - id: get-image-names
     shell: bash
     run: |
