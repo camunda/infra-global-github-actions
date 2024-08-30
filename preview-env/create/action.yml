@@ -38,6 +38,12 @@ inputs:
 runs:
   using: composite
   steps:
+  - name: Restore cache
+    uses: actions/cache@v4
+    id: tool-cache-argocd
+    with:
+      path: /usr/local/bin/argocd
+      key: ${{ runner.os }}-tool-cache-argo-${{ inputs.argocd_version }}
   - name: Setup Argo CD
     shell: bash
     if: ${{ steps.tool-cache-argocd.outputs.cache-hit != 'true' }}
@@ -66,6 +72,7 @@ runs:
       max_retries=3
       for attempt in $(seq "$max_retries"); do
           argocd app create ${{ inputs.argocd_arguments }}
+          echo "command: argocd app create ${{ inputs.argocd_arguments }}"
           if [ $? -eq 0 ]; then
             echo "Creating Argo CD app with name ${{ inputs.app_name }}"
             sleep 10
