@@ -1,0 +1,78 @@
+
+---
+name: Set up GHA caching for Yarn
+
+description: Configures GHA cache for Yarn global cache dir (no save on PRs), see https://github.com/camunda/camunda/wiki/CI-&-Automation#caching-strategy
+
+inputs:
+  directory:
+    description: Directory of the project for which Yarn to GHA cache should be configured
+    required: true
+
+  cache_create_branch_regex:
+    description: GHA cache will only be saved on branches that match this regex, see https://github.com/camunda/camunda/wiki/CI-&-Automation#caching-strategy
+    required: false
+    default: '^(stable\/.+|main)$'
+
+runs:
+  using: composite
+  steps:
+  - name: Echo inputs
+    shell: bash
+    run: |
+      echo "Inputs"
+      echo "-----"
+      echo "Yarn workspace directory: ${{ inputs.directory }}"
+      echo "Cache create branch regex: ${{ inputs.cache_create_branch_regex }}"
+
+  - name: Check if cache should be created
+    id: is-cache-create-branch
+    shell: bash
+    run: |
+      BRANCH_NAME=${GITHUB_REF#refs/heads/}
+      BRANCH_REGEX="${{ inputs.cache_create_branch_regex }}"
+
+      if [[ $BRANCH_NAME =~ $BRANCH_REGEX ]]; then
+        echo "result=true" >> $GITHUB_OUTPUT
+      else
+        echo "result=false" >> $GITHUB_OUTPUT
+      fi
+
+  - name: Get Yarn global cache directory
+    shell: bash
+    working-directory: ${{ inputs.directory }}
+    run: |
+      yarn_version=$(yarn --version)
+      echo "yarn version: $yarn_version"
+
+      if [[ $yarn_version == 1* ]]; then
+        echo "Yarn version 1.x"
+        yarn cache dir || true
+        echo "CUSTOM_YARN_GLOBAL_CACHE_DIR=$(yarn cache dir)" >> $GITHUB_ENV
+      else
+        echo "Yarn version 2.x?"
+        yarn config get cacheFolder || true
+        echo "CUSTOM_YARN_GLOBAL_CACHE_DIR=$(yarn config get cacheFolder)" >> $GITHUB_ENV
+      fi
+
+  - name: Save global Yarn cache on non-PRs
+    if: ${{ steps.is-cache-create-branch.outputs.result == 'true' }}
+    uses: actions/cache@v4
+    with:
+      # need to use an environment variable here, thx to https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/pull/7415
+      path: "${{ env.CUSTOM_YARN_GLOBAL_CACHE_DIR }}"
+      # it matters for caching as absolute paths on self-hosted and Github runners differ
+      # self-hosted: `/runner/` vs gh-hosted: `/home/runner`
+      key: ${{ runner.environment }}-${{ runner.os }}-yarn-${{ hashFiles(format('{0}/yarn.lock', inputs.directory)) }}
+      restore-keys: |
+        ${{ runner.environment }}-${{ runner.os }}-yarn
+
+  - name: Restore global Yarn cache always
+    # Restore cache (but don't save it) if we're not on main or stable/* branches
+    if: ${{ steps.is-cache-create-branch.outputs.result != 'true' }}
+    uses: actions/cache/restore@v4
+    with:
+      path: "${{ env.CUSTOM_YARN_GLOBAL_CACHE_DIR }}"
+      key: ${{ runner.environment }}-${{ runner.os }}-yarn-${{ hashFiles(format('{0}/yarn.lock', inputs.directory)) }}
+      restore-keys: |
+        ${{ runner.environment }}-${{ runner.os }}-yarn
