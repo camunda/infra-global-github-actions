@@ -35,6 +35,11 @@ inputs:
     description: The URL for the Vault endpoint
     required: true
     type: string
+  app-permissions:
+    description: >-
+      The JSON-stringified permissions granted to the token.
+      Defaults to all permissions granted to the GitHub app.
+      See https://docs.github.com/en/rest/apps/apps?apiVersion=2022-11-28#create-an-installation-access-token-for-an-app's `permissions`.
 
 outputs:
   token:
@@ -84,5 +89,6 @@ runs:
     id: github-token
     uses: tibdex/github-app-token@v2
     with:
+      permissions: ${{ inputs.app-permissions }}
       app_id: ${{ steps.app-id.outputs.id }}
       private_key: ${{ steps.app-private-key.outputs.private-key }}

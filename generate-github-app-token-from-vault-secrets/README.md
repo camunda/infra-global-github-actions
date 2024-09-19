@@ -17,6 +17,8 @@ This composite GHA can be used in any repository.
 | vault-auth-role-id                  | The Role Id for (Vault) App Role authentication |
 | vault-auth-secret-id                | The Secret Id for (Vault) App Role authentication |
 | vault-url                           | The URL for the Vault endpoint |
+| app-permissions                     |       The JSON-stringified permissions granted to the token. Defaults to all permissions granted to the GitHub app. See https://docs.github.com/en/rest/apps/apps?apiVersion=2022-11-28#create-an-installation-access-token-for-an-app's `permissions`.
+ |
 
 > (*) The above Vault properties only support App Role authentication (`vault-auth-method=approle`) for now. New inputs may be added in the future to support other authentication methods.
 
