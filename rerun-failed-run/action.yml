@@ -46,12 +46,13 @@ runs:
           secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_ID;
           secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY;
 
-    - name: Generate a GitHub token
+    - name: Generate a GitHub token for infra-rerun camunda/infra-global-github-actions
       id: github-token
-      uses: tibdex/github-app-token@v2
+      uses: actions/create-github-app-token@v1
       with:
-        app_id: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_ID }}
-        private_key: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_KEY }}
+        app-id: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_ID }}
+        private-key: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_KEY }}
+        repositories: "camunda/infra-global-github-actions"
 
     - name: Retrigger run
       env:
@@ -62,5 +63,7 @@ runs:
         error_messages="${{ inputs.error-messages }}"
         result=$(echo "$error_messages" | jq -c -n -R '[inputs | select(length > 0)]')
         echo "result: $result"
+
+        # TODO: test with the ref of the PR, not the --ref=main
 
         gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=main -F run_id=${{ inputs.run-id }} -F repository=${{ inputs.repository }} -F error_messages="$result" -F notify_back_on_error=${{ inputs.notify-back-on-error }} -F notify_back_git_ref=${{ github.ref_name }}
