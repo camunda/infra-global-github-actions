@@ -35,11 +35,23 @@ inputs:
     description: The URL for the Vault endpoint
     required: true
     type: string
+  skip-token-revoke:
+    description: "If truthy, the token will not be revoked when the current job is complete"
+    required: false
+    type: boolean
 
 outputs:
   token:
     description: The generated GitHub token
     value: ${{ steps.github-token.outputs.token }}
+
+  installation-id:
+    description: "GitHub App installation ID"
+    value: ${{ steps.github-token.outputs.installation-id }}
+
+  app-slug:
+    description: "GitHub App slug"
+    value: ${{ steps.github-token.outputs.app-slug }}
 
 runs:
   using: composite
@@ -82,7 +94,8 @@ runs:
         }}
   - name: Generate a Github App token
     id: github-token
-    uses: tibdex/github-app-token@v2
+    uses: actions/create-github-app-token@v1
     with:
-      app_id: ${{ steps.app-id.outputs.id }}
-      private_key: ${{ steps.app-private-key.outputs.private-key }}
+      app-id: ${{ steps.app-id.outputs.id }}
+      private-key: ${{ steps.app-private-key.outputs.private-key }}
+      skip-token-revoke: ${{ inputs.skip-token-revoke }}
