@@ -56,7 +56,8 @@ jobs:
         with:
           app-id: ${{ steps.secrets.outputs.RETRIGGER_APP_ID }}
           private-key: ${{ steps.secrets.outputs.RETRIGGER_APP_KEY }}
-          repositories: "camunda/infra-global-github-actions"
+          owner: "camunda"
+          repositories: "infra-global-github-actions"
 
       - name: Retrigger run
         env:
