@@ -71,6 +71,8 @@ jobs:
           gh config set pager cat
           logs=$(gh run view ${{ inputs.run_id }} -R ${{ inputs.repository }} --exit-status || true)
           echo "Logs coming from run with id: ${{ inputs.run_id }}"
+          # TODO: remove before merge
+          echo "Debug logs: $logs"
           inputted_errors='${{ inputs.error_messages }}'
           echo "Inputted errors: $inputted_errors"
           rerun=$(echo "$logs" | jq -c -n -R --argjson errors "$inputted_errors" '[inputs] | any(test($errors | join("|")))')
