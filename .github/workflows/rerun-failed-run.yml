@@ -43,12 +43,22 @@ jobs:
             secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY;
             secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_ID;
 
-      - name: Generate a GitHub token
+      - name: Extract owner and repo from repository input
+        id: extract-owner-repo
+        run: |
+          owner="$(echo '${{ inputs.repository }}' | cut -d'/' -f1)"
+          repository="$(echo '${{ inputs.repository }}' | cut -d'/' -f2)"
+          echo "owner=$owner" | tee -a "$GITHUB_OUTPUT"
+          echo "repository=$repository" | tee -a "$GITHUB_OUTPUT"
+
+      - name: Generate a Github App for the repository
         id: github-token
-        uses: tibdex/github-app-token@v2
+        uses: actions/create-github-app-token@v1
         with:
-          app_id: ${{ steps.secrets.outputs.RETRIGGER_APP_ID }}
-          private_key: ${{ steps.secrets.outputs.RETRIGGER_APP_KEY }}
+          app-id: ${{ steps.secrets.outputs.RETRIGGER_APP_ID }}
+          private-key: ${{ steps.secrets.outputs.RETRIGGER_APP_KEY }}
+          owner: ${{ steps.extract-owner-repo.outputs.owner }}
+          repositories: ${{ steps.extract-owner-repo.outputs.repository }}
 
       - name: Check previous run logs
         id: check_logs
@@ -59,7 +69,7 @@ jobs:
           echo "Fetching logs for run with id: ${{ inputs.run_id }} from ${{ inputs.repository }} repository."
           # Fetch the logs from the previous run
           gh config set pager cat
-          logs=$(gh run view ${{ inputs.run_id }} -R ${{ inputs.repository }} --exit-status || true)
+          logs=$(gh run view ${{ inputs.run_id }} -R ${{ inputs.repository }} --exit-status --log-failed || true)
           echo "Logs coming from run with id: ${{ inputs.run_id }}"
           inputted_errors='${{ inputs.error_messages }}'
           echo "Inputted errors: $inputted_errors"

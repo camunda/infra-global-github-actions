@@ -49,12 +49,15 @@ jobs:
           secrets: |
             secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY;
             secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_ID;
-      - name: Generate a GitHub token
+
+      - name: Generate GitHub token
         id: github-token
-        uses: tibdex/github-app-token@v2
+        uses: actions/create-github-app-token@v1
         with:
-          app_id: ${{ steps.secrets.outputs.RETRIGGER_APP_ID }}
-          private_key: ${{ steps.secrets.outputs.RETRIGGER_APP_KEY }}
+          app-id: ${{ steps.secrets.outputs.RETRIGGER_APP_ID }}
+          private-key: ${{ steps.secrets.outputs.RETRIGGER_APP_KEY }}
+          owner: "camunda"
+          repositories: "infra-global-github-actions"
 
       - name: Retrigger run
         env:
