@@ -103,6 +103,7 @@ runs:
 
   - name: Set owner and repositories
     id: split-repo
+    shell: bash
     run: |
       # Get the repository name and owner from github.repository
       repo_info="${{ github.repository }}"
