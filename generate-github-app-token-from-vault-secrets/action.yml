@@ -105,9 +105,9 @@ runs:
     id: split-repo
     run: |
       # Get the repository name and owner from github.repository
-      IFS='/' read -r repo_owner repo_name <<< "${{ github.repository }}"
-      echo "repo_owner=${repo_owner}" >> $GITHUB_ENV
-      echo "repo_name=${repo_name}" >> $GITHUB_ENV
+      repo_info="${{ github.repository }}"
+      repo_owner=$(echo "$repo_info" | awk -F'/' '{print $1}')
+      repo_name=$(echo "$repo_info" | awk -F'/' '{print $2}')
 
       # Set defaults if not provided
       echo "owner=${{ inputs.owner || repo_owner }}" >> $GITHUB_ENV
