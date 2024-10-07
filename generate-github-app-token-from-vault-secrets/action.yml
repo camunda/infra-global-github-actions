@@ -106,12 +106,20 @@ runs:
     run: |
       # Get the repository name and owner from github.repository
       repo_info="${{ github.repository }}"
-      repo_owner=$(echo "$repo_info" | awk -F'/' '{print $1}')
-      repo_name=$(echo "$repo_info" | awk -F'/' '{print $2}')
 
-      # Set defaults if not provided
-      echo "owner=${{ inputs.owner || repo_owner }}" >> $GITHUB_ENV
-      echo "repositories=${{ inputs.repositories || repo_name }}" >> $GITHUB_ENV
+      if [ -z "${{ inputs.owner }}" ]; then
+        repo_owner=$(echo "$repo_info" | awk -F'/' '{print $1}')
+        echo "owner=${repo_owner}" >> $GITHUB_ENV
+      else
+        echo "owner=${{ inputs.owner }}" >> $GITHUB_ENV
+      fi
+
+      if [ -z "${{ inputs.repositories }}" ]; then
+        repo_name=$(echo "$repo_info" | awk -F'/' '{print $2}')
+        echo "repositories=${repo_name}" >> $GITHUB_ENV
+      else
+        echo "repositories=${{ inputs.repositories }}" >> $GITHUB_ENV
+      fi
 
   - name: Generate a Github App token
     id: github-token
