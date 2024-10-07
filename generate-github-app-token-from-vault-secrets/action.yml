@@ -40,11 +40,11 @@ inputs:
     required: false
     type: boolean
   owner:
-    description: "The owner of the GitHub App installation (defaults to current repository owner)"
+    description: "The owner of the GitHub App installation (defaults to current repository owner). To leave this value empty in the token generation, set it to '!null'."
     required: false
     type: string
   repositories:
-    description: "Comma or newline-separated list of repositories to install the GitHub App on (defaults to current repository if owner is unset)"
+    description: "Comma or newline-separated list of repositories to install the GitHub App on (defaults to current repository if owner is unset). If you want to generate a token that has access to all repositories of the owner, set this to '!null'."
     required: false
     type: string
 
