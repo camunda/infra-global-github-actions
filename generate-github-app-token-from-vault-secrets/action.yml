@@ -39,6 +39,14 @@ inputs:
     description: "If truthy, the token will not be revoked when the current job is complete"
     required: false
     type: boolean
+  owner:
+    description: "The owner of the GitHub App installation (defaults to current repository owner)"
+    required: false
+    type: string
+  repositories:
+    description: "Comma or newline-separated list of repositories to install the GitHub App on (defaults to current repository if owner is unset)"
+    required: false
+    type: string
 
 outputs:
   token:
@@ -99,3 +107,5 @@ runs:
       app-id: ${{ steps.app-id.outputs.id }}
       private-key: ${{ steps.app-private-key.outputs.private-key }}
       skip-token-revoke: ${{ inputs.skip-token-revoke }}
+      owner: ${{ inputs.owner || github.repository_owner }}
+      repositories: ${{ inputs.repositories || github.repository }}
