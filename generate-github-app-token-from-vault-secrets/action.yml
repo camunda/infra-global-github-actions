@@ -100,6 +100,19 @@ runs:
             'private-key'
           )
         }}
+
+  - name: Set owner and repositories
+    id: split-repo
+    run: |
+      # Get the repository name and owner from github.repository
+      IFS='/' read -r repo_owner repo_name <<< "${{ github.repository }}"
+      echo "repo_owner=${repo_owner}" >> $GITHUB_ENV
+      echo "repo_name=${repo_name}" >> $GITHUB_ENV
+
+      # Set defaults if not provided
+      echo "owner=${{ inputs.owner || repo_owner }}" >> $GITHUB_ENV
+      echo "repositories=${{ inputs.repositories || repo_name }}" >> $GITHUB_ENV
+
   - name: Generate a Github App token
     id: github-token
     uses: actions/create-github-app-token@v1
@@ -107,5 +120,5 @@ runs:
       app-id: ${{ steps.app-id.outputs.id }}
       private-key: ${{ steps.app-private-key.outputs.private-key }}
       skip-token-revoke: ${{ inputs.skip-token-revoke }}
-      owner: ${{ inputs.owner || github.repository_owner }}
-      repositories: ${{ inputs.repositories || github.repository }}
+      owner: ${{ env.owner }}
+      repositories: ${{ env.repositories }}
