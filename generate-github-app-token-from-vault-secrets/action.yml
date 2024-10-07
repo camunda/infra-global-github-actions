@@ -108,16 +108,22 @@ runs:
       # Get the repository name and owner from github.repository
       repo_info="${{ github.repository }}"
 
+      # Check if owner is empty or equals to "!null", we use the latter to indicate explicitely empty value
       if [ -z "${{ inputs.owner }}" ]; then
         repo_owner=$(echo "$repo_info" | awk -F'/' '{print $1}')
         echo "owner=${repo_owner}" >> $GITHUB_ENV
+      elif [ "${{ inputs.owner }}" = "!null" ]; then
+        echo "owner=" >> $GITHUB_ENV
       else
         echo "owner=${{ inputs.owner }}" >> $GITHUB_ENV
       fi
 
+      # Check if repositories is empty or equals to "!null", we use the latter to indicate explicitely empty value
       if [ -z "${{ inputs.repositories }}" ]; then
         repo_name=$(echo "$repo_info" | awk -F'/' '{print $2}')
         echo "repositories=${repo_name}" >> $GITHUB_ENV
+      elif [ "${{ inputs.repositories }}" = "!null" ]; then
+        echo "repositories=" >> $GITHUB_ENV
       else
         echo "repositories=${{ inputs.repositories }}" >> $GITHUB_ENV
       fi
