@@ -19,7 +19,7 @@ This composite GHA can be used in any repository.
 | vault-url                           | The URL for the Vault endpoint                                          |
 | skip-token-revoke                   | If truthy, the token will not be revoked when the current job is complete (optional) |
 | owner                               | The owner of the GitHub App installation (defaults to current repository owner, optional). |
-| repositories                        | Comma or newline-separated list of repositories to install the GitHub App on (defaults to current repository if owner is unset, optional). If you want to generate a token that has access to all repositories of the owner, set this to `!all`. |
+| repositories                        | Comma or newline-separated list of repositories to install the GitHub App on (defaults to current repository if owner is unset, optional). If you want to generate a token that has access to all repositories of the owner, set this to `!all` and explicitely set an `owner`. |
 
 > (*) The above Vault properties only support App Role authentication (`vault-auth-method=approle`) for now. New inputs may be added in the future to support other authentication methods.
 
