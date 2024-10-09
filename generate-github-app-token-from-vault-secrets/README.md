@@ -18,6 +18,8 @@ This composite GHA can be used in any repository.
 | vault-auth-secret-id                | The Secret Id for (Vault) App Role authentication                       |
 | vault-url                           | The URL for the Vault endpoint                                          |
 | skip-token-revoke                   | If truthy, the token will not be revoked when the current job is complete (optional) |
+| owner                               | The owner of the GitHub App installation (defaults to current repository owner, optional). |
+| repositories                        | Comma or newline-separated list of repositories for which the GitHub app token will be valid for(defaults to current repository if owner is unset, optional). If you want to generate a token that has access to all repositories of the owner, set this to `!all` and explicitely set an `owner`. |
 
 > (*) The above Vault properties only support App Role authentication (`vault-auth-method=approle`) for now. New inputs may be added in the future to support other authentication methods.
 
@@ -49,4 +51,10 @@ jobs:
         vault-auth-secret-id: ${{ secrets.VAULT_SECRET_ID }}
         vault-url: ${{ secrets.VAULT_ADDR }}
         skip-token-revoke: false  # Optional, defaults to false if omitted
+        owner: ${{ github.repository_owner }}  # Optional, defaults to current repository owner
+        repositories: ${{ github.repository }}  # Optional, defaults to current repository
 ```
+
+### Token Generation
+
+The generated token is created using the [create-github-app-token](https://github.com/actions/create-github-app-token/) action. For more details on how the token is generated and its use, please refer to the documentation of the create-github-app-token action.

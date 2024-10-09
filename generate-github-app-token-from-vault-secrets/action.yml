@@ -39,6 +39,14 @@ inputs:
     description: "If truthy, the token will not be revoked when the current job is complete"
     required: false
     type: boolean
+  owner:
+    description: "The owner of the GitHub App installation (defaults to current repository owner)."
+    type: string
+    default: ""
+  repositories:
+    description: "Comma or newline-separated list of repositories to install the GitHub App on (defaults to current repository if owner is unset). If you want to generate a token that has access to all repositories of the owner, set this to '!all' and explicitely set an `owner`."
+    required: false
+    type: string
 
 outputs:
   token:
@@ -92,6 +100,25 @@ runs:
             'private-key'
           )
         }}
+
+  - name: Set repositories
+    id: split-repo
+    shell: bash
+    run: |
+      # Get the repository name from github.repository
+      repo_info="${{ github.repository }}"
+
+      # Check if repositories is empty or equals to "!all", we use the latter to indicate explicitely empty value
+      # see https://github.com/actions/create-github-app-token?tab=readme-ov-file#repositories
+      if [ -z "${{ inputs.repositories }}" ]; then
+        repo_name=$(echo "$repo_info" | awk -F'/' '{print $2}')
+        echo "repositories=${repo_name}" >> $GITHUB_ENV
+      elif [ "${{ inputs.repositories }}" = "!all" ]; then
+        echo "repositories=" >> $GITHUB_ENV
+      else
+        echo "repositories=${{ inputs.repositories }}" >> $GITHUB_ENV
+      fi
+
   - name: Generate a Github App token
     id: github-token
     uses: actions/create-github-app-token@v1
@@ -99,3 +126,5 @@ runs:
       app-id: ${{ steps.app-id.outputs.id }}
       private-key: ${{ steps.app-private-key.outputs.private-key }}
       skip-token-revoke: ${{ inputs.skip-token-revoke }}
+      owner: ${{ inputs.owner }}
+      repositories: ${{ env.repositories }}
