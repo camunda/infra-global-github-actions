@@ -89,7 +89,7 @@ runs:
   - name: Upload files
     shell: bash
     run: |
-      gsutil -m cp ${{ inputs.artifact_file }} gs://${{ steps.variables.outputs.bucket_name }}/${{ steps.variables.outputs.dc_repo }}/${{ steps.variables.outputs.subpath }}${{ steps.variables.outputs.version }}${{ steps.variables.outputs.subversion }}
+      gcloud storage cp ${{ inputs.artifact_file }} gs://${{ steps.variables.outputs.bucket_name }}/${{ steps.variables.outputs.dc_repo }}/${{ steps.variables.outputs.subpath }}${{ steps.variables.outputs.version }}${{ steps.variables.outputs.subversion }}
 
 branding:
   icon: upload
