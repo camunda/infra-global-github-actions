@@ -37,7 +37,7 @@ runs:
   - name: Setup python
     uses: actions/setup-python@v5
     with:
-      python-version: '3.11'
+      python-version: '3.11' # gsutil requires python 3.5-3.11 (https://cloud.google.com/storage/docs/gsutil_install#specifications)
 
   - name: Resolve variables
     shell: bash
