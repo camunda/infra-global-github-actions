@@ -1,0 +1,41 @@
+---
+name: Automerge Pull Requests
+description: |
+  Automatically merge pull requests.
+  The action fetches all open pull requests with a specific label (default: `autorelease: pending`) and merges them.
+  The merge method is set to squash to allow a requirement for signed commits on the base branch
+
+inputs:
+  github-token:
+    description: 'Github token with permissions to modify pull requests, contents and actions'
+    required: true
+    secret: true
+  label:
+    description: 'Label to filter pull requests'
+    required: false
+    default: 'autorelease: pending'
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          # Fetch all open pull requests with the specified label
+          const issues = await github.rest.issues.listForRepo({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            state: 'open',
+            labels: '${{ inputs.label }}',
+          });
+          const pullRequests = issues.data.filter(issue => issue.pull_request);
+          # Merge pull requests matching the label
+          for (const pr of pullRequests) {
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              merge_method: 'squash',
+            });
+          }
