@@ -5,7 +5,7 @@
 This action uploads files to [Camunda Download center]( https://downloads.camunda.cloud/). This is useful when you want
 to upload artifacts from your workflow.
 
-This action is owned by Infra team.
+This action is owned by the [Infrastructure Team](https://camunda.slack.com/archives/C5AHF1D8T).
 
 ## Usage
 
