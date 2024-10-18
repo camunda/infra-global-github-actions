@@ -27,6 +27,7 @@ runs:
   using: composite
   steps:
     - name: config-filename defaulting
+      shell: bash
       run: |
         if [ -z "${{ inputs.config-filename }}" ]; then
           echo "config-filename=${{ github.action_path }}/release-please-config.json" >> $GITHUB_ENV
