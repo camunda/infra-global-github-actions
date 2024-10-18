@@ -5,6 +5,9 @@ description: |
   Based on the configuration in the release-please-config.json file in conjunction with
   all conventional commits since the last release, it will create a new release PR.
   If the PR itself gets merged, the action will create a new release and tag it.
+  The config-filename is required until https://github.com/googleapis/release-please-action/issues/1017 is resolved.
+  It's currently not possible to use a file from the filesystem as input for the action.
+  As soon as this gets resolved, we can centralize the configuration in the repository and remove the need for the config-filename input.
 
 inputs:
   github-token:
@@ -15,7 +18,7 @@ inputs:
     description: |
       filename of a custom release-please configuration file.
       Default is release-please-config.json from the action repository.
-    required: false
+    required: true # TODO: toggle to false once https://github.com/googleapis/release-please-action/issues/1017 is resolved
   manifest-filename:
     description: |
       filename of a custom release-please manifest file.
