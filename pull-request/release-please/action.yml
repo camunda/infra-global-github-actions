@@ -1,0 +1,38 @@
+---
+name: Manage Release
+description: |
+  This action manages auto-release handling for the repository.
+  Based on the configuration in the release-please-config.json file in conjunction with
+  all conventional commits since the last release, it will create a new release PR.
+  If the PR itself gets merged, the action will create a new release and tag it.
+
+inputs:
+  github-token:
+    description: 'Github token with permissions to modify pull requests and contents'
+    required: true
+    secret: true
+  config-filename:
+    description: |
+      filename of a custom release-please configuration file.
+      Default is release-please-config.json from the action repository.
+    required: false
+    default: ${{ github.action_path }}/release-please-config.json
+  manifest-filename:
+    description: |
+      filename of a custom release-please manifest file.
+      Defaults to the root of the caller's repository (.release-please-manifest.json).
+    required: false
+    default: ${{ github.action_path }}/release-please-config.json
+
+runs:
+  using: composite
+  steps:
+    # this step actually does 2 things:
+    # 1. Update a release PR based on all conventional commits since the last release
+    # 2. Create a new release and tag it if the release PR gets merged
+    - name: Manage Release
+      uses: googleapis/release-please-action@v4
+      with:
+        config-file: ${{ inputs.config-filename }}
+        manifest-file: ${{ inputs.manifest-filename }}
+        token: ${{ inputs.github-token }}

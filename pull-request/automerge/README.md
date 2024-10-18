@@ -28,7 +28,7 @@ jobs:
           app-id: 1234567 # make sure the app can modify PRs, contents and actions
           private-key: ${{ secrets.APP_PRIVATE_KEY }} # needs to be set on repo or orga level
       - name: Create Release
-        uses: camunda/infra-global-github-actions/automerge@main
+        uses: camunda/infra-global-github-actions/pull-request/automerge@main
         with:
           github-token: ${{ steps.app-token.outputs.token }}
           label: <yourCustomLabel> # optional, defaults to 'autorelease: pending'
