@@ -32,7 +32,7 @@ jobs:
       - name: Run Release Please
         uses: camunda/infra-global-github-actions/pull-request/release-please@main
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
 ```
 

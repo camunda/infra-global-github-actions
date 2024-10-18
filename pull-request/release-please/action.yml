@@ -16,23 +16,26 @@ inputs:
       filename of a custom release-please configuration file.
       Default is release-please-config.json from the action repository.
     required: false
-    default: ${{ github.action_path }}/release-please-config.json
   manifest-filename:
     description: |
       filename of a custom release-please manifest file.
       Defaults to the root of the caller's repository (.release-please-manifest.json).
     required: false
-    default: ${{ github.action_path }}/release-please-config.json
+    default: '.release-please-manifest.json'
 
 runs:
   using: composite
   steps:
-    # this step actually does 2 things:
-    # 1. Update a release PR based on all conventional commits since the last release
-    # 2. Create a new release and tag it if the release PR gets merged
+    - name: config-filename defaulting
+      run: |
+        if [ -z "${{ inputs.config-filename }}" ]; then
+          echo "config-filename=${{ github.action_path }}/release-please-config.json" >> $GITHUB_ENV
+        else
+          echo "config-filename=${{ inputs.config-filename }}" >> $GITHUB_ENV
+        fi
     - name: Manage Release
       uses: googleapis/release-please-action@v4
       with:
-        config-file: ${{ inputs.config-filename }}
+        config-file: ${{ env.config-filename }}
         manifest-file: ${{ inputs.manifest-filename }}
         token: ${{ inputs.github-token }}
