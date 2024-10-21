@@ -23,3 +23,4 @@ repos:
   hooks:
   - id: renovate-config-validator
     args: ["--strict"]
+    language_version: 20.18.0 # temporary workaround to mitigate issue https://github.com/renovatebot/pre-commit-hooks/issues/2460
