@@ -38,8 +38,8 @@ jobs:
 
 ## Inputs
 * `github-token` (required): GitHub token with permissions to modify pull requests and contents.
-* `config-filename` (optional): Filename of a custom release-please configuration file. Default is release-please-config.json from the action repository.
-* `manifest-filename` (optional): Filename of a custom release-please manifest file. Defaults to the root of the caller's repository (.release-please-manifest.json).
+* `config-filename` (optional): Filename of a custom release-please configuration file. Default is `.github/config/release-please-config.json` from the action repository.
+* `manifest-filename` (optional): Filename of a custom release-please manifest file. Default is `.github/config/release-please-manifest.json`.
 
 ## How it works
 

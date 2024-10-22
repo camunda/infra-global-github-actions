@@ -17,14 +17,13 @@ inputs:
   config-filename:
     description: |
       filename of a custom release-please configuration file.
-      Default is release-please-config.json from the action repository.
-    required: true # TODO: toggle to false once https://github.com/googleapis/release-please-action/issues/1017 is resolved
+    required: false
+    default: '.github/config/release-please-config.json' # TODO: remove once https://github.com/googleapis/release-please-action/issues/1017 is resolved
   manifest-filename:
     description: |
       filename of a custom release-please manifest file.
-      Defaults to the root of the caller's repository (.release-please-manifest.json).
     required: false
-    default: '.release-please-manifest.json'
+    default: '.github/config/release-please-manifest.json'
 
 runs:
   using: composite
