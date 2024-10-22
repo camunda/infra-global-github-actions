@@ -28,17 +28,17 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: config-filename defaulting
-      shell: bash
-      run: |
-        if [ -z "${{ inputs.config-filename }}" ]; then
-          echo "config-filename=${{ github.action_path }}/release-please-config.json" >> $GITHUB_ENV
-        else
-          echo "config-filename=${{ inputs.config-filename }}" >> $GITHUB_ENV
-        fi
-    - name: Manage Release
-      uses: googleapis/release-please-action@v4
-      with:
-        config-file: ${{ env.config-filename }}
-        manifest-file: ${{ inputs.manifest-filename }}
-        token: ${{ inputs.github-token }}
+  - name: config-filename defaulting
+    shell: bash
+    run: |
+      if [ -z "${{ inputs.config-filename }}" ]; then
+        echo "config-filename=${{ github.action_path }}/release-please-config.json" >> $GITHUB_ENV
+      else
+        echo "config-filename=${{ inputs.config-filename }}" >> $GITHUB_ENV
+      fi
+  - name: Manage Release
+    uses: googleapis/release-please-action@v4
+    with:
+      config-file: ${{ env.config-filename }}
+      manifest-file: ${{ inputs.manifest-filename }}
+      token: ${{ inputs.github-token }}

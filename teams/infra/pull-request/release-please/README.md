@@ -18,7 +18,7 @@ name: Release Please
 on:
   push:
     branches:
-      - main
+    - main
 
 # Assign required permissions to the default github token
 permissions:
@@ -29,10 +29,10 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: Run Release Please
-        uses: camunda/infra-global-github-actions/pull-request/release-please@main
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Run Release Please
+      uses: camunda/infra-global-github-actions/pull-request/release-please@main
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 
 ```
 
