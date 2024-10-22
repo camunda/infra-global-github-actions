@@ -33,6 +33,7 @@
         }
       ],
       "changelog-type": "github",
+      "extra-label": "automerge",
       "release-type": "simple",
       "include-v-in-tag": true
     }
