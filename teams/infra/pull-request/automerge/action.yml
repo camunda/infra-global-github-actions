@@ -24,4 +24,3 @@ runs:
       GITHUB_TOKEN: "${{ inputs.github-token }}"
       MERGE_METHOD: "squash"
       MERGE_LABELS: "!no-merge,${{ inputs.label }}"
-      LOG: "TRACE"
