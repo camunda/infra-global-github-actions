@@ -23,7 +23,7 @@ inputs:
     description: |
       filename of a custom release-please manifest file.
     required: false
-    default: '.github/config/release-please-manifest.json'
+    default: '.github/config/.release-please-manifest.json'
 
 runs:
   using: composite
