@@ -21,6 +21,6 @@ runs:
   - name: automerge
     uses: pascalgn/automerge-action@v0.16.4
     env:
-      GITHUB_TOKEN: "${{ input.GITHUB_TOKEN }}"
+      GITHUB_TOKEN: "${{ inputs.github-token }}"
       MERGE_METHOD: squash
       MERGE_LABELS: "${{ inputs.label }}"
