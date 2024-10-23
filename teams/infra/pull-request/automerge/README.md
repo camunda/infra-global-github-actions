@@ -12,17 +12,12 @@ This GitHub Action automatically merges pull requests based on a label filter.
 To use this action, create a workflow file in your repository (e.g., `.github/workflows/automerge.yml`):
 
 ```yaml
-name: Automerge on the Weekend
+name: Automerge Release PRs
 
 on:
   schedule:
   - cron: '0 9 * * 6'
   workflow_dispatch:
-
-permissions:            # Additional permissions for standard GITHUB_TOKEN
-  contents: write       # so we can modify the changelog
-  pull-requests: write  # so release-please can create/update PRs
-  actions: write        # so subsequent actions can run
 
 jobs:
   automerge:
@@ -31,6 +26,8 @@ jobs:
     - name: Create Release
       uses: camunda/infra-global-github-actions/pull-request/automerge@main
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
         label: <yourCustomLabel> # optional, defaults to 'autorelease: pending'
+        vault-addr: ${{ secrets.VAULT_ADDR }}
+        vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+        vault-secret-id: ${{ secrets.VAULT_SECRET_ID}}
 ```

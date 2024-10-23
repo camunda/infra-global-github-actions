@@ -15,10 +15,36 @@ inputs:
     description: 'Label to filter pull requests'
     required: false
     default: 'automerge'
+  vault-addr:
+    description: The Vault URL for fetching secrets
+    required: true
+  vault-role-id:
+    description: The Vault role ID for fetching secrets
+    required: true
+  vault-secret-id:
+    description: The Vault secret ID for fetching secrets
+    required: true
 
 runs:
   using: composite
   steps:
+  - name: Import Secrets
+    id: vault-secrets
+    uses: hashicorp/vault-action@v3.0.0
+    with:
+      url: ${{ inputs.vault-addr }}
+      method: approle
+      roleId: ${{ inputs.vault-role-id }}
+      secretId: ${{ inputs.vault-secret-id }}
+      secrets: |
+        secret/data/products/infra/ci/infra-releases RELEASES_APP_ID;
+        secret/data/products/infra/ci/infra-releases RELEASES_APP_KEY;
+  - name: Generate a GitHub token for infra-rerun camunda/infra-global-github-actions
+    id: github-token
+    uses: actions/create-github-app-token@v1
+    with:
+      app-id: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_ID }}
+      private-key: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_KEY }}
   - name: automerge
     uses: pascalgn/automerge-action@v0.16.4
     env:
