@@ -1,0 +1,30 @@
+query get_annotations_by_workflow_run($nodeId:ID!,$endCursor:String) {
+
+  node(id: $nodeId) {
+    ... on WorkflowRun {
+      checkSuite {
+        checkRuns (
+          after: $endCursor
+          first: 100
+        ) {
+          pageInfo {
+            hasNextPage
+            endCursor
+          }
+          edges {
+            node {
+              annotations(first: 100) {
+                edges {
+                  node {
+                    annotationLevel
+                    message
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

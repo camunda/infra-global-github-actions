@@ -52,17 +52,53 @@ runs:
       with:
         app-id: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_ID }}
         private-key: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_KEY }}
-        owner: "camunda"
-        repositories: "infra-global-github-actions"
 
-    - name: Retrigger run
+    - name: Get repository name and owner
+      id: repository
       env:
-        GH_DEBUG: api
-        GITHUB_TOKEN: ${{ steps.github-token.outputs.token }}
-      shell: bash
+        REPOSITORY: ${{ inputs.repository }}
       run: |
-        error_messages="${{ inputs.error-messages }}"
-        result=$(echo "$error_messages" | jq -c -n -R '[inputs | select(length > 0)]')
-        echo "result: $result"
+        echo "owner=${REPOSITORY%/*}" | tee -a "$GITHUB_OUTPUT"
+        echo "name=${REPOSITORY##*/}" | tee -a "$GITHUB_OUTPUT"
+      shell: bash
 
-        gh workflow run rerun-failed-run.yml -R camunda/infra-global-github-actions --ref=main -F run_id=${{ inputs.run-id }} -F repository=${{ inputs.repository }} -F error_messages="$result" -F notify_back_on_error=${{ inputs.notify-back-on-error }} -F notify_back_git_ref=${{ github.ref_name }}
+    - name: Convert error messages list to JSON
+      id: error-messages
+      env:
+        ERROR_MESSAGES: ${{ inputs.error-messages }}
+      run: |
+        messages_json=$(
+          echo "${ERROR_MESSAGES}" | \
+            jq -c -n -R '[inputs | select(length > 0)]' | \
+            jq -R .
+        )
+        echo json="${messages_json}" | tee -a $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Trigger retry-worfklow-run.yml
+      uses: codex-/return-dispatch@v2
+      id: dispatch
+      with:
+        owner: camunda
+        repo: infra-global-github-actions
+        ref: main
+        workflow: retry-worfklow-run.yml
+        token: ${{ steps.github-token.outputs.token }}
+        workflow_inputs: |
+          {
+            "error-messages": ${{ steps.error-messages.outputs.json }},
+            "notify-back-git-ref": "${{ github.ref_name }}",
+            "notify-back-on-error": "${{ inputs.notify-back-on-error }}",
+            "owner": "${{ steps.repository.outputs.owner }}",
+            "repository": "${{ steps.repository.outputs.name }}",
+            "run-id": "${{ inputs.run-id }}"
+          }
+        workflow_timeout_seconds: 120
+
+    - name: Get URL of the new worfklow run dispatched, run-id=${{ steps.dispatch.outputs.run_id }}
+      if: steps.dispatch.outputs.run_id != ''
+      env:
+        RUN_URL: ${{ steps.dispatch.outputs.run_url }}
+      run: |
+        echo "::warning::If specified errors are detected, failed jobs will be retried by ${RUN_URL}"
+      shell: bash
