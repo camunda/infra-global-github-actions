@@ -32,5 +32,5 @@ jobs:
       uses: camunda/infra-global-github-actions/pull-request/automerge@main
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
-        label: <yourCustomLabel> # optional, defaults to 'autorelease: pending'
+        label: <yourCustomLabel> # optional, defaults to 'automerge'
 ```
