@@ -20,25 +20,26 @@ on:
     branches:
     - main
 
+# Assign required permissions to the default github token
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
   release:
     runs-on: ubuntu-latest
     steps:
     - name: Run Release Please
-      uses: camunda/infra-global-github-actions/pull-request/release@main
+      uses: camunda/infra-global-github-actions/pull-request/release-please@main
       with:
-        vault-addr: ${{ secrets.VAULT_ADDR }}
-        vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
-        vault-secret-id: ${{ secrets.VAULT_SECRET_ID}}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
 
 ```
 
 ## Inputs
+* `github-token` (required): GitHub token with permissions to modify pull requests and contents.
 * `config-filename` (optional): Filename of a custom release-please configuration file. Default is `.github/config/release-please-config.json` from the action repository.
 * `manifest-filename` (optional): Filename of a custom release-please manifest file. Default is `.github/config/release-please-manifest.json`.
-* `vault-addr` (required): The address of the Vault server.
-* `vault-role-id` (required): The role ID for Vault authentication.
-* `vault-secret-id` (required): The secret ID for Vault authentication.
 
 ## How it works
 
