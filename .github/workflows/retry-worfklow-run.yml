@@ -1,0 +1,139 @@
+name: Retry workflow run with errors
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: |
+          If enabled, only checks for errors in the workflow run and does not retry.
+        default: false
+        type: boolean
+      error-messages:
+        description: |
+          Error messages to look for in annotations and logs.
+          The worfklow run is only retried if any of the error messages are found.
+        required: false
+      run-id:
+        description: Id of the workflow run to retry
+        required: true
+      owner:
+        description: Owner of the GitHub repository of the workflow run to retry
+        required: true
+      repository:
+        description: GitHub repository of the workflow run to retry
+        required: true
+      notify-back-on-error:
+        # Calling workflow must implement the `notify_back_error_message` parameter and forward the error.
+        description: |
+          If enabled, notifies back (i.e. trigger a new run) with an error message when specified error messages are not found.
+        default: false
+        type: boolean
+      notify-back-git-ref:
+        description: Git reference of the calling workflow to notifying back
+        default: main
+      distinct_id:
+        description: |
+          Random distinct Id to easily find the dispatched workflow run
+          Needed by https://github.com/Codex-/return-dispatch as workaround for https://github.com/cli/cli/issues/4001
+        required: false
+        default: "not-set"
+
+jobs:
+  retry:
+    name: Retry workflow run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo distinct id '${{ inputs.distinct_id }}' to enable codex-/return-dispatch to find this workflow run
+        run: |
+          echo ${{ inputs.distinct_id }}
+        shell: bash
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Import Secrets
+        id: secrets
+        uses: hashicorp/vault-action@v3.0.0
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          secrets: |
+            secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY;
+            secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_ID;
+
+      - name: Generate a GitHub Access Token from Github App
+        id: github-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ steps.secrets.outputs.RETRIGGER_APP_ID }}
+          private-key: ${{ steps.secrets.outputs.RETRIGGER_APP_KEY }}
+          owner: ${{ inputs.owner }}
+          repositories: ${{ inputs.repository }}
+
+      - name: Wait for worfklow run-id=${{ inputs.run-id }} to complete, repo=${{ inputs.owner }}/${{ inputs.repository }}
+        env:
+          GH_REPO: ${{ inputs.owner }}/${{ inputs.repository }}
+          GH_TOKEN: ${{ steps.github-token.outputs.token }}
+          RUN_ID: ${{ inputs.run-id }}
+        run: |
+          echo "Waiting for the workflow run to complete ..."
+          gh run watch "${RUN_ID}"
+
+      - name: Check annotations and job logs for errors
+        id: errors
+        uses: ./rerun-failed-run/check-annotations-and-logs
+        with:
+          error-messages: ${{ inputs.error-messages }}
+          github-token: ${{ steps.github-token.outputs.token }}
+          owner: ${{ inputs.owner }}
+          repository: ${{ inputs.repository }}
+          run-id: ${{ inputs.run-id }}
+
+      - name: Retry worfklow run for repo=${{ inputs.owner }}/${{ inputs.repository }} and run-id=${{ inputs.run-id }}
+        if: steps.errors.outputs.found == 'true'
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+          GH_REPO: ${{ inputs.owner }}/${{ inputs.repository }}
+          GH_TOKEN: ${{ steps.github-token.outputs.token }}
+          RUN_ID: ${{ inputs.run-id }}
+        run: |
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "Skipping retry since this is a dry-run ..."
+          else
+            echo "Triggering a new attempt of run-id=${RUN_ID} ..."
+            # Only retry failed jobs
+            gh run rerun "${RUN_ID}" --failed
+          fi
+        shell: bash
+
+      - name: Notify back error for repo=${{ inputs.owner }}/${{ inputs.repository }} and run-id=${{ inputs.run-id }}
+        if: >
+          steps.errors.outputs.found == 'false' &&
+          inputs.notify-back-on-error == true
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
+          GH_REPO: ${{ inputs.owner }}/${{ inputs.repository }}
+          GH_TOKEN: ${{ steps.github-token.outputs.token }}
+          NOTIFY_BACK_ERROR_MESSAGE: >
+            This workflow attempted a retry but there was no match on the log message, so it was not retried.
+            Please check: ${{ github.server_url }}/${{ inputs.owner }}/${{ inputs.repository }}/actions/runs/${{ inputs.run-id }}
+          notify-back-git-ref: ${{ inputs.notify-back-git-ref }}
+          RUN_ID: ${{ inputs.run-id }}
+        run: |
+          # trigger a new run with error notification
+          workflow_name=$(
+            gh run view "${RUN_ID}" \
+              --json workflowName \
+              --jq '.workflowName'
+          )
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "Skipping notify back since this is a dry-run ..."
+          else
+            echo "notifying back to workflow=${workflow_name}.yml ..."
+            gh workflow run "${workflow_name}.yml" \
+              --field notify_back_error_message="${NOTIFY_BACK_ERROR_MESSAGE}" \
+              --ref="${notify-back-git-ref}"
+          fi
+        shell: bash

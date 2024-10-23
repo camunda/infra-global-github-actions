@@ -1,0 +1,42 @@
+---
+name: Check for errors in workflow run
+
+description: Check annotations and logs for target error patterns in a workflow run
+
+inputs:
+  error-messages:
+    description: |
+      List of error patterns to look for in annotations and logs.
+      Only failed logs and failure annotations are checked.
+    required: true
+  github-token:
+    description: GitHub token to access the GitHub API
+    required: true
+  owner:
+    description: Owner of the GitHub repository of the workflow run to check
+    required: true
+  repository:
+    description: GitHub repository of the workflow run to check
+  run-id:
+    description: Id of the workflow run to check
+
+outputs:
+  found:
+    description: |
+      Boolean indicating whether any of the error patterns were found in the annotations or logs.
+    value: ${{ steps.errors.outputs.found }}
+
+runs:
+  using: composite
+  steps:
+  - name: Check for errors in workflow run
+    id: errors
+    env:
+      ERROR_MESSAGES: ${{ inputs.error-messages }}
+      GH_REPO: ${{ inputs.owner }}/${{ inputs.repository }}
+      GH_TOKEN: ${{ inputs.github-token }}
+      RUN_ID: ${{ inputs.run-id }}
+    run: |
+       found=$(bash ${{ github.action_path }}/find-errors.sh)
+       echo found="$found" | tee -a $GITHUB_OUTPUT
+    shell: bash
