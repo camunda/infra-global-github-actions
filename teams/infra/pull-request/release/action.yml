@@ -1,0 +1,44 @@
+---
+name: Manage Release
+description: |
+  This action manages auto-release handling for the repository.
+  Based on the configuration in the release-please-config.json file in conjunction with
+  all conventional commits since the last release, it will create a new release PR.
+  If the PR itself gets merged, the action will create a new release and tag it.
+  The config-filename is required until https://github.com/googleapis/release-please-action/issues/1017 is resolved.
+  It's currently not possible to use a file from the filesystem as input for the action.
+  As soon as this gets resolved, we can centralize the configuration in the repository and remove the need for the config-filename input.
+
+inputs:
+  github-token:
+    description: 'Github token with permissions to modify pull requests and contents'
+    required: true
+    secret: true
+  config-filename:
+    description: |
+      filename of a custom release-please configuration file.
+    required: false
+    default: '.github/config/release-please-config.json' # TODO: remove once https://github.com/googleapis/release-please-action/issues/1017 is resolved
+  manifest-filename:
+    description: |
+      filename of a custom release-please manifest file.
+    required: false
+    default: '.github/config/.release-please-manifest.json'
+
+runs:
+  using: composite
+  steps:
+  - name: config-filename defaulting
+    shell: bash
+    run: |
+      if [ -z "${{ inputs.config-filename }}" ]; then
+        echo "config-filename=${{ github.action_path }}/release-please-config.json" >> $GITHUB_ENV
+      else
+        echo "config-filename=${{ inputs.config-filename }}" >> $GITHUB_ENV
+      fi
+  - name: Manage Release
+    uses: googleapis/release-please-action@v4
+    with:
+      config-file: ${{ env.config-filename }}
+      manifest-file: ${{ inputs.manifest-filename }}
+      token: ${{ inputs.github-token }}
