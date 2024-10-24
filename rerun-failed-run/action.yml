@@ -52,6 +52,8 @@ runs:
       with:
         app-id: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_ID }}
         private-key: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_KEY }}
+        owner: camunda
+        repositories: infra-global-github-actions
 
     - name: Get repository name and owner
       id: repository
