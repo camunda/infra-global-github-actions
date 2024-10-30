@@ -13,27 +13,38 @@ This repository contains a GitHub Action for automating releases using [release-
 To use this action, add the following to your workflow YAML file:
 
 ```yaml
-name: Release Please
+name: Handle Release PRs
 
 on:
   push:
     branches:
-    - main
-
-# Assign required permissions to the default github token
-permissions:
-  contents: write
-  pull-requests: write
+    - main # the mainline branch may differ for the individual repository
 
 jobs:
-  release:
+  release-please:
     runs-on: ubuntu-latest
     steps:
-    - name: Run Release Please
-      uses: camunda/infra-global-github-actions/pull-request/release-please@main
+    - name: Import Secrets
+      id: vault-secrets
+      uses: hashicorp/vault-action@v3.0.0
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-
+        url: ${{ secrets.VAULT_ADDR }}
+        method: approle
+        roleId: ${{ secrets.VAULT_ROLE_ID }}
+        secretId: ${{ secrets.VAULT_SECRET_ID}}
+        secrets: |
+          secret/data/products/infra/ci/infra-releases RELEASES_APP_ID;
+          secret/data/products/infra/ci/infra-releases RELEASES_APP_KEY;
+    - name: Generate a GitHub token for infra-rerun camunda/infra-global-github-actions
+      id: app-token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ steps.vault-secrets.outputs.RELEASES_APP_ID }}
+        private-key: ${{ steps.vault-secrets.outputs.RELEASES_APP_KEY }}
+    - name: Handle Release Creation
+      uses: camunda/infra-global-github-actions/teams/infra/pull-request/release@main
+      with:
+        github-token: ${{ steps.app-token.outputs.token }}
 ```
 
 ## Inputs
