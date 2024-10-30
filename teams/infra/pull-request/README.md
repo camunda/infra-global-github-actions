@@ -21,7 +21,6 @@ To integrate the `Auto-Release` functionality you need the following basics:
   * `release.yml` - gets triggered on pushes to the mainline branch and calls `release-please` under the hood. You can just copy [the example]()
   * `automerge.yml` - ideally a cronjob (e.g. `weekly`) which leverages `pascalgn/automerge-action` to merge. You can just copy [the example](./automerge/README.md) from the readme into your workflows folder.
 
-That's basically it.
 Once everything got merged, you'll ideally be presented with a new release PR which you can merge directly or wait for the automerge to kick in.
 
 ## Integration Examples
