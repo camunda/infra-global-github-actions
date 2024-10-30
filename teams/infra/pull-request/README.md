@@ -28,4 +28,4 @@ Once everything got merged, you'll see a new release PR which you can merge dire
 * Monorepo Example: https://github.com/camunda/camunda-docker-ci-postgresql/pull/29
 
 ## Pre-Commit Hook
-Since release-please depends on [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) to bump versions appropriately it's recommended to enforce the usage of these by pre-commit hooks. Just look at one of the above's examples to see how it's done.
+Since release-please depends on [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) to bump versions appropriately it's required to enforce the usage of these by pre-commit hooks. Just look at one of the above's examples to see how it's done.
