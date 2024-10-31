@@ -89,6 +89,12 @@ runs:
   - name: Upload files
     shell: bash
     run: |
+      # the target buckets don't support parallel composite uploads
+      # turning it off so there's no checks requiring higher service account permissions
+      # https://stackoverflow.com/q/78548796
+      gcloud config set storage/parallel_composite_upload_enabled false
+      gcloud config set storage/parallel_composite_upload_compatibility_check false
+
       gcloud storage cp ${{ inputs.artifact_file }} gs://${{ steps.variables.outputs.bucket_name }}/${{ steps.variables.outputs.dc_repo }}/${{ steps.variables.outputs.subpath }}${{ steps.variables.outputs.version }}${{ steps.variables.outputs.subversion }}
 
 branding:
