@@ -12,6 +12,10 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 5
     steps:
+    - run: |
+        echo github.repository_owner=${{ github.repository_owner}}
+        echo github.event.pull_request.head.repo.full_name=${{ github.event.pull_request.head.repo.full_name}}
+
     - uses: actions/checkout@v4
 
     - uses: asdf-vm/actions/install@v3
