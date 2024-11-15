@@ -89,6 +89,7 @@ runs:
     env:
       BG_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
       BUILD_BASE_REF: "${{ github.base_ref && format('refs/heads/{0}', github.base_ref) || github.event.merge_group.base_ref }}"
+      BUILD_HEAD_REF: "${{ github.head_ref && format('refs/heads/{0}', github.head_ref) || github.event.merge_group.head_ref }}"
     run: |
       cat <<EOF | tr '\n' ' ' | $BG_COMMAND insert "${{ inputs.big_query_table_name }}"
       {
@@ -104,6 +105,7 @@ runs:
         "runner_arch": "$(echo $RUNNER_ARCH | tr '[:upper:]' '[:lower:]')",
         "runner_os": "$(echo $RUNNER_OS | tr '[:upper:]' '[:lower:]')"
         ${{ (env.BUILD_BASE_REF == '') && ' ' || format(', "build_base_ref": "{0}"', env.BUILD_BASE_REF) }}
+        ${{ (env.BUILD_HEAD_REF == '') && ' ' || format(', "build_head_ref": "{0}"', env.BUILD_HEAD_REF) }}
         ${{ (inputs.build_duration_millis == '') && ' ' || format(', "build_duration_milliseconds": "{0}"', inputs.build_duration_millis) }}
         ${{ (inputs.user_reason == '') && ' ' || format(', "user_reason": "{0}"', inputs.user_reason) }}
         ${{ (inputs.user_description == '') && ' ' || format(', "user_description": "{0}"', inputs.user_description) }}

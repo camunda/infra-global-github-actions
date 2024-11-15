@@ -31,6 +31,7 @@ All data submitted by this action is stored as one record in the Big Query table
 | build_status     | STRING     | REQUIRED   | `"aborted"` |
 | build_ref        | STRING     | NULLABLE   | Git object reference from `"$GITHUB_REF"` |
 | build_base_ref   | STRING     | NULLABLE   | Git object reference of target branch for PRs or GH merge queue |
+| build_head_ref   | STRING     | NULLABLE   | Git object reference of the branch PR was built against |
 | build_duration_milliseconds | INTEGER | NULLABLE | `null` (not implemented yet) |
 | runner_name      | STRING     | NULLABLE   | Lowercase name of the runner executing the GHA workflow job |
 | runner_arch      | STRING     | NULLABLE   | `null` (cannot be determined afterwards) |

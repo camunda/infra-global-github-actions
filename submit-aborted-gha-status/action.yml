@@ -43,6 +43,7 @@ runs:
     env:
       BG_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
       BUILD_BASE_REF: "${{ github.base_ref && format('refs/heads/{0}', github.base_ref) || github.event.merge_group.base_ref }}"
+      BUILD_HEAD_REF: "${{ github.head_ref && format('refs/heads/{0}', github.head_ref) || github.event.merge_group.head_ref }}"
       GH_TOKEN: ${{ github.token }}
     run: |
       gh api -X GET "repos/camunda/camunda/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" --jq '.jobs[] | select(.conclusion=="failure") .id' | while read job_id; do
@@ -72,6 +73,7 @@ runs:
         "runner_name": "$runner_name",
         "user_reason": "agent-disconnected"
         ${{ (env.BUILD_BASE_REF == '') && ' ' || format(', "build_base_ref": "{0}"', env.BUILD_BASE_REF) }}
+        ${{ (env.BUILD_HEAD_REF == '') && ' ' || format(', "build_head_ref": "{0}"', env.BUILD_HEAD_REF) }}
       }
       EOF
         fi
