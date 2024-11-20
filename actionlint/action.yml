@@ -1,0 +1,20 @@
+---
+name: Action lint
+
+description: Linting for GitHub workflows
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+    - name: Download actionlint
+      id: get_actionlint
+      run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
+      shell: bash
+
+    - run: echo "::add-matcher::.github/actionlint-matcher.json"
+      shell: bash
+
+    - name: Check workflow files
+      run: ${{ steps.get_actionlint.outputs.executable }} -color
+      shell: bash
