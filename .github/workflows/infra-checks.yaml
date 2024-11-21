@@ -2,7 +2,7 @@
 name: Infra checks
 
 on:
-  workflow_dispatch: {}
+  workflow_call: {}
 
 jobs:
   actionlint:
