@@ -14,16 +14,16 @@ runs:
         repository: camunda/infra-global-github-actions
         path: camunda-shared-actions
         sparse-checkout: |
-          .github
+          actionlint
 
     - name: Download actionlint
       id: get_actionlint
       run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
       shell: bash
 
-    - run: echo "::add-matcher::camunda-shared-actions/.github/actionlint-matcher.json"
+    - run: echo "::add-matcher::camunda-shared-actions/actionlint/config/actionlint-matcher.json"
       shell: bash
 
     - name: Check workflow files
-      run: ${{ steps.get_actionlint.outputs.executable }} -color -config-file camunda-shared-actions/.github/actionlint.yaml
+      run: ${{ steps.get_actionlint.outputs.executable }} -color -config-file camunda-shared-actions/actionlint/config/actionlint.yaml
       shell: bash
