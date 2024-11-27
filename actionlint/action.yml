@@ -36,7 +36,6 @@ runs:
         CUSTOM_CONFIG_FILE: ${{inputs.custom-config-file}}
         DEFAULT_CONFIG_FILE: ${ github.action_path }}/actionlint.yaml
       run: |
-
         # Verify custom_runners contains only supported labels
         if [[ -n "$CUSTOM_CONFIG_FILE" ]]; then
           supported_runners=$(yq -r '.self-hosted-runner.labels' $DEFAULT_CONFIG_FILE | sort -u)
@@ -73,6 +72,9 @@ runs:
         if [[ -n "$FORMAT" ]]; then
           _args+=(-format "$FORMAT")
         fi
+
+        echo "Running actionlint with these options:"
+        echo "${_args[@]}"
 
         # Execute actionlint
         ${{ steps.get_actionlint.outputs.executable }} "${_args[@]}"
