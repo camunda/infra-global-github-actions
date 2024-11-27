@@ -46,6 +46,7 @@ runs:
           if [[ -n "$invalid_runners" ]]; then
             echo "These self-hosted labels are not supported and workflow using them will not run"
             echo "$invalid_runners"
+            # TODO: possible improvement would be to keep only valid_runners from the one provided by the config
             exit 1
           fi
         fi
