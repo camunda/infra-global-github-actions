@@ -34,7 +34,7 @@ runs:
         FORMAT: ${{ inputs.format }}
         IGNORE_MESSAGES: ${{ inputs.ignore }}
         CUSTOM_CONFIG_FILE: ${{inputs.custom-config-file}}
-        DEFAULT_CONFIG_FILE: ${ github.action_path }}/actionlint.yaml
+        DEFAULT_CONFIG_FILE: ${{ github.action_path }}/actionlint.yaml
       run: |
         config_file=${CUSTOM_CONFIG_FILE:-$DEFAULT_CONFIG_FILE}
         # Verify custom_runners contains only supported labels
