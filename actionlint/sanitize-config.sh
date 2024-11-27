@@ -3,10 +3,12 @@ set -e
 
 CUSTOM_CONFIG_FILE="$1"
 DEFAULT_CONFIG_FILE="$2"
-ERROR_OUTPUT_FILE="${3:-/tmp/actionlint-sanitize-error.log}"
+# TODO: Implement error logging
+# ERROR_OUTPUT_FILE="${3:-/tmp/actionlint-sanitize-error.log}"
 
 error() {
-  echo "$@" >>"$ERROR_OUTPUT_FILE"
+  # echo "$@" >>"$ERROR_OUTPUT_FILE"
+  >&2 echo "$@"
 }
 
 yq -r '.self-hosted-runner.labels' "$CUSTOM_CONFIG_FILE" | sort -u >/tmp/custom_runner_labels

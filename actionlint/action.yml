@@ -33,29 +33,17 @@ runs:
       env:
         FORMAT: ${{ inputs.format }}
         IGNORE_MESSAGES: ${{ inputs.ignore }}
-        CUSTOM_CONFIG_FILE: ${{inputs.custom-config-file}}
+        CUSTOM_CONFIG_FILE: ${{ inputs.custom-config-file }}
         DEFAULT_CONFIG_FILE: ${{ github.action_path }}/actionlint.yaml
       run: |
+
         config_file="$DEFAULT_CONFIG_FILE"
+        echo "Custom config file: ${CUSTOM_CONFIG_FILE}"
+
         # Verify custom_runners contains only supported labels
         if [[ -n "$CUSTOM_CONFIG_FILE" ]]; then
-          # echo "Testing custom config supported labels" 
-          # supported_runners=$(yq -r '.self-hosted-runner.labels' "$DEFAULT_CONFIG_FILE" | sort -u)
-          # custom_runners=$(yq -r '.self-hosted-runner.labels' "$CUSTOM_CONFIG_FILE" | sort -u)
-          # valid_runners=$(comm -12 <(supported_runners) <(custom_runners)) # extract valid labels from custom_runners
-          # unsupported_runners=$(comm -13 <(supported_runners) <(custom_runners)) # extract invalid labels from custom_runners
-          # sanitized_custom_config_file=/tmp/sanitized_custom_config_file.yaml
-          # if [[ -n "$unsupported_runners" ]]; then
-          #   # TODO: possible improvement would be to keep only valid_runners from the one provided by the config
-          #   echo "These self-hosted labels are not supported and will be removed from actionlint configuration"
-          #   echo "$unsupported_runners"
-          # fi
-          # yq -i '.self-hosted-runner.labels = env(valid_runners)' "$CUSTOM_CONFIG_FILE" > "$sanitized_custom_config_file"
-
           SANITIZED_CONFIG_FILE=/tmp/sanitized_custom_config_file.yaml
-          ERROR_OUTPUTS=/tmp/actionlint-santize-error.log
-          ${{ github.action_path }}/sanitize-config.sh "$CUSTOM_CONFIG_FILE" "$DEFAULT_CONFIG_FILE" "$ERROR_OUTPUTS" > "$SANITIZED_CONFIG_FILE"
-          echo ::warning::`cat $ERROR_OUTPUTS`
+          ${{ github.action_path }}/sanitize-config.sh "$CUSTOM_CONFIG_FILE" "$DEFAULT_CONFIG_FILE" > "$SANITIZED_CONFIG_FILE"
           config_file="$SANITIZED_CONFIG_FILE"
         fi
 
