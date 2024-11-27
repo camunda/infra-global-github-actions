@@ -38,7 +38,7 @@ runs:
         IGNORE_MESSAGES: ${{ inputs.ignore }}
         CUSTOM_CONFIG_FILE: ${{ inputs.custom-config-file }}
         DEFAULT_CONFIG_FILE: ${{ github.action_path }}/actionlint.yaml
-        SANITIZE_CUSTOM_LABELS: ${{ inputs.sanitize-runner-labels == "false" && false || true }}
+        SANITIZE_CUSTOM_LABELS: ${{ inputs.sanitize-runner-labels }}
       run: |
 
         config_file="$DEFAULT_CONFIG_FILE"
@@ -47,7 +47,7 @@ runs:
         if [[ -n "$CUSTOM_CONFIG_FILE" ]]; then
           echo "Custom config provided: ${CUSTOM_CONFIG_FILE}"
 
-          if [[ $SANITIZED_CONFIG_FILE ]]; then
+          if [[ $SANITIZED_CONFIG_FILE != "false" ]]; then
           SANITIZED_CONFIG_FILE=/tmp/sanitized_custom_config_file.yaml
           ${{ github.action_path }}/sanitize-config.sh "$CUSTOM_CONFIG_FILE" "$DEFAULT_CONFIG_FILE" > "$SANITIZED_CONFIG_FILE"
             config_file="$SANITIZED_CONFIG_FILE"
