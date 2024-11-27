@@ -12,7 +12,7 @@ inputs:
   format:
     description: Format error messages using Go template
   custom-config-file:
-    description: Actionlint custom configuration file within original repo;
+    description: Actionlint custom configuration file within original repo
 
 runs:
   using: composite
@@ -36,19 +36,25 @@ runs:
         CUSTOM_CONFIG_FILE: ${{inputs.custom-config-file}}
         DEFAULT_CONFIG_FILE: ${{ github.action_path }}/actionlint.yaml
       run: |
-        config_file=${CUSTOM_CONFIG_FILE:-$DEFAULT_CONFIG_FILE}
+        config_file="$DEFAULT_CONFIG_FILE"
         # Verify custom_runners contains only supported labels
         if [[ -n "$CUSTOM_CONFIG_FILE" ]]; then
-          supported_runners=$(yq -r '.self-hosted-runner.labels' $DEFAULT_CONFIG_FILE | sort -u)
-          custom_runners=$(yq -r '.self-hosted-runner.labels' $CUSTOM_CONFIG_FILE | sort -u)
-          valid_runners=$(comm -12 <(supported_runners) <(custom_runners)) # extract valid labels from custom_runners
-          invalid_runners=$(comm -13 <(supported_runners) <(custom_runners)) # extract invalid labels from custom_runners
-          if [[ -n "$invalid_runners" ]]; then
-            echo "These self-hosted labels are not supported and workflow using them will not run"
-            echo "$invalid_runners"
-            # TODO: possible improvement would be to keep only valid_runners from the one provided by the config
-            exit 1
-          fi
+          # echo "Testing custom config supported labels" 
+          # supported_runners=$(yq -r '.self-hosted-runner.labels' "$DEFAULT_CONFIG_FILE" | sort -u)
+          # custom_runners=$(yq -r '.self-hosted-runner.labels' "$CUSTOM_CONFIG_FILE" | sort -u)
+          # valid_runners=$(comm -12 <(supported_runners) <(custom_runners)) # extract valid labels from custom_runners
+          # unsupported_runners=$(comm -13 <(supported_runners) <(custom_runners)) # extract invalid labels from custom_runners
+          # sanitized_custom_config_file=/tmp/sanitized_custom_config_file.yaml
+          # if [[ -n "$unsupported_runners" ]]; then
+          #   # TODO: possible improvement would be to keep only valid_runners from the one provided by the config
+          #   echo "These self-hosted labels are not supported and will be removed from actionlint configuration"
+          #   echo "$unsupported_runners"
+          # fi
+          # yq -i '.self-hosted-runner.labels = env(valid_runners)' "$CUSTOM_CONFIG_FILE" > "$sanitized_custom_config_file"
+
+          SANITIZED_CONFIG_FILE=/tmp/sanitized_custom_config_file.yaml
+          ${{ github.action_path }}/sanitize-config.sh "$CUSTOM_CONFIG_FILE" "$DEFAULT_CONFIG_FILE" > "$SANITIZED_CONFIG_FILE"
+          config_file="$SANITIZED_CONFIG_FILE"
         fi
 
         # Combine all args into an array for running purposes and readability purposes
