@@ -16,11 +16,13 @@ if [ -n "$UNSUPPORTED_RUNNERS" ]; then
   # Print warning messages on stderr
   error "These self-hosted labels are not supported and will be removed from actionlint configuration"
   error "$UNSUPPORTED_RUNNERS"
+  error
 fi
 VALID_RUNNERS="$(comm -12 /tmp/supported_runner_labels /tmp/custom_runner_labels)"
 if [ -z "$VALID_RUNNERS" ]; then
   error "No valid self-hosted labels found in your actionlint configuration"
   error "Fallback to default runners"
+  error
   VALID_RUNNERS=$(cat /tmp/supported_runner_labels)
 fi
 valid_runners="$VALID_RUNNERS" yq '.self-hosted-runner.labels = env(valid_runners)' "$CUSTOM_CONFIG_FILE"
