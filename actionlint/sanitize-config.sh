@@ -23,7 +23,7 @@ fi
 VALID_RUNNERS="$(comm -12 /tmp/supported_runner_labels /tmp/custom_runner_labels)"
 if [ -z "$VALID_RUNNERS" ]; then
   error "No valid self-hosted labels found in your actionlint configuration"
-  error "Fallback to default runners"
+  error "Fallback to supported self-hosted labels provided by infra team"
   error
   VALID_RUNNERS=$(cat /tmp/supported_runner_labels)
 fi

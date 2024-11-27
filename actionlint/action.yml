@@ -38,13 +38,15 @@ runs:
       run: |
 
         config_file="$DEFAULT_CONFIG_FILE"
-        echo "Custom config file: ${CUSTOM_CONFIG_FILE}"
 
         # Verify custom_runners contains only supported labels
         if [[ -n "$CUSTOM_CONFIG_FILE" ]]; then
+          echo "Custom config provided: ${CUSTOM_CONFIG_FILE}"
+
           SANITIZED_CONFIG_FILE=/tmp/sanitized_custom_config_file.yaml
           ${{ github.action_path }}/sanitize-config.sh "$CUSTOM_CONFIG_FILE" "$DEFAULT_CONFIG_FILE" > "$SANITIZED_CONFIG_FILE"
           config_file="$SANITIZED_CONFIG_FILE"
+
         fi
 
         # Combine all args into an array for running purposes and readability purposes
