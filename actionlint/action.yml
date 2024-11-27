@@ -3,27 +3,78 @@ name: Action lint
 
 description: Linting for GitHub workflows
 
+inputs:
+  version:
+    description: Actionlint version
+    default: "1.7.3"
+  ignore:
+    description: Multiline; Ignore errors by messaging using regular expression.
+  format:
+    description: Format error messages using Go template
+  custom-config-file:
+    description: Actionlint custom configuration file within original repo;
+
 runs:
   using: composite
   steps:
     - uses: actions/checkout@v4
 
-    - name: Checkout tools repo
-      uses: actions/checkout@v4
-      with:
-        repository: camunda/infra-global-github-actions
-        path: camunda-shared-actions
-        sparse-checkout: |
-          .github
+    - run: echo "::add-matcher::${{ github.action_path }}/actionlint-matcher.json"
+      shell: bash
 
     - name: Download actionlint
       id: get_actionlint
-      run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash)
-      shell: bash
-
-    - run: echo "::add-matcher::camunda-shared-actions/.github/actionlint-matcher.json"
+      env:
+        ACTIONLINT_VERSION: ${{ inputs.version }}
+      run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) $ACTIONLINT_VERSION
       shell: bash
 
     - name: Check workflow files
-      run: ${{ steps.get_actionlint.outputs.executable }} -color -config-file camunda-shared-actions/.github/actionlint.yaml
+      env:
+        FORMAT: ${{ inputs.format }}
+        IGNORE_MESSAGES: ${{ inputs.ignore }}
+        CUSTOM_CONFIG_FILE: ${{inputs.custom-config-file}}
+        DEFAULT_CONFIG_FILE: ${ github.action_path }}/actionlint.yaml
+      run: |
+
+        # Verify custom_runners contains only supported labels
+        if [[ -n "$CUSTOM_CONFIG_FILE" ]]; then
+          supported_runners=$(yq -r '.self-hosted-runner.labels' $DEFAULT_CONFIG_FILE | sort -u)
+          custom_runners=$(yq -r '.self-hosted-runner.labels' $CUSTOM_CONFIG_FILE | sort -u)
+          valid_runners=$(comm -12 <(supported_runners) <(custom_runners)) # extract valid labels from custom_runners
+          invalid_runners=$(comm -13 <(supported_runners) <(custom_runners)) # extract invalid labels from custom_runners
+          if [[ -n "$invalid_runners" ]]; then
+            echo "These self-hosted labels are not supported and workflow using them will not run"
+            echo "$invalid_runners"
+            exit 1
+          fi
+        fi
+
+        # Combine all args into an array for running purposes and readability purposes
+        _args=()
+        _args+=(-color)
+
+        # Set config file
+        _args+=(-config-file "$config_file")
+
+        # Exclude shellcheck and pyflakes
+        _args+=(-shellcheck)
+        _args+=(-pyflakes)
+
+        # Ignore error messages
+        if [[ -n "$IGNORE_MESSAGES" ]]; then
+          while read -r line
+          do
+            _args+=(-ignore "$line")
+          done < <($IGNORE_MESSAGES)
+        fi
+
+        # Set format for error messages
+        if [[ -n "$FORMAT" ]]; then
+          _args+=(-format "$FORMAT")
+        fi
+
+        # Execute actionlint
+        ${{ steps.get_actionlint.outputs.executable }} "${_args[@]}"
+
       shell: bash
