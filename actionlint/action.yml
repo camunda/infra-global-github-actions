@@ -55,7 +55,7 @@ runs:
           SANITIZED_CONFIG_FILE=/tmp/sanitized_custom_config_file.yaml
           ERROR_OUTPUTS=/tmp/actionlint-santize-error.log
           ${{ github.action_path }}/sanitize-config.sh "$CUSTOM_CONFIG_FILE" "$DEFAULT_CONFIG_FILE" "$ERROR_OUTPUTS" > "$SANITIZED_CONFIG_FILE"
-          cat "$ERROR_OUTPUTS"
+          echo ::set-output name=actionlint-invalid-labels::`cat $ERROR_OUTPUTS`
           config_file="$SANITIZED_CONFIG_FILE"
         fi
 
