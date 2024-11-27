@@ -47,7 +47,7 @@ runs:
         if [[ -n "$CUSTOM_CONFIG_FILE" ]]; then
           echo "Custom config provided: ${CUSTOM_CONFIG_FILE}"
 
-          if [[ $SANITIZED_CONFIG_FILE != "false" ]]; then
+          if [[ $SANITIZE_CUSTOM_LABELS != "false" ]]; then
           SANITIZED_CONFIG_FILE=/tmp/sanitized_custom_config_file.yaml
           ${{ github.action_path }}/sanitize-config.sh "$CUSTOM_CONFIG_FILE" "$DEFAULT_CONFIG_FILE" > "$SANITIZED_CONFIG_FILE"
             config_file="$SANITIZED_CONFIG_FILE"
