@@ -36,6 +36,7 @@ runs:
         CUSTOM_CONFIG_FILE: ${{inputs.custom-config-file}}
         DEFAULT_CONFIG_FILE: ${ github.action_path }}/actionlint.yaml
       run: |
+        config_file=${CUSTOM_CONFIG_FILE:-$DEFAULT_CONFIG_FILE}
         # Verify custom_runners contains only supported labels
         if [[ -n "$CUSTOM_CONFIG_FILE" ]]; then
           supported_runners=$(yq -r '.self-hosted-runner.labels' $DEFAULT_CONFIG_FILE | sort -u)
