@@ -1,30 +1,39 @@
 ---
-name: Configure maintenance Pull Request
-
-on:
-  pull_request:
-    types:
-    - labeled
-    - opened
-
-jobs:
-  configure-pr:
-    name: Configure maintenance Pull Request
-    runs-on: ubuntu-latest
-    steps:
-    - name: Generate a GitHub token
-      id: github-token
-      uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@main
-      with:
-        github-app-id-vault-key: GITHUB_APP_ID
-        github-app-id-vault-path: secret/data/products/infra/ci/team-infrastructure
-        github-app-private-key-vault-key: GITHUB_APP_PRIVATE_KEY
-        github-app-private-key-vault-path: secret/data/products/infra/ci/team-infrastructure
-        vault-auth-method: approle
-        vault-auth-role-id: ${{ secrets.VAULT_ROLE_ID }}
-        vault-auth-secret-id: ${{ secrets.VAULT_SECRET_ID}}
-        vault-url: ${{ secrets.VAULT_ADDR }}
-    - name: Apply maintenance parameters to the Pull Request if applicable
-      uses: camunda/infra-global-github-actions/teams/infra/configure-maintenance-pull-request@main
-      with:
-        github-token: ${{ steps.github-token.outputs.token }}
+  name: Configure maintenance Pull Request
+  
+  on:
+    pull_request:
+  
+  jobs:
+    configure-pr:
+      name: Configure maintenance Pull Request
+      runs-on: ubuntu-latest
+      steps:
+      - env:
+          IS_FORK: >-
+            ${{ 
+              github.event.name == 'pull_request' == '' &&
+              github.event.pull_request.head.repo.full_name != 'camunda/camunda'
+            }}
+        run: |
+          echo github.repository_owner=${{ github.repository_owner}}
+          echo github.event.pull_request.head.repo.full_name=${{ github.event.pull_request.head.repo.full_name}}
+          echo github.event.pull_request.base.repo.full_name=${{ github.event.pull_request.base.repo.full_name}}
+          echo IS_FORK=${IS_FORK}
+      - name: Generate a GitHub token
+        id: github-token
+        uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@main
+        with:
+          github-app-id-vault-key: GITHUB_APP_ID
+          github-app-id-vault-path: secret/data/products/infra/ci/team-infrastructure
+          github-app-private-key-vault-key: GITHUB_APP_PRIVATE_KEY
+          github-app-private-key-vault-path: secret/data/products/infra/ci/team-infrastructure
+          vault-auth-method: approle
+          vault-auth-role-id: ${{ secrets.VAULT_ROLE_ID }}
+          vault-auth-secret-id: ${{ secrets.VAULT_SECRET_ID}}
+          vault-url: ${{ secrets.VAULT_ADDR }}
+      - name: Apply maintenance parameters to the Pull Request if applicable
+        uses: camunda/infra-global-github-actions/teams/infra/configure-maintenance-pull-request@main
+        with:
+          github-token: ${{ steps.github-token.outputs.token }}
+  
