@@ -80,6 +80,6 @@ runs:
         echo "${_args[@]}"
 
         # Execute actionlint
-        ./actionlint "${_args[@]}"
+        eval "./actionlint ${_args[@]}"
 
       shell: bash
