@@ -28,11 +28,14 @@ runs:
     - name: Check workflow files
       env:
         FORMAT: ${{ inputs.format }}
+        ACTIONLINT_VERSION: ${{ inputs.version }}
         IGNORE_MESSAGES: ${{ inputs.ignore }}
         CUSTOM_CONFIG_FILE: ${{ inputs.custom-config-file }}
         DEFAULT_CONFIG_FILE: ${{ github.action_path }}/actionlint.yaml
         SANITIZE_CUSTOM_LABELS: ${{ inputs.sanitize-runner-labels }}
       run: |
+        # Download actionlint
+        bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) $ACTIONLINT_VERSION
 
         config_file="$DEFAULT_CONFIG_FILE"
 
@@ -48,8 +51,6 @@ runs:
             config_file="$CUSTOM_CONFIG_FILE"
           fi
         fi
-        # Download actionlint
-        bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) $ACTIONLINT_VERSION
 
         # Combine all args into an array for running purposes and readability purposes
         _args=()
@@ -79,6 +80,6 @@ runs:
         echo "${_args[@]}"
 
         # Execute actionlint
-        ./actionlint -config-file "$config_file" -color -shellcheck -pyflakes
+        ./actionlint "${_args[@]}"
 
       shell: bash
