@@ -25,13 +25,6 @@ runs:
     - run: echo "::add-matcher::${{ github.action_path }}/actionlint-matcher.json"
       shell: bash
 
-    - name: Download actionlint
-      id: get_actionlint
-      env:
-        ACTIONLINT_VERSION: ${{ inputs.version }}
-      run: bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) $ACTIONLINT_VERSION
-      shell: bash
-
     - name: Check workflow files
       env:
         FORMAT: ${{ inputs.format }}
@@ -55,6 +48,8 @@ runs:
             config_file="$CUSTOM_CONFIG_FILE"
           fi
         fi
+        # Download actionlint
+        bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) $ACTIONLINT_VERSION
 
         # Combine all args into an array for running purposes and readability purposes
         _args=()
@@ -84,6 +79,6 @@ runs:
         echo "${_args[@]}"
 
         # Execute actionlint
-        ${{ steps.get_actionlint.outputs.executable }} "${_args[@]}"
+        ./actionlint -config-file "$config_file" -color -shellcheck -pyflakes
 
       shell: bash
