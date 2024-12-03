@@ -1,11 +1,13 @@
 # actionlint
 
-Thok,lk,,is composite GitHub Action (GHA) is supposed to be used to lint GitHub action workflows.
+This composite GitHub Action (GHA) is supposed to be used to lint GitHub action workflows.
 
 It's basically a wrap around the `actionlint` tool, with the goal to provide a consistent way
 to lint GitHub action workflows across all Camunda repositories, especially when using self-hosted runners.
 
 You can read more about `actionlint` [here](https://github.com/rhysd/actionlint/tree/main)
+
+You can see the list of checks supported by `actionlint` [here](https://github.com/rhysd/actionlint/blob/main/docs/checks.md)
 
 ## Customizations
 
