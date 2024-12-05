@@ -28,6 +28,9 @@ runs:
         # Download actionlint
         bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) $ACTIONLINT_VERSION
 
+        # Download yq
+        curl -o /usr/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64  && chmod +x /usr/bin/yq
+
         CONFIG_FILE="$DEFAULT_CONFIG_FILE"
 
         if [[ -f "$REPOSITORY_ADDITIONAL_CONFIG_FILE" ]]; then
