@@ -9,13 +9,6 @@ inputs:
     default: "1.7.4"
   ignore:
     description: Multiline; Ignore errors by messaging using regular expression.
-  format:
-    description: Format error messages using Go template
-  custom-config-file:
-    description: Actionlint custom configuration file path within original repo
-  sanitize-runner-labels:
-    description: Sanitize custom runner labels to only those supported by infra-team
-    default: "true"
 
 runs:
   using: composite
@@ -27,29 +20,21 @@ runs:
 
     - name: Check workflow files
       env:
-        FORMAT: ${{ inputs.format }}
         ACTIONLINT_VERSION: ${{ inputs.version }}
         IGNORE_MESSAGES: ${{ inputs.ignore }}
-        CUSTOM_CONFIG_FILE: ${{ inputs.custom-config-file }}
         DEFAULT_CONFIG_FILE: ${{ github.action_path }}/actionlint.yaml
-        SANITIZE_CUSTOM_LABELS: ${{ inputs.sanitize-runner-labels }}
+        REPOSITORY_ADDITIONAL_CONFIG_FILE: ${{ github.action_path }}/repository-additional-configuration/${{ github.repository }}/actionlint.yaml
       run: |
         # Download actionlint
         bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) $ACTIONLINT_VERSION
 
-        config_file="$DEFAULT_CONFIG_FILE"
+        CONFIG_FILE="$DEFAULT_CONFIG_FILE"
 
-        # Verify custom_runners contains only supported labels
-        if [[ -n "$CUSTOM_CONFIG_FILE" ]]; then
-          echo "Custom config provided: ${CUSTOM_CONFIG_FILE}"
-
-          if [[ $SANITIZE_CUSTOM_LABELS != "false" ]]; then
-          SANITIZED_CONFIG_FILE=/tmp/sanitized_custom_config_file.yaml
-          ${{ github.action_path }}/sanitize-config.sh "$CUSTOM_CONFIG_FILE" "$DEFAULT_CONFIG_FILE" > "$SANITIZED_CONFIG_FILE"
-            config_file="$SANITIZED_CONFIG_FILE"
-          else
-            config_file="$CUSTOM_CONFIG_FILE"
-          fi
+        if [[ -f "$REPOSITORY_ADDITIONAL_CONFIG_FILE" ]]; then
+          # Merge repository custom configuration with default configuration
+          echo "Including additional configuration for ${{ github.repository }} to default configuration"
+          CONFIG_FILE=/tmp/custom-actionlint-config.yml
+          yq eval-all '. as $item ireduce ({}; . *+ $item)' "$DEFAULT_CONFIG_FILE" "$REPOSITORY_ADDITIONAL_CONFIG_FILE" > "$CONFIG_FILE"
         fi
 
         # Combine all args into an array for running purposes and readability purposes
@@ -57,7 +42,7 @@ runs:
         _args+=(-color)
 
         # Set config file
-        _args+=(-config-file "$config_file")
+        _args+=(-config-file "$CONFIG_FILE")
 
         # Exclude shellcheck and pyflakes
         _args+=(-shellcheck)
@@ -69,11 +54,6 @@ runs:
           do
             _args+=(-ignore "'$line'")
           done < <(echo "$IGNORE_MESSAGES")
-        fi
-
-        # Set format for error messages
-        if [[ -n "$FORMAT" ]]; then
-          _args+=(-format "$FORMAT")
         fi
 
         echo "Running actionlint with these options:"
