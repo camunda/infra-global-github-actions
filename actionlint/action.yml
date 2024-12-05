@@ -32,7 +32,8 @@ runs:
 
         if [[ -f "$REPOSITORY_ADDITIONAL_CONFIG_FILE" ]]; then
           # Merge repository custom configuration with default configuration
-          echo "Including additional configuration for ${{ github.repository }} to default configuration"
+          REPOSITORY_NAME=${{ github.repository }}
+          echo "Including additional configuration for $REPOSITORY_NAME to default configuration"
           CONFIG_FILE=/tmp/custom-actionlint-config.yml
           yq eval-all '. as $item ireduce ({}; . *+ $item)' "$DEFAULT_CONFIG_FILE" "$REPOSITORY_ADDITIONAL_CONFIG_FILE" > "$CONFIG_FILE"
         fi
