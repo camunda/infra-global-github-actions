@@ -28,9 +28,6 @@ runs:
         # Download actionlint
         bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) $ACTIONLINT_VERSION
 
-        # Download yq
-        curl -o ./yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64  && chmod +x ./yq
-
         CONFIG_FILE="$DEFAULT_CONFIG_FILE"
 
         if [[ -f "$REPOSITORY_ADDITIONAL_CONFIG_FILE" ]]; then
@@ -38,7 +35,7 @@ runs:
           REPOSITORY_NAME=${{ github.repository }}
           echo "Including additional configuration for $REPOSITORY_NAME to default configuration"
           CONFIG_FILE=/tmp/custom-actionlint-config.yml
-          ./yq eval-all '. as $item ireduce ({}; . *+ $item)' "$DEFAULT_CONFIG_FILE" "$REPOSITORY_ADDITIONAL_CONFIG_FILE" > "$CONFIG_FILE"
+          yq eval-all '. as $item ireduce ({}; . *+ $item)' "$DEFAULT_CONFIG_FILE" "$REPOSITORY_ADDITIONAL_CONFIG_FILE" > "$CONFIG_FILE"
         fi
 
         # Combine all args into an array for running purposes and readability purposes
