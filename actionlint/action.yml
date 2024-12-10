@@ -1,0 +1,66 @@
+---
+name: Action lint
+
+description: Linting for GitHub workflows
+
+inputs:
+  version:
+    description: Actionlint version
+    default: "1.7.4"
+  ignore:
+    description: Multiline; Ignore errors by messaging using regular expression.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@v4
+
+    - run: echo "::add-matcher::${{ github.action_path }}/actionlint-matcher.json"
+      shell: bash
+
+    - name: Check workflow files
+      env:
+        ACTIONLINT_VERSION: ${{ inputs.version }}
+        IGNORE_MESSAGES: ${{ inputs.ignore }}
+        DEFAULT_CONFIG_FILE: ${{ github.action_path }}/actionlint.yaml
+        REPOSITORY_ADDITIONAL_CONFIG_FILE: ${{ github.action_path }}/custom/${{ github.repository }}/actionlint.yaml
+      run: |
+        # Download actionlint
+        bash <(curl https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) $ACTIONLINT_VERSION
+
+        CONFIG_FILE="$DEFAULT_CONFIG_FILE"
+
+        if [[ -f "$REPOSITORY_ADDITIONAL_CONFIG_FILE" ]]; then
+          # Merge repository custom configuration with default configuration
+          REPOSITORY_NAME=${{ github.repository }}
+          echo "Including additional configuration for $REPOSITORY_NAME to default configuration"
+          CONFIG_FILE=/tmp/custom-actionlint-config.yml
+          yq eval-all '. as $item ireduce ({}; . *+ $item)' "$DEFAULT_CONFIG_FILE" "$REPOSITORY_ADDITIONAL_CONFIG_FILE" > "$CONFIG_FILE"
+        fi
+
+        # Combine all args into an array for running purposes and readability purposes
+        _args=()
+        _args+=(-color)
+
+        # Set config file
+        _args+=(-config-file "$CONFIG_FILE")
+
+        # Exclude shellcheck and pyflakes
+        _args+=(-shellcheck)
+        _args+=(-pyflakes)
+
+        # Ignore error messages
+        if [[ -n "$IGNORE_MESSAGES" ]]; then
+          while read -r line
+          do
+            _args+=(-ignore "'$line'")
+          done < <(echo "$IGNORE_MESSAGES")
+        fi
+
+        echo "Running actionlint with these options:"
+        echo "${_args[@]}"
+
+        # Execute actionlint
+        eval "./actionlint ${_args[@]}"
+
+      shell: bash
