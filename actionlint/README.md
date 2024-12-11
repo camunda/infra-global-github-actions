@@ -23,6 +23,12 @@ As a wrap around the `actionlint` tool, this composite GHA provides the followin
 `actionlint` provides the ability to ignore specific checks and errors using regular expressions. This composite GHA allows you to provide
 a multiline field to specify the ignore patterns. One ignore pattern per line.
 
+⚠️ **Note** ⚠️
+
+Make sure when adding ignore patterns to use the `|-` instead of the `|` yaml syntax to avoid any issues with new lines.
+The action will try to sanitize this input by removing any empty or space-only lines.
+Check the usage below for an example of a correct input.
+
 ### Additional configuration
 
 Additional configuration could be included by creating a dedicated `actinlint.yaml` under the `custom` directory.
