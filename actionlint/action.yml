@@ -51,10 +51,16 @@ runs:
 
         # Ignore error messages
         if [[ -n "$IGNORE_MESSAGES" ]]; then
+          # Remove empty or space-only lines from ignore messages
+          non_empty_lines=$(echo "$IGNORE_MESSAGES" | sed '/^[[:space:]]*$/d')
           while read -r line
+          # Double check, if line is empty don't consider it
+          if [[ -z "$line" ]]; then
+            continue
+          fi
           do
             _args+=(-ignore "'$line'")
-          done < <(echo "$IGNORE_MESSAGES")
+          done < <(echo "$non_empty_lines")
         fi
 
         echo "Running actionlint with these options:"
