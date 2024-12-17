@@ -8,23 +8,24 @@ This composite GHA can be used in any non-public repository with a `Dockerfile` 
 
 ### Inputs
 
-| Input name        | Description                                        |
-|-------------------|----------------------------------------------------|
-| registry_host     | Host name of target Docker registry, e.g. `gcr.io` |
-| registry_username | Username used for authenticating to registry host  |
-| registry_password | Password used for authenticating to registry host  |
-| image_name        | Docker image name (*without* registry and Docker tag), e.g. `example/image` |
-| build_args        | Allows defining extra build-args, supply as list with \| (pipe bar) |
-| extra_tags        | Allows defining extra tags according to the [metadata action](https://github.com/docker/metadata-action), supply as list with \| (pipe bar) |
-| force_push        | Allows overwriting the image push behaviour, by setting to 'true' as input |
-| build_context     | Docker build context location                      |
-| build_allow       | Extra privilege entitlements to give builder       |
-| build_platforms   | List of [target platforms](https://docs.docker.com/engine/reference/commandline/buildx_build/#platform) for build        |
-| buildx_driver     | Driver to use for buildx builder                   |
-| buildx_version    | Which release version of a buildx action to use    |
-| docker_load       | Whether or not to load docker image builds into the local Docker Images |
-| qemu_image        | QEMU static binaries Docker image                  |
-| qemu_platforms    | Platforms to install (e.g., `arm64,riscv64,arm`)   |
+| Input name                 | Description                                        |
+|----------------------------|----------------------------------------------------|
+| registry_host              | Host name of target Docker registry, e.g. `gcr.io` |
+| registry_username          | Username used for authenticating to registry host  |
+| registry_password          | Password used for authenticating to registry host  |
+| use_workload_identity_auth | Use Google Workload Identity for authenticating to registry host |
+| image_name                 | Docker image name (*without* registry and Docker tag), e.g. `example/image` |
+| build_args                 | Allows defining extra build-args, supply as list with \| (pipe bar) |
+| extra_tags                 | Allows defining extra tags according to the [metadata action](https://github.com/docker/metadata-action), supply as list with \| (pipe bar) |
+| force_push                 | Allows overwriting the image push behaviour, by setting to 'true' as input |
+| build_context              | Docker build context location                      |
+| build_allow                | Extra privilege entitlements to give builder       |
+| build_platforms            | List of [target platforms](https://docs.docker.com/engine/reference/commandline/buildx_build/#platform) for build        |
+| buildx_driver              | Driver to use for buildx builder                   |
+| buildx_version             | Which release version of a buildx action to use    |
+| docker_load                | Whether or not to load docker image builds into the local Docker Images |
+| qemu_image                 | QEMU static binaries Docker image                  |
+| qemu_platforms             | Platforms to install (e.g., `arm64,riscv64,arm`)   |
 
 For the above example inputs the resulting Docker image would be named `gcr.io/example/image`.
 
