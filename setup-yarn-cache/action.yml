@@ -39,10 +39,9 @@ runs:
       fi
 
     # Check if PR contains a label to disable the cache
-  - name: Check if cache is disabled
-    if: ${{ !(startsWith(github.ref_name, 'stable/') || github.ref_name == 'main') }}
-    uses: ./.github/actions/is-cache-disabled
-    id: is-cache-disabled
+  - name: Check if cache is enabled
+    uses: ./.github/actions/is-cache-enabled
+    id: is-cache-enabled
 
   - name: Get Yarn global cache directory
     shell: bash
@@ -75,7 +74,7 @@ runs:
 
   - name: Restore global Yarn cache always
     # Restore cache (but don't save it) if we're not on main or stable/* branches and cache is not disabled
-    if: ${{ steps.is-cache-create-branch.outputs.result != 'true' && steps.is-cache-disabled.outputs.is-cache-disabled == 'false' }}
+    if: ${{ steps.is-cache-create-branch.outputs.result != 'true' && steps.is-cache-enabled.outputs.is-cache-enabled == 'true' }}
     uses: actions/cache/restore@v4
     with:
       path: "${{ env.CUSTOM_YARN_GLOBAL_CACHE_DIR }}"
