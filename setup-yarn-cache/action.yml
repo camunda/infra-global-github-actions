@@ -40,7 +40,7 @@ runs:
 
     # Check if PR contains a label to disable the cache
   - name: Check if cache is enabled
-    uses: camunda/infra-global-github-action/is-cache-enabled@6f325f913625cc0025659822abaf8168f867e432
+    uses: camunda/infra-global-github-actions/is-cache-enabled@6f325f913625cc0025659822abaf8168f867e432
     id: is-cache-enabled
 
   - name: Get Yarn global cache directory
