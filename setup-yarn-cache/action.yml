@@ -38,6 +38,17 @@ runs:
         echo "result=false" >> $GITHUB_OUTPUT
       fi
 
+  - name: Symlink current action repo
+    env:
+      action_path: ${{ github.action_path }}
+    run: ln -fs ${{ env.action_path }}/.. .github/.linked-infra-global-github-actions
+    shell: bash
+
+    # Check if PR contains a label to disable the cache
+  - name: Check if cache is enabled
+    uses: ./.github/.linked-infra-global-github-actions/is-cache-enabled
+    id: is-cache-enabled
+
   - name: Get Yarn global cache directory
     shell: bash
     working-directory: ${{ inputs.directory }}
