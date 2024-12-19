@@ -38,6 +38,18 @@ runs:
         echo "result=false" >> $GITHUB_OUTPUT
       fi
 
+  - name: Get infra-global-github-actions root folder
+    id: infra-global-github-actions-root-folder
+    shell: bash
+    run: |
+      cd ${{ github.action_path }}/..
+      echo 'path=$(pwd)' | tee -a $GITHUB_OUTPUT
+
+    # Check if PR contains a label to disable the cache
+  - name: Check if cache is enabled
+    uses: ${{ steps.infra-global-github-actions-root-folder.outputs.path }}/is-cache-enabled
+    id: is-cache-enabled
+
   - name: Get Yarn global cache directory
     shell: bash
     working-directory: ${{ inputs.directory }}
