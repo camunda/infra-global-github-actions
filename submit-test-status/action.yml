@@ -93,7 +93,8 @@ runs:
     run: |
       BQ_TABLE=$(echo "${{ inputs.big_query_table_name }}" | cut -d':' -f2)
 
-      echo '${{ inputs.test_event_record }}' > ${{ steps.download-schema.outputs.temp-dir }}/input_test_event_record.json
+      echo ${{ inputs.test_event_record }}
+      echo ${{ inputs.test_event_record }} > ${{ steps.download-schema.outputs.temp-dir }}/input_test_event_record.json
       REPORT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
       jq -c --arg REPORT_TIME "$REPORT_TIME" '. + {report_time: $REPORT_TIME}' \
         ${{ steps.download-schema.outputs.temp-dir }}/input_test_event_json \
