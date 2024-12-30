@@ -83,7 +83,7 @@ runs:
         --format prettyjson \
         "${{ inputs.big_query_table_name }}" \
       | jq '.schema.fields' > $TEMP_DIR/table_schema.json
-      echo "sumbit-test-status-gha-temp-dir=$TEMP_DIR" >> $GITHUB_ENV
+      echo "submit-test-status-gha-temp-dir=$TEMP_DIR" >> $GITHUB_ENV
 
   - name: Submit build status to CI Analytics
     shell: bash
