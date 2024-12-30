@@ -98,7 +98,7 @@ runs:
       cat $TEMP_DIR/input_test_event_record.json
 
       REPORT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-      jq -c --arg REPORT_TIME $REPORT_TIME '. + {report_time: $REPORT_TIME}' \
+      jq -c --arg REPORT_TIME "$REPORT_TIME" '. + {report_time: $REPORT_TIME}' \
         $TEMP_DIR/input_test_event_record.json > $TEMP_DIR/test_event_record.json
 
       cat $TEMP_DIR/test_event_record.json
