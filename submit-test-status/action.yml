@@ -67,10 +67,10 @@ runs:
     shell: bash
     run: |
       if ! command -v jq &> /dev/null; then
-        echo "`jq` is not installed. Installing..."
+        echo "jq is not installed. Installing..."
         sudo apt-get update && sudo apt-get install -y jq
       else
-        echo "`jq` is already installed."
+        echo "jq is already installed."
       fi
 
   - name: Download table schema
@@ -86,12 +86,11 @@ runs:
       | jq '.schema.fields' > $TEMP_DIR/table_schema.json
       echo "::set-output name=temp-dir::$TEMP_DIR"
       echo "::set-output name=bq-command::$BQ_COMMAND"
-
+      cat $TEMP_DIR/table_schema.json
 
   - name: Submit build status to CI Analytics
     shell: bash
     run: |
-      PROJECT_ID=$(echo "${{ inputs.big_query_table_name }}" | cut -d':' -f1)
       BQ_TABLE=$(echo "${{ inputs.big_query_table_name }}" | cut -d':' -f2)
 
       echo '${{ inputs.test_event_record }}' > ${{ steps.download-schema.outputs.temp-dir }}/input_test_event_record.json
@@ -100,9 +99,12 @@ runs:
         ${{ steps.download-schema.outputs.temp-dir }}/input_test_event_json \
         > ${{ steps.download-schema.outputs.temp-dir }}/test_event_record.json
 
+      cat ${{ steps.download-schema.outputs.temp-dir }}/input_test_event_record.json
+      cat ${{ steps.download-schema.outputs.temp-dir }}/test_event_record.json
+
       ${{ steps.download-schema.outputs.bq-command }} load \
         --source_format=NEWLINE_DELIMITED_JSON \
-        --project_id=$PROJECT_ID \
+        --project_id=$GCP_PROJECT \
         $BQ_TABLE \
         ${{ steps.download-schema.outputs.temp-dir }}/test_event_record.json \
         ${{ steps.download-schema.outputs.temp-dir }}/table_schema.json
