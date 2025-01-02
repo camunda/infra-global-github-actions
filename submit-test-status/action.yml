@@ -112,10 +112,10 @@ runs:
 
       cat $TEMP_DIR/test_event_record.json
 
-      # BQ_TABLE=$(echo "${{ inputs.big_query_table_name }}" | cut -d':' -f2)
-      # $BQ_COMMAND load \
-      #   --source_format=NEWLINE_DELIMITED_JSON \
-      #   --project_id=$GCP_PROJECT \
-      #   $BQ_TABLE \
-      #   $TEMP_DIR/test_event_record.json \
-      #   $TEMP_DIR/table_schema.json
+      BQ_TABLE=$(echo "${{ inputs.big_query_table_name }}" | cut -d':' -f2)
+      $BQ_COMMAND load \
+        --source_format=NEWLINE_DELIMITED_JSON \
+        --project_id=$GCP_PROJECT \
+        $BQ_TABLE \
+        $TEMP_DIR/test_event_record.json \
+        $TEMP_DIR/table_schema.json
