@@ -16,6 +16,11 @@ inputs:
   image_name:
     description: Docker image name WITHOUT registry and WITHOUT Docker tag, e.g. example/image.
     required: true
+  add_hosts:
+    description: |
+      Add a list of custom host-to-IP mapping (host:ip)
+      https://docs.docker.com/reference/cli/docker/buildx/build/#add-entries-to-container-hosts-file---add-host
+    required: false
   build_args:
     description: Docker build args to append to `docker build` command.
     required: false
@@ -160,6 +165,7 @@ runs:
     env:
       DOCKER_BUILD_SUMMARY: ${{ inputs.job_summary }}
     with:
+      add-hosts: ${{ inputs.add_hosts }}
       allow: ${{ inputs.build_allow }}
       context: ${{ inputs.build_context }}
       builder: ${{ steps.buildx.output.name }}
