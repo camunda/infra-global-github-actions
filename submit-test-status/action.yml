@@ -91,7 +91,10 @@ runs:
       TEMP_DIR: ${{ env.submit-test-status-gha-temp-dir }}
       BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
     run: |
-      # echo "${{ inputs.test_event_record }}" > $TEMP_DIR/input_test_event_record.json
+      echo "GITHUB_SERVER_URL: $GITHUB_SERVER_URL"
+      echo "GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
+      echo "GITHUB_RUN_ID: $GITHUB_RUN_ID"
+      echo "GITHUB_RUN_ATTEMPT: $GITHUB_RUN_ATTEMPT"
 
       cat <<EOF > $TEMP_DIR/input_test_event_record.json
       ${{ inputs.test_event_record }}
@@ -100,8 +103,11 @@ runs:
       cat $TEMP_DIR/input_test_event_record.json
 
       REPORT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-      jq -c --arg REPORT_TIME "$REPORT_TIME" \
-        '. + {"report_time": $REPORT_TIME} + {"ci_url": $GITHUB_SERVER_URL/$GITHUB_REPOSITORY} + {"build_id": $GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT}' \
+      jq -c \
+        --arg REPORT_TIME "$REPORT_TIME" \
+        --arg CI_URL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+        --arg BUILD_ID "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT" \
+        '. + {"report_time": $REPORT_TIME} + {"ci_url": $CI_URL} + {"build_id": $BUILD_ID}' \
         $TEMP_DIR/input_test_event_record.json > $TEMP_DIR/test_event_record.json
 
       cat $TEMP_DIR/test_event_record.json
