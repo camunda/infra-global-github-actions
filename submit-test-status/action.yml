@@ -74,7 +74,7 @@ runs:
       cat <<EOF > $TEMP_DIR/input_test_event_record.json
       ${{ inputs.test_event_record }}
       EOF
-      
+
       # validate input for the presence of mandatory keys
       INVALID_LINES=$(jq -c 'select((has("test_name") and has("test_status")) | not)' "$TEMP_DIR/input_test_event_record.json")
       if [ -n "$INVALID_LINES" ]; then
