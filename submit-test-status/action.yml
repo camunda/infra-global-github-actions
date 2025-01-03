@@ -4,23 +4,8 @@ name: Submit Test Status
 description: Submits test status records from a GHA workflow job to CI Analytics. See https://confluence.camunda.com/display/HAN/CI+Analytics
 
 inputs:
-  # test_class_name:
-  #   description: Individual (unit) test cases are usually grouped together in a container ("class" in Java world). This field holds the name of the class.
-  #   required: false
-  # test_class_duration_millis:
-  #   description: Optional number (positive) that indicates the duration of the tests for a whole class in milliseconds.
-  #   required: false
-  # test_name:
-  #   description: Name of the individual test case, can include parameters for uniqueness.
-  #   required: true
-  # test_status:
-  #   description: Status of the individual test case, one of success/failure/skipped/flaky.
-  #   required: true
-  # test_duration_millis:
-  #   description: Optional number (positive) that indicates the duration of the individual test in milliseconds.
-  #   required: false
   test_event_record:
-    description: Test event(s) in JSONL format. Required fields are test_name, test_status
+    description: Test event(s) in JSONL format. Required keys are test_name and test_status.
     required: true
 
   gcp_credentials_json:
@@ -44,18 +29,13 @@ runs:
       echo "Test event record: ${{ inputs.test_event_record }}"
       echo "BQ table name (for testing): ${{ inputs.big_query_table_name }}"
 
-  - name: Validate test record
-    shell: bash
-    run: |
-      #TODO: validate JSONL input for the presence of mandatory keys
-
-  - name: Login to Google Cloud
+  - name: login to Google Cloud
     id: auth
     uses: google-github-actions/auth@v2
     with:
       credentials_json: '${{ inputs.gcp_credentials_json }}'
 
-  - name: Setup Google Cloud SDK
+  - name: setup Google Cloud SDK
     uses: google-github-actions/setup-gcloud@v2
 
   - name: Print Google Cloud SDK version used
@@ -63,7 +43,7 @@ runs:
     run: |
       gcloud info
 
-  - name: Ensure that jq is available
+  - name: ensure that jq is available
     shell: bash
     run: |
       if ! command -v jq &> /dev/null; then
@@ -73,7 +53,7 @@ runs:
         echo "jq is already installed."
       fi
 
-  - name: Download table schema
+  - name: download table schema from CI Analytics
     shell: bash
     env:
       BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
@@ -85,23 +65,25 @@ runs:
       | jq '.schema.fields' > $TEMP_DIR/table_schema.json
       echo "submit-test-status-gha-temp-dir=$TEMP_DIR" >> $GITHUB_ENV
 
-  - name: Submit build status to CI Analytics
+  - name: validate input and submit to CI Analytics
     shell: bash
     env:
       TEMP_DIR: ${{ env.submit-test-status-gha-temp-dir }}
       BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
     run: |
-      echo "GITHUB_SERVER_URL: $GITHUB_SERVER_URL"
-      echo "GITHUB_REPOSITORY: $GITHUB_REPOSITORY"
-      echo "GITHUB_RUN_ID: $GITHUB_RUN_ID"
-      echo "GITHUB_RUN_ATTEMPT: $GITHUB_RUN_ATTEMPT"
-
       cat <<EOF > $TEMP_DIR/input_test_event_record.json
       ${{ inputs.test_event_record }}
       EOF
       
-      cat $TEMP_DIR/input_test_event_record.json
+      # validate input for the presence of mandatory keys
+      INVALID_LINES=$(jq -c 'select((has("test_name") and has("test_status")) | not)' "$TEMP_DIR/input_test_event_record.json")
+      if [ -n "$INVALID_LINES" ]; then
+        echo "JSONL input validation failed. The following lines are invalid:"
+        echo "$INVALID_LINES"
+        exit 1
+      fi
 
+      # add report_time, ci_url and build_id to the test records
       REPORT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
       jq -c \
         --arg REPORT_TIME "$REPORT_TIME" \
@@ -110,8 +92,7 @@ runs:
         '. + {"report_time": $REPORT_TIME} + {"ci_url": $CI_URL} + {"build_id": $BUILD_ID}' \
         $TEMP_DIR/input_test_event_record.json > $TEMP_DIR/test_event_record.json
 
-      cat $TEMP_DIR/test_event_record.json
-
+      # upload data to CI Analytics
       BQ_TABLE=$(echo "${{ inputs.big_query_table_name }}" | cut -d':' -f2)
       $BQ_COMMAND load \
         --source_format=NEWLINE_DELIMITED_JSON \
