@@ -71,8 +71,8 @@ runs:
       TEMP_DIR: ${{ runner.temp }}/sts
     uses: dsanders11/json-schema-validate-action@v1.2.0
     with:
-      schema: $TEMP_DIR/table_schema.json
-      files: $TEMP_DIR/input_test_event_record.json
+      schema: ${{ env.TEMP_DIR }}/table_schema.json
+      files: ${{ env.TEMP_DIR }}/input_test_event_record.json
 
       # # validate input for the presence of mandatory keys
       # INVALID_LINES=$(jq -c 'select((has("test_name") and has("test_status")) | not)' "$TEMP_DIR/input_test_event_record.json")
