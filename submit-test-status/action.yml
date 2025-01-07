@@ -72,7 +72,7 @@ runs:
           }
         })),
         "required": [.[] | select(.mode == "REQUIRED") | .name]
-      }' "$schema_file" > "converted_schema_file"
+      }' "$schema_file" > "$converted_schema_file"
 
       echo "Converted schema saved to $converted_schema_file"
 
