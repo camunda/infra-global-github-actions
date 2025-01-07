@@ -74,7 +74,10 @@ runs:
         "required": [.[] | select(.mode == "REQUIRED") | .name]
       }' "$schema_file" > "$converted_schema_file"
 
-      echo "Converted schema saved to $converted_schema_file"
+      # schema fix for ci_uri field
+      jq '.properties.ci_url.format = "uri"' "$converted_schema_file" \
+        > "${converted_schema_file}.tmp" \
+      && mv "${converted_schema_file}.tmp" "${converted_schema_file}"
 
   - name: load input and add required keys
     shell: bash
