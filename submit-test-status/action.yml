@@ -69,7 +69,7 @@ runs:
   - name: validate input
     env:
       TEMP_DIR: ${{ runner.temp }}/sts
-    uses: dsanders11/json-schema-validate-action
+    uses: dsanders11/json-schema-validate-action@v1.2.0
     with:
       schema: $TEMP_DIR/table_schema.json
       files: $TEMP_DIR/input_test_event_record.json
