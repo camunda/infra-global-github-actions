@@ -44,46 +44,51 @@ runs:
       gcloud info
 
   - name: ensure that jq is available
-    shell: bash
-    run: |
-      if ! command -v jq &> /dev/null; then
-        echo "jq is not installed. Installing..."
-        sudo apt-get update && sudo apt-get install -y jq
-      else
-        echo "jq is already installed."
-      fi
+    uses: dcarbone/install-jq-action@v3.0.1
 
   - name: download table schema from CI Analytics
     shell: bash
     env:
       BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
     run: |
-      TEMP_DIR=$(mktemp -d)
+      mkdir ${{ runner.temp }}/sts
       $BQ_COMMAND show \
         --format prettyjson \
         "${{ inputs.big_query_table_name }}" \
-      | jq '.schema.fields' > $TEMP_DIR/table_schema.json
-      echo "submit-test-status-gha-temp-dir=$TEMP_DIR" >> $GITHUB_ENV
+      | jq '.schema.fields' > ${{ runner.temp }}/sts/table_schema.json
 
-  - name: validate input and submit to CI Analytics
+  - name: load input
     shell: bash
     env:
-      TEMP_DIR: ${{ env.submit-test-status-gha-temp-dir }}
-      BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
+      TEMP_DIR: ${{ runner.temp }}/sts
     run: |
       cat <<EOF > $TEMP_DIR/input_test_event_record.json
       ${{ inputs.test_event_record }}
       EOF
 
-      # validate input for the presence of mandatory keys
-      INVALID_LINES=$(jq -c 'select((has("test_name") and has("test_status")) | not)' "$TEMP_DIR/input_test_event_record.json")
-      if [ -n "$INVALID_LINES" ]; then
-        echo "JSONL input validation failed. The following lines are invalid:"
-        echo "$INVALID_LINES"
-        exit 1
-      fi
+  - name: validate input
+    env:
+      TEMP_DIR: ${{ runner.temp }}/sts
+    uses: dsanders11/json-schema-validate-action
+    with:
+      schema: $TEMP_DIR/table_schema.json
+      files: $TEMP_DIR/input_test_event_record.json
 
-      # add report_time, ci_url and build_id to the test records
+      # # validate input for the presence of mandatory keys
+      # INVALID_LINES=$(jq -c 'select((has("test_name") and has("test_status")) | not)' "$TEMP_DIR/input_test_event_record.json")
+      # if [ -n "$INVALID_LINES" ]; then
+      #   echo "JSONL input validation failed. The following lines are invalid:"
+      #   echo "$INVALID_LINES"
+      #   exit 1
+      # fi
+
+  - name: submit to CI Analytics
+    shell: bash
+    env:
+      TEMP_DIR: ${{ runner.temp }}/sts
+      BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
+    run: |
+      # add mandatory report_time, ci_url and build_id to the test records
       REPORT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
       jq -c \
         --arg REPORT_TIME "$REPORT_TIME" \

@@ -11,7 +11,7 @@ This composite GHA can be used in any repository that was set up to provide cred
 
 | Input name           | Description                                        |
 |----------------------|----------------------------------------------------|
-| test_event_record    | Multi-line string that contains the details of the test events in JSONL format. One test event per line. |
+| test_event_record    | Multi-line string that contains the details of the test events in [JSONL format](https://jsonlines.org). One test event per line. |
 | gcp_credentials_json | Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file |
 
 Please check out Camunda's [Github Actions Recipes](https://github.com/camunda/github-actions-recipes#secrets=) for how to retrieve secrets from Vault.
@@ -53,9 +53,7 @@ All data submitted by this action is stored as one record per JSONL input line i
 
 ### Integration
 
-The scope of the `submit-test-status` action is to persist a *user-provided* test status information (whether a GHA workflow job run is considered successful or failed) into the central [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics) database for later analysis.
-
-It is _out of scope_ for this action to extract that test status information from a GHA workflow run itself as this depends on the structure of the GHA workflow.
+The scope of the `submit-test-status` action is to load the  *user-provided* test status information into the central [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics) database for later analysis.
 
 It is task of the user to integrate this action into their GHA workflows by invoking it at all suitable places and providing the desired inputs.
 
