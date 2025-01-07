@@ -46,18 +46,37 @@ runs:
   - name: ensure that jq is available
     uses: dcarbone/install-jq-action@v3.0.1
 
-  - name: download table schema from CI Analytics
+  - name: download and convert table schema
     shell: bash
     env:
       BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
     run: |
+      schema_file="${{ runner.temp }}/sts/table_schema.json"
+      converted_schema_file="${{ runner.temp }}/sts/converted_schema.json"
+
+      # download schema from CI Analytics
       mkdir ${{ runner.temp }}/sts
       $BQ_COMMAND show \
         --format prettyjson \
         "${{ inputs.big_query_table_name }}" \
-      | jq '.schema.fields' > ${{ runner.temp }}/sts/table_schema.json
+      | jq '.schema.fields' > $schema_file
 
-  - name: load input
+      # convert schema for the further validation to JSON schema specs format
+      jq '{
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "type": "object",
+        "properties": (reduce .[] as $field ({}; . + {
+          ($field.name): {
+            "type": ($field.type | ascii_downcase | if . == "timestamp" then "string" else . end | if $field.mode == "NULLABLE" then [., "null"] else . end),
+            "format": (if $field.type == "TIMESTAMP" then "date-time" else null end)
+          }
+        })),
+        "required": [.[] | select(.mode == "REQUIRED") | .name]
+      }' "$schema_file" > "converted_schema_file"
+
+      echo "Converted schema saved to $converted_schema_file"
+
+  - name: load input and add required keys
     shell: bash
     env:
       TEMP_DIR: ${{ runner.temp }}/sts
@@ -65,13 +84,21 @@ runs:
       cat <<EOF > $TEMP_DIR/input_test_event_record.json
       ${{ inputs.test_event_record }}
       EOF
+      # add mandatory report_time, ci_url and build_id to the test records
+      REPORT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+      jq -c \
+        --arg REPORT_TIME "$REPORT_TIME" \
+        --arg CI_URL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+        --arg BUILD_ID "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT" \
+        '. + {"report_time": $REPORT_TIME} + {"ci_url": $CI_URL} + {"build_id": $BUILD_ID}' \
+        $TEMP_DIR/input_test_event_record.json > $TEMP_DIR/test_event_record.json
 
   - name: validate input
     env:
       TEMP_DIR: ${{ runner.temp }}/sts
     uses: dsanders11/json-schema-validate-action@v1.2.0
     with:
-      schema: ${{ env.TEMP_DIR }}/table_schema.json
+      schema: ${{ env.TEMP_DIR }}/converted_schema.json
       files: ${{ env.TEMP_DIR }}/input_test_event_record.json
 
       # # validate input for the presence of mandatory keys
@@ -88,14 +115,14 @@ runs:
       TEMP_DIR: ${{ runner.temp }}/sts
       BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
     run: |
-      # add mandatory report_time, ci_url and build_id to the test records
-      REPORT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-      jq -c \
-        --arg REPORT_TIME "$REPORT_TIME" \
-        --arg CI_URL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
-        --arg BUILD_ID "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT" \
-        '. + {"report_time": $REPORT_TIME} + {"ci_url": $CI_URL} + {"build_id": $BUILD_ID}' \
-        $TEMP_DIR/input_test_event_record.json > $TEMP_DIR/test_event_record.json
+      # # add mandatory report_time, ci_url and build_id to the test records
+      # REPORT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+      # jq -c \
+      #   --arg REPORT_TIME "$REPORT_TIME" \
+      #   --arg CI_URL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
+      #   --arg BUILD_ID "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT" \
+      #   '. + {"report_time": $REPORT_TIME} + {"ci_url": $CI_URL} + {"build_id": $BUILD_ID}' \
+      #   $TEMP_DIR/input_test_event_record.json > $TEMP_DIR/test_event_record.json
 
       # upload data to CI Analytics
       BQ_TABLE=$(echo "${{ inputs.big_query_table_name }}" | cut -d':' -f2)
