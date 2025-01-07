@@ -1,4 +1,3 @@
-
 # submit-test-status
 
 This composite Github Action (GHA) is aimed to be used by Camunda teams for submitting the test status(es) from a GHA workflow job to [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics). This allows teams to generate statistics about flakiness, runtime, etc. per test case across all branches and prioritize the worst offenders.
