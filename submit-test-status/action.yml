@@ -26,7 +26,6 @@ runs:
     run: |
       echo "Inputs"
       echo "-----"
-      echo "Test event record: ${{ inputs.test_event_record }}"
       echo "BQ table name (for testing): ${{ inputs.big_query_table_name }}"
 
   - name: login to Google Cloud
