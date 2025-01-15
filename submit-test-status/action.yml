@@ -12,6 +12,11 @@ inputs:
     description: Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file.
     required: true
 
+  job_name_override:
+    description: Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB` useful e.g. for matrix builds
+    required: false
+    default: ''
+
   big_query_table_name:
     description: Use only for infrastructure testing purposes to target e.g. dev environment.
     required: false
@@ -26,6 +31,7 @@ runs:
     run: |
       echo "Inputs"
       echo "-----"
+      echo "Job name override: ${{ inputs.job_name_override }} (default job name: $GITHUB_JOB)"
       echo "BQ table name (for testing): ${{ inputs.big_query_table_name }}"
 
   - name: login to Google Cloud
@@ -90,7 +96,8 @@ runs:
         --arg REPORT_TIME "$REPORT_TIME" \
         --arg CI_URL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
         --arg BUILD_ID "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT" \
-        '. + {"report_time": $REPORT_TIME} + {"ci_url": $CI_URL} + {"build_id": $BUILD_ID}' \
+        --arg JOB_NAME "${{ (inputs.job_name_override == '') && '$GITHUB_JOB' || inputs.job_name_override }}" \
+        '. + {"report_time": $REPORT_TIME} + {"ci_url": $CI_URL} + {"build_id": $BUILD_ID} + {"job_name": $JOB_NAME}' \
         $TEMP_DIR/input_test_event_record.json > $TEMP_DIR/test_event_record.json
 
       # upload data to CI Analytics
