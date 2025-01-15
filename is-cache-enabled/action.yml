@@ -12,7 +12,7 @@ description: |
 inputs: {}
 
 outputs:
-  is-cache-disabled:
+  is-cache-enabled:
     description: |
       Output whether the workflows has cache enabled based on three conditions:
       - workflow is triggered by a pull_request event
