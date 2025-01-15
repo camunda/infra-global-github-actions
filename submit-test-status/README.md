@@ -12,6 +12,7 @@ This composite GHA can be used in any repository that was set up to provide cred
 | Input name           | Description                                        |
 |----------------------|----------------------------------------------------|
 | test_event_record    | Multi-line string that contains the details of the test events in [JSONL format](https://jsonlines.org). One test event per line. |
+| job_name_override    | Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB`, useful e.g. for matrix builds |
 | gcp_credentials_json | Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file |
 
 Please check out Camunda's [Github Actions Recipes](https://github.com/camunda/github-actions-recipes#secrets=) for how to retrieve secrets from Vault.
@@ -44,6 +45,7 @@ All data submitted by this action is stored as one record per JSONL input line i
 | report_time                      | TIMESTAMP  | REQUIRED   | Time of record submission |
 | ci_url                           | STRING     | REQUIRED   | Github repository URL from `"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"` |
 | build_id                         | STRING     | REQUIRED   | GHA workflow run ID from `"$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT"` |
+| job_name                         | STRING     | REQUIRED   | GHA workflow job ID from `"$GITHUB_JOB"` |
 | test_class_name                  | STRING     | NULLABLE   | Individual (unit) test cases are usually grouped together in a container/class. This field holds the name of the container. |
 | test_class_duration_milliseconds | INTEGER    | NULLABLE   | Based on user input (time a test class needed from start to finish) |
 | test_name                        | STRING     | REQUIRED   | Name of the individual test case, can include parameters for uniqueness |
