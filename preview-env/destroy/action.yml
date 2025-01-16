@@ -26,6 +26,11 @@ inputs:
     default: v2.13.3
     description: Version tag of Argo CD CLI tool
     required: false
+
+  github_token:
+    description: Personal access token used to delete the deployment and the environment
+    required: false
+
 runs:
   using: composite
   steps:
@@ -61,5 +66,14 @@ runs:
     with:
       step: deactivate-env
       token: "${{ github.token }}"
+      env: ${{ inputs.app_name }}
+      ref: ${{ inputs.revision }}
+
+  - uses: bobheadxi/deployments@v1.5.0
+    if: ${{ inputs.github_token }}
+    name: Delete GitHub Deployment environment
+    with:
+      step: delete-env
+      token: "${{ inputs.github_token }}"
       env: ${{ inputs.app_name }}
       ref: ${{ inputs.revision }}
