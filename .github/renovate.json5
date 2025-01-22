@@ -66,5 +66,13 @@
       ],
       extractVersion: "^v(?<version>.*)$",
     },
+    {
+      matchUpdateTypes: ["patch"],
+      matchPackageNames: [
+        "/actionlint/"
+      ],
+      addLabels: ["automerge"],
+      automerge: true,
+    } 
   ]
 }
