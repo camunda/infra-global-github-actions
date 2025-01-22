@@ -73,6 +73,6 @@
       ],
       addLabels: ["automerge"],
       automerge: true,
-    } 
+    }
   ]
 }
