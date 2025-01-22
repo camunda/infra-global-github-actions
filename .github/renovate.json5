@@ -56,6 +56,14 @@
       addLabels: ["automerge"],
       automerge: true
     },
+    {
+      matchUpdateTypes: ["patch"],
+      matchPackageNames: [
+        "/actionlint/"
+      ],
+      addLabels: ["automerge"],
+      automerge: true,
+    },
     // For known Github repositories that use Github tags/releases of format
     // "v1.2.3" and where the asdf plugin ignores the "v" prefix, we also tell
     // Renovate to ignore it via extractVersion when updating .tool-version file
@@ -65,6 +73,6 @@
         "quay.io/argoproj/argocd",
       ],
       extractVersion: "^v(?<version>.*)$",
-    },
+    }
   ]
 }
