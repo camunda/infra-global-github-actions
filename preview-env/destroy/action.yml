@@ -28,7 +28,11 @@ inputs:
     required: false
 
   github_token:
-    description: Personal access token used to delete the deployment and the environment
+    description: |-
+      Personal access token used to delete the deployment and the environment;
+      If present, the deployment environment also gets deleted.
+      Token must include deployments:write and administration:write permissions
+      for environment to be deleted
     required: false
 
 runs:
