@@ -77,22 +77,28 @@ runs:
     id: removable-environment
     shell: bash
     env:
+      GITHUB_TOKEN: ${{ inputs.github_token }}
       ENVIRONMENT: ${{ inputs.app_name }}
     run: |-
-      echo "Verifying if GitHub environment can be deleted"
-      case "$ENVIRONMENT" in
-        production | stage | main | master )
-          is_removable="false"
-          ;;
-        *)
-          is_removable="true"
-          ;;
-      esac
+      echo "Verifying if GitHub Environment can be deleted"
+      is_removable="false"
+      if [[ -n "$GITHUB_TOKEN" ]]; then
+        case "$ENVIRONMENT" in
+          production | stage | main | master )
+            echo "Environment '$ENVIRONMENT' is protected and can't be removed"
+            ;;
+          *)
+            is_removable="true"
+            ;;
+        esac
+      else
+        echo "No GitHub token provided, environment can't be removed"
+      fi
       echo "is-removable=$is_removable" | tee -a $GITHUB_OUTPUT
 
   - uses: bobheadxi/deployments@v1.5.0
-    if: ${{ inputs.github_token != '' && steps.removable-environment.outputs.is-removable == 'true' }}
-    name: Delete GitHub Deployment environment
+    if: ${{ steps.removable-environment.outputs.is-removable == 'true' }}
+    name: Delete GitHub Environment
     with:
       step: delete-env
       token: "${{ inputs.github_token }}"
