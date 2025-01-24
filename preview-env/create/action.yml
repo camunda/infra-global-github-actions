@@ -108,6 +108,7 @@ runs:
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server }}
   - name: Wait for sync (up to 20 minutes)
+    id: wait-for-sync
     shell: bash
     run: |-
       echo "::group::wait for sync"
@@ -125,7 +126,7 @@ runs:
       EOF
       )
 
-      echo $ARGOCD_APP_DETAILS
+      echo "argocd_app_details=${ARGOCD_APP_DETAILS}" >> $GITHUB_OUTPUT
 
       # echo "::group::get app status details"
       # echo "App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')"
@@ -167,6 +168,7 @@ runs:
       ARGOCD_SERVER: ${{ inputs.argocd_server }}
       REPO: ${{ github.repository }}
       RUN_ID: ${{ github.run_id }}
+      ARGOCD_APP_DETAILS: ${{ steps.wait-for-sync.outputs.argocd_app_details }}
     run: |
       template=$(envsubst < ${{ github.action_path }}/templates/comment-${{ github.action_status }}.md)
       echo "$template" > status_${{ inputs.app_name }}.md
