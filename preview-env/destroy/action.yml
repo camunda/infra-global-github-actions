@@ -26,6 +26,15 @@ inputs:
     default: v2.13.3
     description: Version tag of Argo CD CLI tool
     required: false
+
+  github_token:
+    description: |-
+      GitHub token used to delete the deployment and the environment;
+      If present, the deployment environment also gets deleted.
+      Token must include deployments:write and administration:write permissions
+      for environment to be deleted
+    required: false
+
 runs:
   using: composite
   steps:
@@ -61,5 +70,37 @@ runs:
     with:
       step: deactivate-env
       token: "${{ github.token }}"
+      env: ${{ inputs.app_name }}
+      ref: ${{ inputs.revision }}
+
+  - name: Verify protected environment
+    id: removable-environment
+    shell: bash
+    env:
+      GITHUB_TOKEN: ${{ inputs.github_token }}
+      ENVIRONMENT: ${{ inputs.app_name }}
+    run: |-
+      echo "Verifying if GitHub Environment can be deleted"
+      is_removable="false"
+      if [[ -n "$GITHUB_TOKEN" ]]; then
+        case "$ENVIRONMENT" in
+          production | stage | main | master )
+            echo "Environment '$ENVIRONMENT' is protected and can't be removed"
+            ;;
+          *)
+            is_removable="true"
+            ;;
+        esac
+      else
+        echo "No GitHub token provided, environment can't be removed"
+      fi
+      echo "is-removable=$is_removable" | tee -a $GITHUB_OUTPUT
+
+  - uses: bobheadxi/deployments@v1.5.0
+    if: ${{ steps.removable-environment.outputs.is-removable == 'true' }}
+    name: Delete GitHub Environment
+    with:
+      step: delete-env
+      token: "${{ inputs.github_token }}"
       env: ${{ inputs.app_name }}
       ref: ${{ inputs.revision }}
