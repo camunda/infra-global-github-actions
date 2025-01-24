@@ -125,7 +125,7 @@ runs:
       EOF
       )
 
-      echo $ARGOCD_APP_STATUS
+      echo $ARGOCD_APP_DETAILS
 
       # echo "::group::get app status details"
       # echo "App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')"
