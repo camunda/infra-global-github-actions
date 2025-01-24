@@ -126,8 +126,10 @@ runs:
       EOF
       )
 
-      echo "argocd_app_details=${ARGOCD_APP_DETAILS}" >> $GITHUB_OUTPUT
-
+      echo "argocd_app_details<<EOF" >> $GITHUB_OUTPUT
+      echo "$ARGOCD_APP_DETAILS" >> $GITHUB_OUTPUT
+      echo "EOF" >> $GITHUB_OUTPUT
+      
       # echo "::group::get app status details"
       # echo "App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')"
       # echo "App sync: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.sync.status')"
