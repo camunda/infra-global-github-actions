@@ -112,7 +112,7 @@ runs:
     shell: bash
     run: |-
       echo "::group::wait for sync"
-      argocd app wait ${{ inputs.app_name }} --timeout 1200 --health
+      argocd app wait ${{ inputs.app_name }} --timeout 1200 --health --sync
       echo "::endgroup::"
 
       # collect application details from ArgoCD for troubleshooting
