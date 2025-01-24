@@ -149,7 +149,7 @@ runs:
       echo "$ARGOCD_APP_DETAILS" >> $GITHUB_OUTPUT
       echo "EOF" >> $GITHUB_OUTPUT
 
-      if [ "$APP_HEALTH_STATUS" == "Healthy" ]; then
+      if [ "$ARGOCD_APP_STATUS" == "Healthy" ]; then
         echo "Application reached healthy state."
         exit 0
       else
