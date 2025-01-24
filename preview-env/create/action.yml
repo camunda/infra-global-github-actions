@@ -113,36 +113,33 @@ runs:
       echo "::group::wait for sync"
       argocd app wait ${{ inputs.app_name }} --timeout 1200 --health
       echo "::endgroup::"
-      
-      echo "::group::get app status details"
-      echo "App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')"
-      echo "App sync: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.sync.status')"
-      echo "App conditions: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.conditions')"
-      echo "State of the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.phase')"
-      echo "Message from the lastest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.message')"
-      echo "Sync results: $(argocd app get ${{ inputs.app_name }} -o json | jq '.status.operationState.syncResult[]')"
-      # echo "Kubernetes warnings (if any): $()"
-      echo "::endgroup::"
+
+      ARGOCD_APP_DETAILS=$(cat <<EOF
+      App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')
+      App sync: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.sync.status')
+      App conditions: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.conditions')
+      State of the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.phase')
+      Message from the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.message')
+      Sync results:
+      $(argocd app get ${{ inputs.app_name }} -o json | jq '.status.operationState.syncResult[]')
+      EOF
+      )
+
+      echo $ARGOCD_APP_STATUS
+
+      # echo "::group::get app status details"
+      # echo "App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')"
+      # echo "App sync: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.sync.status')"
+      # echo "App conditions: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.conditions')"
+      # echo "State of the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.phase')"
+      # echo "Message from the lastest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.message')"
+      # echo "Sync results: $(argocd app get ${{ inputs.app_name }} -o json | jq '.status.operationState.syncResult[]')"
+      # # echVo "Kubernetes warnings (if any): $()"
+      # echo "::endgroup::"
     env:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server  }}
-  # - name: Get app status details
-  #   shell: bash
-  #   run: |-
-  #     echo "::group::get app status details"
-  #     echo "App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')"
-  #     echo "App sync: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.sync.status')"
-  #     echo "App conditions: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.conditions')"
-  #     echo "State of the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.phase')"
-  #     echo "Message from the lastest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.message')"
-  #     echo "Sync results: $(argocd app get ${{ inputs.app_name }} -o json | jq '.status.operationState.syncResult[]')"
-  #     # echo "Kubernetes warnings (if any): $()"
-  #     echo "::endgroup::"
-  #   env:
-  #     ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
-  #     ARGOCD_OPTS: "--grpc-web"
-  #     ARGOCD_SERVER: ${{ inputs.argocd_server  }}
     #########################################################################
     # Update the deployment status so we can see the result in the Pull Request
     # or in the list of environments.
