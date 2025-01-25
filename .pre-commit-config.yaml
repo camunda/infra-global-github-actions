@@ -16,13 +16,13 @@ repos:
       args: [--external-sources]
 
 - repo: https://github.com/rhysd/actionlint
-  rev: v1.7.6
+  rev: v1.7.7
   hooks:
     - id: actionlint
       args: ["-config-file", "actionlint/actionlint.yaml"]
 
 - repo: https://github.com/renovatebot/pre-commit-hooks
-  rev: 39.113.0
+  rev: 39.133.3
   hooks:
   - id: renovate-config-validator
     args: ["--strict"]
