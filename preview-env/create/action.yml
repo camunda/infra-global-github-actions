@@ -35,6 +35,11 @@ inputs:
   argocd_arguments:
     description: List of arguments to pass to Argocd command for creating the new application
     required: true
+
+  argocd_wait_for_sync_timeout:
+    description: The time (in seconds) that the action waits for the app to become healthy
+    required: false
+    default: "1200" # wait for up to 20 minutes
 runs:
   using: composite
   steps:
@@ -115,7 +120,7 @@ runs:
       # argocd app wait ${{ inputs.app_name }} --timeout 1200 --health
       # echo "::endgroup::"
 
-      TIMEOUT=1800  # Total timeout in seconds
+      TIMEOUT=${{ inputs.argocd_wait_for_sync_timeout }}
       INTERVAL=30   # Interval between retries in seconds
       ELAPSED=0
       while [ $ELAPSED -lt $TIMEOUT ]; do
