@@ -56,10 +56,12 @@
       addLabels: ["automerge"],
       automerge: true
     },
+    // Automerge Section
     {
       matchUpdateTypes: ["patch"],
       matchPackageNames: [
-        "/actionlint/"
+        "/actionlint/",
+        "argoproj/argo-cd",
       ],
       addLabels: ["automerge"],
       automerge: true,
