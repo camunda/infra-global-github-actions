@@ -141,7 +141,7 @@ runs:
         echo "Application reached healthy state."
         exit 0
       else
-        echo "Timeout reached. The application did not become healthy. Collecting troubleshhoting information."
+        echo "Timeout reached. The application did not become healthy. Collecting troubleshooting information."
         # collect application details for troubleshooting if it didn't reach the healthy status
         ARGOCD_APP_DETAILS=$(cat <<EOF
       App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')
@@ -174,7 +174,7 @@ runs:
     with:
       version: 17.2.3
   - name: Authenticate with Teleport
-    if: success() && steps.setup_teleport.outcome == 'success'
+    if: failure() && steps.setup_teleport.outcome == 'success'
     id: auth_teleport
     uses: teleport-actions/auth-k8s@v2
     with:
@@ -182,7 +182,7 @@ runs:
       token: infra-ci-prod-github-action-preview-env-infra
       kubernetes-cluster: camunda-ci
   - name: Get Kubernetes events
-    if: success() && steps.auth_teleport.outcome == 'success'
+    if: failure() && steps.auth_teleport.outcome == 'success'
     id: get_k8s_events
     shell: bash
     run: |
