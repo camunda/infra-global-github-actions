@@ -144,14 +144,14 @@ runs:
         echo "Timeout reached. The application did not become healthy. Collecting troubleshhoting information."
         # collect application details for troubleshooting if it didn't reach the healthy status
         ARGOCD_APP_DETAILS=$(cat <<EOF
-        App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')
-        App sync: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.sync.status')
-        App conditions: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.conditions')
-        State of the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.phase')
-        Message from the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.message')
-        Sync results:
-        $(argocd app get ${{ inputs.app_name }} -o json | jq '.status.operationState.syncResult[]')
-        EOF
+      App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')
+      App sync: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.sync.status')
+      App conditions: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.conditions')
+      State of the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.phase')
+      Message from the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.message')
+      Sync results:
+      $(argocd app get ${{ inputs.app_name }} -o json | jq '.status.operationState.syncResult[]')
+      EOF
         )
         echo "argocd_app_details<<EOF" >> $GITHUB_OUTPUT
         echo "$ARGOCD_APP_DETAILS" >> $GITHUB_OUTPUT
@@ -180,7 +180,7 @@ runs:
     with:
       proxy: camunda.teleport.sh:443
       token: infra-ci-prod-github-action-preview-env-infra
-      kubernetes-cluster: camunda-ci-prod
+      kubernetes-cluster: camunda-ci
   - name: Get Kubernetes events
     if: success() && steps.auth_teleport.outcome == 'success'
     id: get_k8s_events
