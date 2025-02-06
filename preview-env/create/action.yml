@@ -39,7 +39,7 @@ inputs:
   argocd_wait_for_sync_timeout:
     description: The time (in seconds) that the action waits for the app to become healthy
     required: false
-    default: "1200" # wait for up to 20 minutes
+    default: "1800" # wait for up to 30 minutes
 runs:
   using: composite
   steps:
@@ -112,13 +112,11 @@ runs:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server }}
-  - name: Wait for sync (up to 30 minutes)
-    id: wait-for-sync
+  - name: Wait for sync
+    id: wait_for_sync
     shell: bash
     run: |-
       echo "::group::wait for sync"
-      # argocd app wait ${{ inputs.app_name }} --timeout 1200 --health
-      # echo "::endgroup::"
 
       TIMEOUT=${{ inputs.argocd_wait_for_sync_timeout }}
       INTERVAL=30   # Interval between retries in seconds
@@ -139,26 +137,25 @@ runs:
 
       echo "::endgroup::"
 
-      # collect application details for troubleshooting
-      ARGOCD_APP_DETAILS=$(cat <<EOF
-      App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')
-      App sync: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.sync.status')
-      App conditions: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.conditions')
-      State of the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.phase')
-      Message from the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.message')
-      Sync results:
-      $(argocd app get ${{ inputs.app_name }} -o json | jq '.status.operationState.syncResult[]')
-      EOF
-      )
-      echo "argocd_app_details<<EOF" >> $GITHUB_OUTPUT
-      echo "$ARGOCD_APP_DETAILS" >> $GITHUB_OUTPUT
-      echo "EOF" >> $GITHUB_OUTPUT
-
       if [ "$ARGOCD_APP_STATUS" == "Healthy" ]; then
         echo "Application reached healthy state."
         exit 0
       else
-        echo "Timeout reached. The application did not become healthy."
+        echo "Timeout reached. The application did not become healthy. Collecting troubleshhoting information."
+        # collect application details for troubleshooting if it didn't reach the healthy status
+        ARGOCD_APP_DETAILS=$(cat <<EOF
+        App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')
+        App sync: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.sync.status')
+        App conditions: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.conditions')
+        State of the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.phase')
+        Message from the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.message')
+        Sync results:
+        $(argocd app get ${{ inputs.app_name }} -o json | jq '.status.operationState.syncResult[]')
+        EOF
+        )
+        echo "argocd_app_details<<EOF" >> $GITHUB_OUTPUT
+        echo "$ARGOCD_APP_DETAILS" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
         exit 1
       fi
 
@@ -166,6 +163,43 @@ runs:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server  }}
+
+    #########################################################################
+    # Get additional troubleshooting information from Kubernetes events
+    # in case of the app didn't reach healthy state
+  - name: Setup Teleport
+    if: failure()
+    id: setup_teleport
+    uses: teleport-actions/setup@v1
+    with:
+      version: 17.2.3
+  - name: Authenticate with Teleport
+    if: success() && steps.setup_teleport.outcome == 'success'
+    id: auth_teleport
+    uses: teleport-actions/auth-k8s@v2
+    with:
+      proxy: camunda.teleport.sh:443
+      token: infra-ci-prod-github-action-preview-env-infra
+      kubernetes-cluster: camunda-ci-prod
+  - name: Get Kubernetes events
+    if: success() && steps.auth_teleport.outcome == 'success'
+    id: get_k8s_events
+    shell: bash
+    run: |
+      kubectl auth whoami
+      kubectl get ns ${{ inputs.app_name }}
+      KUBERNETES_EVENTS=$(cat <<EOF
+      Kubernetes events
+      -----------------
+      $(kubectl get event -n ${{inputs.app_name }} -o json | \
+        jq -r '.items[] | select(.type == "Warning") | {time: .lastTimestamp, message: .message} | @json' | \
+        jq -s 'sort_by(.time) | reverse | .[] | "\(.time) \(.message)"')
+      EOF
+      )
+      echo "kubernetes_events<<EOF" >> $GITHUB_OUTPUT
+      echo "$KUBERNETES_EVENTS" >> $GITHUB_OUTPUT
+      echo "EOF" >> $GITHUB_OUTPUT
+
     #########################################################################
     # Update the deployment status so we can see the result in the Pull Request
     # or in the list of environments.
@@ -194,6 +228,7 @@ runs:
       REPO: ${{ github.repository }}
       RUN_ID: ${{ github.run_id }}
       ARGOCD_APP_DETAILS: ${{ steps.wait-for-sync.outputs.argocd_app_details }}
+      KUBERNETES_EVENTS: ${{ steps.get_k8s_events.outputs.kubernetes_events }}
     run: |
       template=$(envsubst < ${{ github.action_path }}/templates/comment-${{ github.action_status }}.md)
       echo "$template" > status_${{ inputs.app_name }}.md
