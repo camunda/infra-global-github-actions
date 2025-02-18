@@ -40,6 +40,14 @@ inputs:
     description: The time (in seconds) that the action waits for the app to become healthy
     required: false
     default: "1800" # wait for up to 30 minutes
+
+  github_token:
+    description: |-
+      GitHub token is used to authenticate with Teleport.
+      It needs to have an "id-token: write" permission.
+      If the token is present, the Kubernetes events get added to the troubleshooting information.
+    required: false
+
 runs:
   using: composite
   steps:
@@ -166,9 +174,11 @@ runs:
 
     #########################################################################
     # Get additional troubleshooting information from Kubernetes events
-    # in case of the app didn't reach healthy state
+    # in case of the app didn't reach healthy state.
+    # Events only get requested if a GitHub token with appropriate rights
+    # is passed from the caller workflow.
   - name: Setup Teleport
-    if: failure()
+    if: failure() && inputs.github_token != ''
     id: setup_teleport
     uses: teleport-actions/setup@v1
     with:
@@ -176,6 +186,8 @@ runs:
   - name: Authenticate with Teleport
     if: failure() && steps.setup_teleport.outcome == 'success'
     id: auth_teleport
+    env:
+      GITHUB_TOKEN: ${{ inputs.github_token }}
     uses: teleport-actions/auth-k8s@v2
     with:
       proxy: camunda.teleport.sh:443
