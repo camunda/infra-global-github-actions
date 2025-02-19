@@ -148,7 +148,7 @@ runs:
 
       if [ "$ARGOCD_APP_STATUS" == "Healthy" ]; then
         echo "Application reached healthy state."
-        FAILURE=0 
+        exit 0
       else
         echo "Timeout reached. The application did not become healthy. Collecting troubleshooting information."
         ARGOCD_APP_DETAILS=$(cat <<EOF
@@ -166,10 +166,10 @@ runs:
         echo "argocd_app_details<<EOF" >> $GITHUB_OUTPUT
         echo "$ARGOCD_APP_DETAILS" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
-        FAILURE=1 
+        # ensure output is flushed before exiting
+        # sync
+        exit 1
       fi
-
-      exit $FAILURE
 
     env:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
@@ -243,7 +243,7 @@ runs:
       ARGOCD_SERVER: ${{ inputs.argocd_server }}
       REPO: ${{ github.repository }}
       RUN_ID: ${{ github.run_id }}
-      ARGOCD_APP_DETAILS: ${{ steps.wait-for-sync.outputs.argocd_app_details }}
+      ARGOCD_APP_DETAILS: ${{ steps.wait_for_sync.outputs.argocd_app_details }}
       KUBERNETES_EVENTS: ${{ steps.get_k8s_events.outputs.kubernetes_events }}
     run: |
       template=$(envsubst < ${{ github.action_path }}/templates/comment-${{ github.action_status }}.md)
