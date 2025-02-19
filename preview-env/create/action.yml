@@ -148,10 +148,9 @@ runs:
 
       if [ "$ARGOCD_APP_STATUS" == "Healthy" ]; then
         echo "Application reached healthy state."
-        exit 0
+        FAILURE=0 
       else
         echo "Timeout reached. The application did not become healthy. Collecting troubleshooting information."
-        # collect application details for troubleshooting if it didn't reach the healthy status
         ARGOCD_APP_DETAILS=$(cat <<EOF
       ArgoCD App details
       ------------------
@@ -167,10 +166,10 @@ runs:
         echo "argocd_app_details<<EOF" >> $GITHUB_OUTPUT
         echo "$ARGOCD_APP_DETAILS" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
-        # ensure output is flushed before exiting
-        sync
-        exit 1
+        FAILURE=1 
       fi
+
+      exit $FAILURE
 
     env:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
