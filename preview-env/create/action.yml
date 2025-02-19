@@ -141,6 +141,7 @@ runs:
         echo "App is not healthy yet. Retrying in $INTERVAL seconds..."
         sleep $INTERVAL
         ELAPSED=$((ELAPSED + INTERVAL))
+        echo "Elapsed time is $ELAPSED seconds."
       done
 
       echo "::endgroup::"
@@ -152,6 +153,8 @@ runs:
         echo "Timeout reached. The application did not become healthy. Collecting troubleshooting information."
         # collect application details for troubleshooting if it didn't reach the healthy status
         ARGOCD_APP_DETAILS=$(cat <<EOF
+      ArgoCD App details
+      ------------------
       App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')
       App sync: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.sync.status')
       App conditions: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.conditions')
@@ -164,6 +167,8 @@ runs:
         echo "argocd_app_details<<EOF" >> $GITHUB_OUTPUT
         echo "$ARGOCD_APP_DETAILS" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
+        # ensure output is flushed before exiting
+        sync
         exit 1
       fi
 
