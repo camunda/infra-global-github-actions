@@ -44,7 +44,7 @@ inputs:
   github_token:
     description: |-
       GitHub token is used to authenticate with Teleport.
-      It needs to have an "id-token: write" permission.
+      It needs to have `contents: read`, `deployments:write` and `id-token:write` permissions.
       If the token is present, the Kubernetes events get added to the troubleshooting information.
     required: false
 
