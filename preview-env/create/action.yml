@@ -129,11 +129,12 @@ runs:
       TIMEOUT=${{ inputs.argocd_wait_for_sync_timeout }}
       INTERVAL=30   # Interval between retries in seconds
       ELAPSED=0
-      while [ $ELAPSED -lt $TIMEOUT ]; do
+
+      while [ $ELAPSED -le $TIMEOUT ]; do
         ARGOCD_APP_STATUS=$(argocd app get "${{ inputs.app_name }}" -o json | jq -r '.status.health.status')
         echo "Current status: $ARGOCD_APP_STATUS"
 
-        if [ "$ARGOCD_APP_STATUS" == "Healthy" ]; then
+        if [ -n "$ARGOCD_APP_STATUS" && "$ARGOCD_APP_STATUS" == "Healthy" ]; then
           echo "App is healthy."
           break
         fi
@@ -166,8 +167,6 @@ runs:
         echo "argocd_app_details<<EOF" >> $GITHUB_OUTPUT
         echo "$ARGOCD_APP_DETAILS" >> $GITHUB_OUTPUT
         echo "EOF" >> $GITHUB_OUTPUT
-        # ensure output is flushed before exiting
-        # sync
         exit 1
       fi
 
@@ -186,7 +185,8 @@ runs:
     id: setup_teleport
     uses: teleport-actions/setup@v1
     with:
-      version: 17.2.3
+      # renovate: datasource=docker depName=public.ecr.aws/gravitational/teleport-ent-distroless
+      version: 17.2.8
   - name: Authenticate with Teleport
     if: failure() && steps.setup_teleport.outcome == 'success'
     id: auth_teleport
