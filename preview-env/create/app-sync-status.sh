@@ -56,6 +56,7 @@ Sync results:
 $(argocd app get "$APP_NAME" -o json | jq '.status.operationState.syncResult[]')
 EOF
     )
+    # shellcheck disable=SC2129
     echo "argocd_app_details<<EOF" >> "$GITHUB_OUTPUT"
     echo "$ARGOCD_APP_DETAILS" >> "$GITHUB_OUTPUT"
     echo "EOF" >> "$GITHUB_OUTPUT"
