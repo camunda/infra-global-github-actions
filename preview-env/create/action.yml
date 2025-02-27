@@ -35,6 +35,19 @@ inputs:
   argocd_arguments:
     description: List of arguments to pass to Argocd command for creating the new application
     required: true
+
+  argocd_wait_for_sync_timeout:
+    description: The time (in seconds) that the action waits for the app to become healthy
+    required: false
+    default: "1800" # wait for up to 30 minutes
+
+  github_token:
+    description: |-
+      GitHub token is used to authenticate with Teleport.
+      It needs to have `contents: read`, `deployments:write` and `id-token:write` permissions.
+      If the token is present, the Kubernetes events get added to the troubleshooting information.
+    required: false
+
 runs:
   using: composite
   steps:
@@ -55,6 +68,8 @@ runs:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server }}
+  - name: Ensure that jq is available
+    uses: dcarbone/install-jq-action@v3.0.1
     #########################################################################
     # Create a GitHub deployment that points to the URL we're going to deploy to.
     # If a Pull Request exists, it will show the status of this deployment.
@@ -105,16 +120,55 @@ runs:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server }}
-  - name: Wait for sync (up to 20 minutes)
+  - name: Wait for sync
+    id: wait_for_sync
     shell: bash
-    run: |-
-      echo "::group::wait for sync"
-      argocd app wait ${{ inputs.app_name }} --timeout 1200 --health
-      echo "::endgroup::"
     env:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server  }}
+      TIMEOUT: ${{ inputs.argocd_wait_for_sync_timeout }}
+      APP_NAME: ${{ inputs.app_name }}
+    run: |
+      bash ${{ github.action_path }}/app-sync-status.sh
+    #########################################################################
+    # Get additional troubleshooting information from Kubernetes events
+    # in case of the app didn't reach healthy state.
+    # Events only get requested if a GitHub token with appropriate rights
+    # is passed from the caller workflow.
+  - name: Setup Teleport
+    if: failure() && inputs.github_token != ''
+    id: setup_teleport
+    uses: teleport-actions/setup@v1
+    with:
+      # renovate: datasource=docker depName=public.ecr.aws/gravitational/teleport-ent-distroless
+      version: 17.2.8
+  - name: Authenticate with Teleport
+    if: failure() && steps.setup_teleport.outcome == 'success'
+    id: auth_teleport
+    env:
+      GITHUB_TOKEN: ${{ inputs.github_token }}
+    uses: teleport-actions/auth-k8s@v2
+    with:
+      proxy: camunda.teleport.sh:443
+      token: infra-ci-prod-github-action-preview-env-infra
+      kubernetes-cluster: camunda-ci
+  - name: Get Kubernetes events
+    if: failure() && steps.auth_teleport.outcome == 'success'
+    id: get_k8s_events
+    shell: bash
+    run: |
+      KUBERNETES_EVENTS=$(cat <<EOF
+      Kubernetes events
+      -----------------
+      $(kubectl get event -n ${{inputs.app_name }} -o json | \
+        jq -r '.items[] | select(.type == "Warning") | {time: .lastTimestamp, message: .message} | @json' | \
+        jq -s 'sort_by(.time) | reverse | .[] | "\(.time) \(.message)"')
+      EOF
+      )
+      echo "kubernetes_events<<EOF" >> "$GITHUB_OUTPUT"
+      echo "$KUBERNETES_EVENTS" >> "$GITHUB_OUTPUT"
+      echo "EOF" >> "$GITHUB_OUTPUT"
     #########################################################################
     # Update the deployment status so we can see the result in the Pull Request
     # or in the list of environments.
@@ -142,6 +196,8 @@ runs:
       ARGOCD_SERVER: ${{ inputs.argocd_server }}
       REPO: ${{ github.repository }}
       RUN_ID: ${{ github.run_id }}
+      ARGOCD_APP_DETAILS: ${{ steps.wait_for_sync.outputs.argocd_app_details }}
+      KUBERNETES_EVENTS: ${{ steps.get_k8s_events.outputs.kubernetes_events }}
     run: |
       template=$(envsubst < ${{ github.action_path }}/templates/comment-${{ github.action_status }}.md)
       echo "$template" > status_${{ inputs.app_name }}.md
