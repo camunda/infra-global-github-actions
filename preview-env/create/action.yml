@@ -123,57 +123,61 @@ runs:
   - name: Wait for sync
     id: wait_for_sync
     shell: bash
-    run: |-
-      echo "::group::wait for sync"
-
-      TIMEOUT=${{ inputs.argocd_wait_for_sync_timeout }}
-      INTERVAL=30   # Interval between retries in seconds
-      ELAPSED=0
-
-      while [ $ELAPSED -le $TIMEOUT ]; do
-        ARGOCD_APP_STATUS=$(argocd app get "${{ inputs.app_name }}" -o json | jq -r '.status.health.status')
-        echo "Current status: $ARGOCD_APP_STATUS"
-
-        if [ -n "$ARGOCD_APP_STATUS" && "$ARGOCD_APP_STATUS" == "Healthy" ]; then
-          echo "App is healthy."
-          break
-        fi
-
-        echo "App is not healthy yet. Retrying in $INTERVAL seconds..."
-        sleep $INTERVAL
-        ELAPSED=$((ELAPSED + INTERVAL))
-        echo "Elapsed time is $ELAPSED seconds."
-      done
-
-      echo "::endgroup::"
-
-      if [ "$ARGOCD_APP_STATUS" == "Healthy" ]; then
-        echo "Application reached healthy state."
-        exit 0
-      else
-        echo "Timeout reached. The application did not become healthy. Collecting troubleshooting information."
-        ARGOCD_APP_DETAILS=$(cat <<EOF
-      ArgoCD App details
-      ------------------
-      App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')
-      App sync: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.sync.status')
-      App conditions: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.conditions')
-      State of the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.phase')
-      Message from the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.message')
-      Sync results:
-      $(argocd app get ${{ inputs.app_name }} -o json | jq '.status.operationState.syncResult[]')
-      EOF
-        )
-        echo "argocd_app_details<<EOF" >> $GITHUB_OUTPUT
-        echo "$ARGOCD_APP_DETAILS" >> $GITHUB_OUTPUT
-        echo "EOF" >> $GITHUB_OUTPUT
-        exit 1
-      fi
-
     env:
       ARGOCD_AUTH_TOKEN: ${{ inputs.argocd_token }}
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server  }}
+      TIMEOUT: ${{ inputs.argocd_wait_for_sync_timeout }}
+      APP_NAME: ${{ inputs.app_name }}
+    run: |
+      bash ${{ github.action_path }}/app-sync-status.sh
+
+      # echo "::group::wait for sync"
+
+      # TIMEOUT=${{ inputs.argocd_wait_for_sync_timeout }}
+      # INTERVAL=30   # Interval between retries in seconds
+      # ELAPSED=0
+      #
+      # while [ $ELAPSED -le $TIMEOUT ]; do
+      #   ARGOCD_APP_STATUS=$(argocd app get "${{ inputs.app_name }}" -o json | jq -r '.status.health.status')
+      #   echo "Current status: $ARGOCD_APP_STATUS"
+      #
+      #   if [ -n "$ARGOCD_APP_STATUS" && "$ARGOCD_APP_STATUS" == "Healthy" ]; then
+      #     echo "App is healthy."
+      #     break
+      #   fi
+      #
+      #   echo "App is not healthy yet. Retrying in $INTERVAL seconds..."
+      #   sleep $INTERVAL
+      #   ELAPSED=$((ELAPSED + INTERVAL))
+      #   echo "Elapsed time is $ELAPSED seconds."
+      # done
+      #
+      # echo "::endgroup::"
+      #
+      # if [ "$ARGOCD_APP_STATUS" == "Healthy" ]; then
+      #   echo "Application reached healthy state."
+      #   exit 0
+      # else
+      #   echo "Timeout reached. The application did not become healthy. Collecting troubleshooting information."
+      #   ARGOCD_APP_DETAILS=$(cat <<EOF
+      # ArgoCD App details
+      # ------------------
+      # App health: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.health.status')
+      # App sync: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.sync.status')
+      # App conditions: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.conditions')
+      # State of the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.phase')
+      # Message from the latest operation phase: $(argocd app get ${{ inputs.app_name }} -o json | jq -r '.status.operationState.message')
+      # Sync results:
+      # $(argocd app get ${{ inputs.app_name }} -o json | jq '.status.operationState.syncResult[]')
+      # EOF
+      #   )
+      #   echo "argocd_app_details<<EOF" >> $GITHUB_OUTPUT
+      #   echo "$ARGOCD_APP_DETAILS" >> $GITHUB_OUTPUT
+      #   echo "EOF" >> $GITHUB_OUTPUT
+      #   exit 1
+      # fi
+
 
     #########################################################################
     # Get additional troubleshooting information from Kubernetes events
