@@ -187,6 +187,13 @@ runs:
       env_url: ${{ inputs.app_url }}
       ref: ${{ inputs.revision }}
       env: ${{ inputs.app_name }}
+    # envsubst is not available on the self-hosted runners
+    # therefore the deployment status artifact step would fail
+  - name: Install envsubst
+    if: always()
+    shell: bash
+    run: |
+      sudo apt-get update && sudo apt-get install -y gettext-base
   - name: Create deployment status artifact
     if: always()
     shell: bash
