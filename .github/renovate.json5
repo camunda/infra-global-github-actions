@@ -62,6 +62,7 @@
       matchPackageNames: [
         "/actionlint/",
         "argoproj/argo-cd",
+        "gravitational/teleport-ent-distroless",
       ],
       addLabels: ["automerge"],
       automerge: true,
