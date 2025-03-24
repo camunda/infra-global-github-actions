@@ -61,6 +61,7 @@
       matchUpdateTypes: ["patch"],
       matchPackageNames: [
         "/actionlint/",
+        "/argocd/",
         "argoproj/argo-cd",
         "gravitational/teleport-ent-distroless",
       ],
