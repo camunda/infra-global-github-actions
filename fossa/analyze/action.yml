@@ -1,0 +1,40 @@
+name: fossa analyze
+
+description: Run FOSSA CLI analyze command
+
+inputs:
+  api-key:
+    description: The API key to access fossa.com
+    required: true
+  branch:
+    description: Name of the branch to be scanned
+    required: true
+  configuration-file:
+    description: Path to the FOSSA configuration file
+    required: false
+    default: .fossa.yml
+  path:
+    description: Path to the directory to be scanned
+    default: .
+    required: false
+  revision-id:
+    description: ID of the scanned revision
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Run FOSSA analyze
+      env:
+        BRANCH: ${{ inputs.branch }}
+        CONFIGURATION_FILE: ${{ inputs.configuration-file }}
+        DIRECTORY_PATH: ${{ inputs.path }}
+        FOSSA_API_KEY: ${{ inputs.api-key }}
+        REVISION_ID: ${{ inputs.revision-id }}
+      run: |
+        set -e # Exit on error
+        fossa analyze "${DIRECTORY_PATH}" \
+          --strict \
+          --config "${CONFIGURATION_FILE}" \
+          --branch "${BRANCH}" \
+          --revision "${REVISION_ID}"
+      shell: bash

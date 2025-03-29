@@ -1,0 +1,29 @@
+name: fossa setup
+
+description: Install FOSSA CLI
+
+inputs:
+  version:
+    description: Version of the FOSSA CLI to install
+    # renovate: datasource=github-releases depName=fossas/fossa-cli
+    default: 3.10.5
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install FOSSA CLI
+      env:
+        FOSSA_CLI_VERSION: ${{ inputs.version }}
+      run: |
+        if ! command -v fossa &> /dev/null
+        then
+          echo "FOSSA CLI not found, installing version=${FOSSA_CLI_VERSION}..."
+          curl \
+            -sSL \
+            -H 'Cache-Control: no-cache' \
+            https://github.com/fossas/fossa-cli/releases/download/v${FOSSA_CLI_VERSION}/fossa_${FOSSA_CLI_VERSION}_linux_amd64.tar.gz | \
+           sudo tar -xz -C /usr/local/bin
+        else
+          echo "FOSSA CLI is already installed"
+        fi
+      shell: bash
