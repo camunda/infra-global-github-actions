@@ -49,7 +49,7 @@ runs:
       gcloud info
 
   - name: ensure that jq is available
-    uses: dcarbone/install-jq-action@v3.1.0
+    uses: dcarbone/install-jq-action@v3.1.1
 
   - name: download table schema from CI Analytics
     shell: bash

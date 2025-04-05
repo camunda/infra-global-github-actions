@@ -69,7 +69,7 @@ runs:
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server }}
   - name: Ensure that jq is available
-    uses: dcarbone/install-jq-action@v3.1.0
+    uses: dcarbone/install-jq-action@v3.1.1
     #########################################################################
     # Create a GitHub deployment that points to the URL we're going to deploy to.
     # If a Pull Request exists, it will show the status of this deployment.
