@@ -23,7 +23,7 @@ inputs:
 
   argocd_version:
     # renovate: datasource=docker depName=quay.io/argoproj/argocd
-    default: v2.14.8
+    default: v2.14.9
     description: Version tag of Argo CD CLI tool
     required: false
 
