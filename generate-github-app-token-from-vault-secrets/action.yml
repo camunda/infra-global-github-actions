@@ -39,6 +39,7 @@ inputs:
     description: "If truthy, the token will not be revoked when the current job is complete"
     required: false
     type: boolean
+    default: false
   owner:
     description: "The owner of the GitHub App installation (defaults to current repository owner)."
     type: string
