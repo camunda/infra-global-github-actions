@@ -14,7 +14,7 @@ inputs:
     required: false
     default: .fossa.yml
   path:
-    description: Path to the directory to be scanned
+    description: Path to the directory for scanning
     default: .
     required: false
   revision-id:

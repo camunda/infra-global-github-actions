@@ -1,0 +1,79 @@
+name: pr check
+
+description: |
+  Check for new license issues introduced by a pull request.
+
+inputs:
+  api-key:
+    description: The API key to access fossa.com
+    required: true
+  base-ref:
+    description: |
+      The ref (name) of the base branch in the context of a pull request.
+      Only for display purposes, not required.
+    required: false
+  base-revision:
+    description: |
+      The revision (commit SHA) of the base branch in the context of a pull request.
+    required: true
+  configuration-file:
+    description: Path to the FOSSA configuration file
+    required: false
+    default: .fossa.yml
+  path:
+    description: Path to the directory for scanning
+    default: .
+    required: false
+  project:
+    description: |
+      The project name.
+      Only for display purposes, not required.
+    default: main
+    required: false
+  revision:
+    description: |
+      The revision (commit sha) of the HEAD branch in the context of a pull request.
+    required: true
+
+runs:
+  using: composite
+  steps:
+  - name: Check for new issues against the base ref=${{ inputs.base-ref }}
+    id: check
+    env:
+      BASE_REVISION: ${{ inputs.base-revision }}
+      CONFIGURATION_FILE: ${{ inputs.configuration-file }}
+      DIRECTORY_PATH: ${{ inputs.path }}
+      FOSSA_API_KEY: ${{ inputs.api-key }}
+      REVISION: ${{ inputs.revision }}
+    run: |
+      # Run fossa test
+      results=$(fossa test "${DIRECTORY_PATH}" --config "${CONFIGURATION_FILE}" --diff "${BASE_REVISION}" --revision "${REVISION}" --format json || true)
+
+      license_issues=$(echo "$results" | jq -c '.issues | map(select(.type == "policy_flag"))')
+      license_issues_count=$(echo "$license_issues" | jq '. | length')
+      security_issues=$(echo "$results" | jq -c '.issues | map(select(.type == "vulnerability"))')
+      security_issues_count=$(echo "$security_issues" | jq '. | length')
+
+      echo "License issues: ${license_issues_count}"
+      echo "Security issues: ${security_issues_count} (non-license issues are currently ignored)"
+
+      echo "license-issues=${license_issues}" >> $GITHUB_OUTPUT
+      echo "license-issues-count=${license_issues_count}" >> $GITHUB_OUTPUT
+    shell: bash
+  - name: License Issues found - Action needed
+    if: fromJSON(steps.check.outputs.license-issues-count) > 0
+    env:
+      FOSSA_API_KEY: ${{ inputs.api-key }}
+      LICENSE_ISSUES: ${{ steps.check.outputs.license-issues }}
+      LICENSE_ISSUES_COUNT: ${{ steps.check.outputs.license-issues-count }}
+      PROJECT: ${{ inputs.project }}
+    run: |
+      echo "This PR introduces new license issues that must be addressed prior to merging."
+      echo "HOW-TO: https://confluence.camunda.com/spaces/HAN/pages/277024795/FOSSA#FOSSA-Handlelicenseissues"
+      echo "License Issues:"
+      echo "${LICENSE_ISSUES}" | jq -r '.[] | "- Package: \(.revisionId)\n  License: \(.license)\n  Issue URL: \(.issueDashURL)\n"'
+      echo "Adding an annotation to the GitHub job for visibility and exiting with error..."
+      echo "::error title=License Check (project=${PROJECT})::${LICENSE_ISSUES_COUNT} issue found. Please check the logs and resolve before merging."
+      exit 1
+    shell: bash
