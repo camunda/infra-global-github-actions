@@ -25,7 +25,7 @@
   customManagers: [
     {
       customType: "regex",
-      fileMatch: ["\.ya?ml$"],
+      managerFilePatterns: ["/.ya?ml$/"],
       matchStrings: [
         "renovate: datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\\s.* (?<currentValue>.*)\\s"
       ],

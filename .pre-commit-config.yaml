@@ -22,8 +22,8 @@ repos:
       args: ["-config-file", "actionlint/actionlint.yaml"]
 
 - repo: https://github.com/renovatebot/pre-commit-hooks
-  rev: 39.259.0
+  rev: 40.3.1
   hooks:
   - id: renovate-config-validator
     args: ["--strict"]
-    language_version: 20.18.0 # temporary workaround to mitigate issue https://github.com/renovatebot/pre-commit-hooks/issues/2460
+    language_version: lts
