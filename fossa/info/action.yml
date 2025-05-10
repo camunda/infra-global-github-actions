@@ -1,0 +1,69 @@
+name: fossa info
+
+description: Provides context info required for other FOSSA composite actions.
+
+outputs:
+  is-pull-request:
+    description: |
+      True in the context of a pull request, false otherwise.
+    value: ${{ steps.info.outputs.is-pull-request }}
+  base-ref:
+    description: |
+      The ref (name) of the base branch in the context of a pull request.
+      Empty if not a pull request.
+    value: ${{ steps.info.outputs.base-ref }}
+  base-revision:
+    description: |
+      The revision (commit SHA) of the base branch in the context of a pull request.
+      Empty if not a pull request.
+      Generally used to find (via diff) new license issues introduced by a PR.
+    value: ${{ steps.info.outputs.base-revision }}
+  head-ref:
+    description: |
+      The HEAD ref (name) of the branch to be analyzed by FOSSA, determined based on the context of the event.
+    value: ${{ steps.info.outputs.head-ref }}
+  head-revision:
+    description: |
+      The HEAD revision (commit sha) to be analyzed by FOSSA, determined based on the context of the event.
+    value: ${{ steps.info.outputs.head-revision }}
+
+runs:
+  using: composite
+  steps:
+  - name: Get context info
+    id: info
+    env:
+      IS_PULL_REQUEST: ${{ github.event_name == 'pull_request' }}
+      BASE_REF: >
+        ${{
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.base.ref ||
+          ''
+        }}
+      BASE_REVISION: >
+        ${{
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.base.sha ||
+          ''
+        }}
+      HEAD_REF: >
+        ${{
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.ref ||
+          github.ref_name
+        }}
+      HEAD_REVISION: >
+        ${{
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.sha ||
+          github.sha
+        }}
+    run: |
+      {
+        echo "is-pull-request=${IS_PULL_REQUEST}"
+        echo "base-ref=${BASE_REF}"
+        echo "base-revision=${BASE_REVISION}"
+        echo "head-ref=${HEAD_REF}"
+        echo "head-revision=${HEAD_REVISION}"
+      } >> $GITHUB_OUTPUT
+    shell: bash
