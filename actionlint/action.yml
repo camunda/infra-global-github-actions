@@ -33,8 +33,7 @@ runs:
     #     else
     #       echo "shellcheck is already installed."
     #     fi
-
-        shellcheck --version
+    #     shellcheck --version
 
     - name: Check workflow files
       env:
