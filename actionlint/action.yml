@@ -65,7 +65,7 @@ runs:
         _args+=(-config-file "$CONFIG_FILE")
 
         # Exclude pyflakes
-        _args+=(-pyflakes)
+        _args+=(-pyflakes "")
 
         # Configure shellcheck
         if [[ "$USE_SHELLCHHECK" == "true" ]]; then
