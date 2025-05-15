@@ -22,19 +22,6 @@ runs:
     - run: echo "::add-matcher::${{ github.action_path }}/actionlint-matcher.json"
       shell: bash
 
-    # - name: Install shellcheck if needed
-    #   if: inputs.use_shellcheck == 'true'
-    #   shell: bash
-    #   run: |
-    #     if ! command -v shellcheck &> /dev/null; then
-    #       echo "Installing shellcheck..."
-    #       sudo apt-get update
-    #       sudo apt-get install -y shellcheck
-    #     else
-    #       echo "shellcheck is already installed."
-    #     fi
-    #     shellcheck --version
-
     - name: Check workflow files
       env:
         ACTIONLINT_VERSION: ${{ inputs.version }}
