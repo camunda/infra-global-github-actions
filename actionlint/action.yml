@@ -26,7 +26,7 @@ runs:
       env:
         ACTIONLINT_VERSION: ${{ inputs.version }}
         IGNORE_MESSAGES: ${{ inputs.ignore }}
-        USE_SHELLCHHECK: ${{ inputs.use_shellcheck }}
+        USE_SHELLCHECK: ${{ inputs.use_shellcheck }}
         DEFAULT_CONFIG_FILE: ${{ github.action_path }}/actionlint.yaml
         REPOSITORY_ADDITIONAL_CONFIG_FILE: ${{ github.action_path }}/custom/${{ github.repository }}/actionlint.yaml
       run: |
@@ -54,7 +54,7 @@ runs:
         _args+=(-pyflakes=)
 
         # Configure shellcheck
-        if [[ "$USE_SHELLCHHECK" == "false" ]]; then
+        if [[ "$USE_SHELLCHECK" == "false" ]]; then
           _args+=(-shellcheck=)
         fi
 
