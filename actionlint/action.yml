@@ -69,9 +69,9 @@ runs:
 
         # Configure shellcheck
         if [[ "$USE_SHELLCHHECK" == "true" ]]; then
-          _args+=(-shellcheck shellcheck)
+          _args+=(-shellcheck "shellcheck")
         else
-          _args+=(-shellcheck)
+          _args+=(-shellcheck "")
         fi
 
         # Ignore error messages
