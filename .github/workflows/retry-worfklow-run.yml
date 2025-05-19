@@ -123,16 +123,18 @@ jobs:
           RUN_ID: ${{ inputs.run-id }}
         run: |
           # trigger a new run with error notification
-          workflow_name=$(
-            gh run view "${RUN_ID}" \
-              --json workflowName \
-              --jq '.workflowName'
-          )
+
+          path=$(gh api "/repos/${GH_REPO}/actions/runs/${RUN_ID}" \
+            --jq '.path'
+            )
+
+          workflow_name=$(basename "$path")
+
           if [ "${DRY_RUN}" = "true" ]; then
             echo "Skipping notify back since this is a dry-run ..."
           else
-            echo "notifying back to workflow=${workflow_name}.yml ..."
-            gh workflow run "${workflow_name}.yml" \
+            echo "notifying back to workflow=${workflow_name} ..."
+            gh workflow run "${workflow_name}" \
               --field notify_back_error_message="${NOTIFY_BACK_ERROR_MESSAGE}" \
               --ref="${notify-back-git-ref}"
           fi
