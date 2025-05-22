@@ -1,7 +1,11 @@
 ---
 name: Rerun failed run
 
-description: Retrigger a GitHub Actions workflow run that has failed with a specific error message
+description: |
+  Retrigger a GitHub Actions workflow run that has failed with a specific error message.
+  This action can optionally check for specific error messages in the logs of failed jobs before retrying.
+  If no error messages are provided, the workflow will retry directly without checking the logs.
+  This allows for flexibility in handling workflow failures, whether you need to check for specific errors or simply want to retry the workflow immediately.
 
 inputs:
   run-id:
@@ -11,8 +15,11 @@ inputs:
     description: The name of the repository to which the workflow run belongs
     required: true
   error-messages:
-    description: The error messages to check for in the workflow run logs. The workflow will be rerun only if at least one of the given messages is found in the logs of a failed job.
-    required: true
+    description: |
+      The error messages to check for in the workflow run logs.
+      The workflow will be rerun only if at least one of the given messages is found in the logs of a failed job.
+      If not provided, the workflow will retry directly without checking the logs.
+    default: ''
   vault-addr:
     description: The Vault URL for fetching secrets
     required: true
@@ -23,7 +30,7 @@ inputs:
     description: The Vault secret ID for fetching secrets
     required: true
   notify-back-on-error:
-    description: |-
+    description: |
       When the error message does not match the expected one,
       re-trigger the workflow with the parameter `notify_back_error_message`.
       Your calling workflow must implement the `notify_back_error_message` parameter
@@ -66,6 +73,7 @@ runs:
 
     - name: Convert error messages list to JSON
       id: error-messages
+      if: inputs.error-messages != ''
       env:
         ERROR_MESSAGES: ${{ inputs.error-messages }}
       run: |
@@ -88,8 +96,8 @@ runs:
         token: ${{ steps.github-token.outputs.token }}
         workflow_inputs: |
           {
-            "error-messages": ${{ steps.error-messages.outputs.json }},
-            "notify-back-git-ref": "${{ github.ref_name }}",
+            "error-messages": ${{ steps.error-messages.outputs.json || '' }},
+            "notify-back-git-ref": "${{ github.head_ref || github.ref_name }}",
             "notify-back-on-error": "${{ inputs.notify-back-on-error }}",
             "owner": "${{ steps.repository.outputs.owner }}",
             "repository": "${{ steps.repository.outputs.name }}",
