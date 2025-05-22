@@ -121,7 +121,6 @@ jobs:
           NOTIFY_BACK_ERROR_MESSAGE: >
             This workflow attempted a retry but there was no match on the log message, so it was not retried.
             Please check: ${{ github.server_url }}/${{ inputs.owner }}/${{ inputs.repository }}/actions/runs/${{ inputs.run-id }}
-          notify-back-git-ref: ${{ inputs.notify-back-git-ref }}
           RUN_ID: ${{ inputs.run-id }}
         run: |
           # trigger a new run with error notification
@@ -138,6 +137,6 @@ jobs:
             echo "notifying back to workflow=${workflow_name} ..."
             gh workflow run "${workflow_name}" \
               --field notify_back_error_message="${NOTIFY_BACK_ERROR_MESSAGE}" \
-              --ref="${notify-back-git-ref}"
+              --ref="${{ inputs.notify-back-git-ref }}"
           fi
         shell: bash
