@@ -11,8 +11,8 @@ on:
       error-messages:
         description: |
           Error messages to look for in annotations and logs.
-          The worfklow run is only retried if any of the error messages are found.
-        required: false
+          The workflow run is only retried if any of the error messages are found.
+        default: ''
       run-id:
         description: Id of the workflow run to retry
         required: true
@@ -83,6 +83,7 @@ jobs:
 
       - name: Check annotations and job logs for errors
         id: errors
+        if: inputs.error-messages != ''
         uses: ./rerun-failed-run/check-annotations-and-logs
         with:
           error-messages: ${{ inputs.error-messages }}
@@ -92,7 +93,7 @@ jobs:
           run-id: ${{ inputs.run-id }}
 
       - name: Retry worfklow run for repo=${{ inputs.owner }}/${{ inputs.repository }} and run-id=${{ inputs.run-id }}
-        if: steps.errors.outputs.found == 'true'
+        if: steps.errors.outputs.found == 'true' || inputs.error-messages == ''
         env:
           DRY_RUN: ${{ inputs.dry-run }}
           GH_REPO: ${{ inputs.owner }}/${{ inputs.repository }}
