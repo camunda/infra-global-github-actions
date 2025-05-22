@@ -12,6 +12,7 @@ on:
         description: |
           Error messages to look for in annotations and logs.
           The workflow run is only retried if any of the error messages are found.
+          If this parameter is empty, the workflow will be retried without checking for specific error messages.
         default: ''
       run-id:
         description: Id of the workflow run to retry

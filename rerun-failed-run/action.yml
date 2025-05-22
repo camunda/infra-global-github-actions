@@ -97,7 +97,7 @@ runs:
         workflow_inputs: |
           {
             "error-messages": ${{ steps.error-messages.outputs.json || '' }},
-            "notify-back-git-ref": "${{ github.ref_name }}",
+            "notify-back-git-ref": "${{ github.head_ref || github.ref_name }}",
             "notify-back-on-error": "${{ inputs.notify-back-on-error }}",
             "owner": "${{ steps.repository.outputs.owner }}",
             "repository": "${{ steps.repository.outputs.name }}",
