@@ -73,7 +73,6 @@ runs:
 
     - name: Convert error messages list to JSON
       id: error-messages
-      if: inputs.error-messages != ''
       env:
         ERROR_MESSAGES: ${{ inputs.error-messages }}
       run: |
@@ -96,7 +95,7 @@ runs:
         token: ${{ steps.github-token.outputs.token }}
         workflow_inputs: |
           {
-            "error-messages": ${{ steps.error-messages.outputs.json || '' }},
+            "error-messages": ${{ steps.error-messages.outputs.json }},
             "notify-back-git-ref": "${{ github.head_ref || github.ref_name }}",
             "notify-back-on-error": "${{ inputs.notify-back-on-error }}",
             "owner": "${{ steps.repository.outputs.owner }}",

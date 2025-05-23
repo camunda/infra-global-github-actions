@@ -16,7 +16,7 @@ If these secrets are not present, please contact the infrastructure team to set 
 | Input name                 | Description                                                                                                                                  |
 |----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
 | run-id (required)          | The ID of the failed workflow run to be retried.                                                                                             |
-| error-messages (required)  | Custom error messages to search for in the logs.                                                                                             |
+| error-messages  |       The error messages to check for in the workflow run logs. The workflow will be rerun only if at least one of the given messages is found in the logs of a failed job If not provided, the workflow will retry directly without checking the logs.                                                                                             |
 | repository (required)      | The name of the repository containing the workflow to be retried in the format ORG/REPO_NAME (example: `camunda/infra-global-github-action`) |
 | vault-addr (required)      | The Vault URL.                                                                                                                               |
 | vault-role-id (required)   | The Vault Role ID.                                                                                                                           |
