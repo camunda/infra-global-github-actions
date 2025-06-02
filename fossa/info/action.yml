@@ -2,6 +2,12 @@ name: fossa info
 
 description: Provides context info required for other FOSSA composite actions.
 
+inputs:
+  github-token:
+    description: |
+      The GitHub token to use for API calls.
+    default: ${{ github.token }}
+
 outputs:
   is-pull-request:
     description: |
@@ -18,6 +24,12 @@ outputs:
       Empty if not a pull request.
       Generally used to find (via diff) new license issues introduced by a PR.
     value: ${{ steps.info.outputs.base-revision }}
+  base-revision-most-recent-with-scanning-results:
+    description: |
+      The latest base branch revision (commit SHA) with FOSSA scanning results.
+      Useful when the base revision has no scanning results, such as after a manual merge commit that did not trigger a workflow (and so a scan).
+      Empty if none found.
+    value: ${{ steps.info-pr.outputs.base-ref-with-scanning-results }}
   head-ref:
     description: |
       The HEAD ref (name) of the branch to be analyzed by FOSSA, determined based on the context of the event.
@@ -66,4 +78,48 @@ runs:
         echo "head-ref=${HEAD_REF}"
         echo "head-revision=${HEAD_REVISION}"
       } >> $GITHUB_OUTPUT
+    shell: bash
+  - name: Get additional PR info
+    if: ${{ steps.info.outputs.is-pull-request == 'true' }}
+    id: info-pr
+    env:
+      BASE_REF: ${{ steps.info.outputs.base-ref }}
+      BASE_REVISION: ${{ steps.info.outputs.base-revision }}
+      GH_TOKEN: ${{ inputs.github-token }}
+      WORKFLOW_NAME: ${{ github.workflow }}
+    run: |
+      # Check recent commits of the base commit for existing scanning results
+      # history depth to search for scanning results
+      depth=5
+
+      # Ensure history is available for the base branch up to the specified depth
+      git fetch origin "${BASE_REF}" --depth=200
+      # If not enough, fetch more
+      git rev-parse "${BASE_REVISION}~$((depth-1))" >/dev/null 2>&1 || \
+        git fetch origin "${BASE_REF}" --unshallow
+
+      # Check if the base branch or its recent parents have scanning results
+      base_ref_with_scanning_results=""
+      for i in $(seq 0 $((depth-1))); do
+        commit=$(git rev-parse "${BASE_REVISION}~$i" 2>/dev/null || true)
+        # Check if a workflow run of "Check Licenses" succeeded for the commit
+        if gh run list \
+          --limit 1000 \
+          --commit "$commit" \
+          --json workflowName,conclusion \
+          --jq '[.[] | select(.workflowName == "'"$WORKFLOW_NAME"'" and .conclusion == "success")] | any' | grep -q true; then
+          if [ "$i" -gt 0 ]; then
+             echo "Scanning result found for commit=$commit, which is $i commit(s) behind the base branch/ref."
+          fi
+          base_ref_with_scanning_results=$commit
+          break
+        fi
+      done
+      if [ -z "$base_ref_with_scanning_results" ]; then
+        echo "No scan results found for base branch '${BASE_REF}' (revision: ${BASE_REVISION}) or any of its recent ancestors."
+        echo "::warning::No commit in the recent history of the base branch has scan results available."
+        echo "This likely indicates that recent scans for the base branch have failed and need to be addressed."
+        echo "Scan results for the base branch are required to compute a diff and identify license issues introduced by this PR. Without it, license checks will likely fail."
+      fi
+      echo "base-ref-with-scanning-results=${base_ref_with_scanning_results}" >> $GITHUB_OUTPUT
     shell: bash
