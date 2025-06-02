@@ -50,7 +50,7 @@ runs:
       # Run fossa test
       results=$(fossa test "${DIRECTORY_PATH}" --config "${CONFIGURATION_FILE}" --diff "${BASE_REVISION}" --revision "${REVISION}" --format json || true)
 
-      # Exit if results is empty or not a valid JSON
+      # Fail if results is empty or not a valid JSON
       if [ -z "$results" ] || ! echo "$results" | jq empty > /dev/null 2>&1; then
         exit 1
       fi
