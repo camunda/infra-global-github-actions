@@ -98,6 +98,21 @@ runs:
       git rev-parse "${BASE_REVISION}~$((depth-1))" >/dev/null 2>&1 || \
         git fetch origin "${BASE_REF}" --unshallow
 
+      # Ensure the GitHub CLI is installed
+      if ! command -v gh &> /dev/null; then
+        echo "GitHub CLI not found. Installing..."
+        sudo apt update
+        sudo apt install curl -y
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | \
+          sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+        sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] \
+          https://cli.github.com/packages stable main" | \
+          sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+        sudo apt update
+        sudo apt install gh -y
+      fi
+
       # Check if the base branch or its recent parents have scanning results
       base_ref_with_scanning_results=""
       for i in $(seq 0 $((depth-1))); do
