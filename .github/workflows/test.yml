@@ -1,0 +1,22 @@
+name: example
+on:
+  push:
+    branches:
+      - 32376-previous-version-gha-test
+jobs:
+  trigger-branch-deployment:
+    runs-on: ubuntu-latest
+    steps:
+      - id: checkout
+        uses: actions/checkout@v4
+        with:
+          ref: "main"
+          fetch-depth: 0 # To fetch tags as well - required for tags processing
+      - id: prev_version
+        uses: camunda/infra-global-github-actions/previous-version@32376-previous-version-gha-test
+        with:
+          version: '1.0.1'
+          verbose: 'true'
+      - run: |
+          echo ${{ steps.prev_version.outputs.previous_version }}
+          echo ${{ steps.prev_version.outputs.release_type }}
