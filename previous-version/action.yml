@@ -1,0 +1,47 @@
+---
+name: Identify release type and previous release version
+
+description: Given a current release version identifies a previous release version based on existing git tags
+
+inputs:
+  version:
+    description: 'Current version (e.g. 8.8.0)'
+    required: true
+  verbose:
+    description: 'Verbose mode (true|false)'
+    default: 'false'
+outputs:
+  previous_version:
+    description: 'Previous version (e.g. 8.7.0)'
+    value: ${{ steps.run.outputs.previous_version }}
+  release_type:
+    description: 'Current release type (NORMAL|ALPHA|RC)'
+    value: ${{ steps.run.outputs.release_type }}
+
+runs:
+  using: composite
+  steps:
+  - name: Echo inputs
+    shell: bash
+    run: |
+      echo "Inputs"
+      echo "-----"
+      echo "version: ${{ inputs.version }}"
+      echo "verbose: ${{ inputs.verbose }}"
+
+  - name: run previous_version.sh
+    id: run
+    shell: bash
+    run: |
+      set -eou pipefail
+      # Convert to lowercase for case-insensitive comparison
+      VERBOSE=$(echo "${{ inputs.verbose }}" | tr '[:upper:]' '[:lower:]')
+      if [ "$VERBOSE" = "true" ]; then
+        set -x
+      fi
+
+      RESULT=$(${{ github.action_path }}/previous_version.sh '${{ inputs.version }}')
+      RELEASE_TYPE=$(echo "$RESULT" | awk '{print $1}')
+      PREVIOUS_VERSION=$(echo "$RESULT" | awk '{print $2}')
+      echo "release_type=$RELEASE_TYPE" >> "$GITHUB_OUTPUT"
+      echo "previous_version=$PREVIOUS_VERSION" >> "$GITHUB_OUTPUT"
