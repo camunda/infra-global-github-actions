@@ -40,7 +40,7 @@ runs:
         set -x
       fi
 
-      RESULT=$(${{ github.action_path }}/previous_version.sh '${{ inputs.version }}')
+      RESULT=$(${{ github.action_path }}/previous_version.sh '${{ inputs.version }}' "$VERBOSE")
       RELEASE_TYPE=$(echo "$RESULT" | awk '{print $1}')
       PREVIOUS_VERSION=$(echo "$RESULT" | awk '{print $2}')
       echo "release_type=$RELEASE_TYPE" >> "$GITHUB_OUTPUT"

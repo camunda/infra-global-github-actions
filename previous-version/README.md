@@ -20,7 +20,7 @@ name: example
 on:
   pull_request:
 jobs:
-  trigger-branch-deployment:
+  test-previous-version:
     runs-on: ubuntu-latest
 
     steps:

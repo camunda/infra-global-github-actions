@@ -15,6 +15,12 @@
 #   E.g. "NORMAL 8.7.0"
 
 PREV_TAG="not found"
+VERSION=$1
+VERBOSE=$2
+
+if [ "$VERBOSE" = "true" ]; then
+  set -x
+fi
 
   # Function to determine the previous tag using 'NORMAL' logic
   determine_normal_prev_tag() {
@@ -147,7 +153,7 @@ get_previous_alpha_tag() {
 }
 
 # validation for tag format
-if [[ ! $1 =~ ^[0-9]+\.[0-9]+\.[0-9]+(-alpha[0-9]+(\.[0-9]+)?)?(-rc[0-9]+)?$ ]]; then
+if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+(-alpha[0-9]+(\.[0-9]+)?)?(-rc[0-9]+)?$ ]]; then
   echo "Release tag is invalid"
   exit 1
 fi
@@ -157,11 +163,11 @@ ALPHA_PATTERN='-alpha[0-9]+(\.[0-9]+)?$'
 RC_PATTERN='-rc[0-9]+$'
 
 TYPE=""
-if [[ $1 =~ $NORMAL_PATTERN ]]; then
+if [[ $VERSION =~ $NORMAL_PATTERN ]]; then
   TYPE="NORMAL"
-elif [[ $1 =~ $ALPHA_PATTERN ]]; then
+elif [[ $VERSION =~ $ALPHA_PATTERN ]]; then
   TYPE="ALPHA"
-elif [[ $1 =~ $RC_PATTERN ]]; then
+elif [[ $VERSION =~ $RC_PATTERN ]]; then
   TYPE="RC"
 fi
 
@@ -172,7 +178,7 @@ fi
 
 
 # Determine the previous tag
-determine_prev_tag "$1" "$TYPE"
+determine_prev_tag "$VERSION" "$TYPE"
 if [[ -z $PREV_TAG ]]; then
   echo "No previous tag found for the given rules"
   exit 1

@@ -4,7 +4,7 @@ on:
     branches:
       - 32376-previous-version-gha-test
 jobs:
-  trigger-branch-deployment:
+  test-previous-version:
     runs-on: ubuntu-latest
     steps:
       - id: checkout
@@ -16,7 +16,7 @@ jobs:
         uses: camunda/infra-global-github-actions/previous-version@32376-previous-version-gha-test
         with:
           version: '1.0.1'
-          verbose: 'true'
+#          verbose: 'false'
       - run: |
           echo ${{ steps.prev_version.outputs.previous_version }}
           echo ${{ steps.prev_version.outputs.release_type }}
