@@ -33,7 +33,7 @@ fi
               IFS='.' read -r tag_major tag_minor tag_patch <<< "$tag"
               IFS='.' read -r curr_major curr_minor curr_patch <<< "$current_tag"
               curr_patch=${curr_patch%%-*}
-               if [[ $tag == "$current_tag" ]] || { ((tag_major == curr_major)) && ((tag_minor == curr_minor)) && ((tag_patch == curr_patch)); }; then
+               if { ((tag_major == curr_major)) && ((tag_minor == curr_minor)) && ((tag_patch == curr_patch)); }; then
                               continue
                           fi
 
