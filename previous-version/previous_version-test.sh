@@ -102,36 +102,35 @@ test_fail_count=0
 
 # Function to run a single test case
 run_test() {
-    local input_tag=$1
-    local expected_output=$2
-    local expected_type=$3
+  local input_tag=$1
+  local expected_output=$2
+  local expected_type=$3
 
-    # Run the previous_version.sh script and capture its output
-    local -r script_output=$(bash ../previous_version.sh "$input_tag")
+  # Run the previous_version.sh script and capture its output
+  local -r script_output=$(bash ../previous_version.sh "$input_tag")
    # Check if the script output indicates an invalid tag format
-    if [[ "$script_output" == "Release tag is invalid" ]]; then
-        if [[ "$expected_output" == "Release tag is invalid" ]]; then
-            passed_tests_results+="Test passed for input $input_tag: Expected Type: $expected_type, Prev Tag: $expected_output. Got Type: $script_output, Prev Tag: $script_output\n"
-            ((test_passed_count++))
-        else
-            fail_test_results+="Test failed for input $input_tag: Expected Type: $expected_type, Prev Tag: $expected_output. Got Type: $script_output, Prev Tag: $script_output\n"
-            ((test_fail_count++))
-        fi
+  if [[ "$script_output" == "Release tag is invalid" ]]; then
+    if [[ "$expected_output" == "Release tag is invalid" ]]; then
+      passed_tests_results+="Test passed for input $input_tag: Expected Type: $expected_type, Prev Tag: $expected_output. Got Type: $script_output, Prev Tag: $script_output\n"
+      ((test_passed_count++))
     else
-        # Extract the type and previous tag from the script output
-        local -r script_output_type=$(echo "$script_output" | awk '{print $1}')
-        local -r script_output_prev_tag=$(echo "$script_output" | awk '{print $2}')
-
-        # Compare the extracted values with the expected ones
-        if [[ "$script_output_type" == "$expected_type" ]] && [[ "$script_output_prev_tag" == "$expected_output" ]]; then
-            passed_tests_results+="Test passed for input $input_tag: Expected Type: $expected_type, Prev Tag: $expected_output. Got Type: $script_output_type, Prev Tag: $script_output_prev_tag\n"
-            ((test_passed_count++))
-        else
-            fail_test_results+="Test failed for input $input_tag: Expected Type: $expected_type, Prev Tag: $expected_output. Got Type: $script_output_type, Prev Tag: $script_output_prev_tag\n"
-            ((test_fail_count++))
-        fi
+      fail_test_results+="Test failed for input $input_tag: Expected Type: $expected_type, Prev Tag: $expected_output. Got Type: $script_output, Prev Tag: $script_output\n"
+      ((test_fail_count++))
     fi
+  else
+    # Extract the type and previous tag from the script output
+    local -r script_output_type=$(echo "$script_output" | awk '{print $1}')
+    local -r script_output_prev_tag=$(echo "$script_output" | awk '{print $2}')
 
+    # Compare the extracted values with the expected ones
+    if [[ "$script_output_type" == "$expected_type" ]] && [[ "$script_output_prev_tag" == "$expected_output" ]]; then
+      passed_tests_results+="Test passed for input $input_tag: Expected Type: $expected_type, Prev Tag: $expected_output. Got Type: $script_output_type, Prev Tag: $script_output_prev_tag\n"
+      ((test_passed_count++))
+    else
+      fail_test_results+="Test failed for input $input_tag: Expected Type: $expected_type, Prev Tag: $expected_output. Got Type: $script_output_type, Prev Tag: $script_output_prev_tag\n"
+      ((test_fail_count++))
+    fi
+  fi
 }
 
 
