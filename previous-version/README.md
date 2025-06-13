@@ -8,10 +8,10 @@ This GHA can be used in any repository, but requires it to be fetched with full 
 so that existing tags can be analyzed. Otherwise, results may be incorrect.
 
 ### Inputs
-| Input name | Description                            |
-|------------|----------------------------------------|
-| version    | current release version (e.g. 8.8.0)   |
-| verbose    | provide verbose output (true \| false) |
+| Input name | Description                            | Mandatory | Default |
+|------------|----------------------------------------|-----------|---------|
+| version    | Current release version (e.g. 8.8.0)   | Yes       |         |
+| verbose    | Provide verbose output (true \| false) | No        | false   |
 
 ### Outputs
 | Input name        | Description                                  |
