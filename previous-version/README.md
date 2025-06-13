@@ -1,6 +1,6 @@
 # previous-version
 
-Given a release version identifies release type and a corresponding previous release version
+Given a release version identifies release type and a corresponding previous release version in a current repository.
 
 ## Usage
 
@@ -12,6 +12,12 @@ so that existing tags can be analyzed. Otherwise, results may be incorrect.
 |------------|----------------------------------------|
 | version    | current release version (e.g. 8.8.0)   |
 | verbose    | provide verbose output (true \| false) |
+
+### Outputs
+| Input name        | Description                                  |
+|-------------------|----------------------------------------------|
+| previous_version  | Previous version (e.g. 8.7.0)                |
+| release_type      | Current release type (NORMAL \| ALPHA \| RC) |
 
 ### Workflow Example
 ```yaml
