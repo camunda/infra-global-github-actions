@@ -16,10 +16,10 @@
 #   E.g. "NORMAL 8.7.0"
 
 PREV_TAG="not found"
-VERSION=$1
-VERBOSE=$2
+VERSION="$1"
+VERBOSE="$2"
 
-if [[ "${VERBOSE}" = "true" ]]; then
+if [[ ${VERBOSE} = "true" ]]; then
   set -x
 fi
 
