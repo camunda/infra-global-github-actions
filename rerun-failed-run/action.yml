@@ -43,7 +43,7 @@ runs:
   steps:
     - name: Import Secrets
       id: vault-secrets
-      uses: hashicorp/vault-action@v3.3.0
+      uses: hashicorp/vault-action@v3.4.0
       with:
         url: ${{ inputs.vault-addr }}
         method: approle
