@@ -44,7 +44,4 @@ runs:
       with:
         types: ${{ inputs.types }}
         subjectPattern: ${{ inputs.subject-pattern }}
-        ignoreLabels: |
-          release/pr
-          autorelease: pending
         validateSingleCommit: true
