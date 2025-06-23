@@ -3,6 +3,31 @@ This collection of github actions is currently intended to enable `Auto-Releases
 
 If applied correctly, every commit to the mainline branch of a repository will be [added to a Release PR](./release/README.md) which then can be [automerged](./automerge/README.md) on a schedule.
 
+## Available Actions
+
+This package contains three complementary actions for pull request management:
+
+* **[Release](./release/README.md)** - Automated release PR creation and management based on conventional commits
+* **[Automerge](./automerge/README.md)** - Automated merging of release PRs on a schedule
+* **[Validate Title](./validate-title/README.md)** - Validates PR titles against conventional commit format (recommended for side projects)
+
+## PR Title Validation for Side Projects
+
+⚠️ **Important for Side Projects**: If your repository uses the release action and "Squash & Merge" strategy, it's highly recommended to also use the [validate-title](./validate-title/README.md) action. This prevents broken releases when PR titles don't follow conventional commit format.
+
+```yaml
+# .github/workflows/validate-pr-title.yml
+name: Validate PR Title
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+jobs:
+  validate-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: camunda/infra-global-github-actions/teams/infra/pull-request/validate-title@main
+```
+
 ## Architecture
 The `release` action leverages the [release-please-action](https://github.com/googleapis/release-please-action) to manage these release PRs.
 It is handling the creation and updates of mentioned release PRs and the "bumping" of versions based on conventional commits. When a release PR gets merged release-please handles the creation of a new Github Release, the respective tag and a the management of the changelog file.
@@ -27,5 +52,7 @@ Once everything got merged, you'll see a new release PR which you can merge dire
 * Simple release: https://github.com/camunda/infra-k8s-webhook/pull/86
 * Monorepo Example: https://github.com/camunda/camunda-docker-ci-postgresql/pull/29
 
-## Pre-Commit Hook
+## Pre-Commit Hook & PR Title Validation
 Since release-please depends on [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) to bump versions appropriately it's required to enforce the usage of these by pre-commit hooks. Just look at one of the above's examples to see how it's done.
+
+For repositories using "Squash & Merge", it's also recommended to use the [validate-title](./validate-title/README.md) action to ensure PR titles follow conventional commit format, as the PR title becomes the commit message during squash merging.
