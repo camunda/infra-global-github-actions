@@ -1,0 +1,65 @@
+---
+name: Validate PR Title
+description: |
+  Validates pull request titles against conventional commit format.
+  This action helps ensure that PR titles follow conventional commit standards,
+  which is critical for side projects using release-please when using
+  "Squash & Merge".
+
+inputs:
+  github-token:
+    description: 'GitHub token with read access to pull requests'
+    required: false
+    default: ${{ github.token }}
+  types:
+    description: |
+      List of allowed commit types.
+      Defaults to common conventional commit types.
+    required: false
+    default: |
+      feat
+      fix
+      docs
+      style
+      refactor
+      test
+      build
+      ci
+      chore
+      revert
+  subject-pattern:
+    description: |
+      Regex pattern for the subject line.
+      Default ensures subject doesn't start with uppercase.
+    required: false
+    default: '^(?![A-Z]).+$'
+  ignore-labels:
+    description: |
+      Labels to ignore when validating PR titles.
+      PRs with these labels will skip validation.
+    required: false
+    default: |
+      release/pr
+      autorelease: pending
+  validate-single-commit:
+    description: |
+      When using "Squash and merge" on a PR with only one commit, GitHub
+      will suggest using that commit message instead of the PR title.
+      Enable this to also validate the commit message for single commit PRs.
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Validate PR title
+      # v5.5.3
+      uses: >-
+        amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      with:
+        types: ${{ inputs.types }}
+        subjectPattern: ${{ inputs.subject-pattern }}
+        ignoreLabels: ${{ inputs.ignore-labels }}
+        validateSingleCommit: ${{ inputs.validate-single-commit }}
