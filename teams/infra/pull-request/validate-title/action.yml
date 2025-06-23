@@ -33,33 +33,18 @@ inputs:
       Default ensures subject doesn't start with uppercase.
     required: false
     default: '^(?![A-Z]).+$'
-  ignore-labels:
-    description: |
-      Labels to ignore when validating PR titles.
-      PRs with these labels will skip validation.
-    required: false
-    default: |
-      release/pr
-      autorelease: pending
-  validate-single-commit:
-    description: |
-      When using "Squash and merge" on a PR with only one commit, GitHub
-      will suggest using that commit message instead of the PR title.
-      Enable this to also validate the commit message for single commit PRs.
-    required: false
-    default: 'true'
 
 runs:
   using: composite
   steps:
     - name: Validate PR title
-      # v5.5.3
-      uses: >-
-        amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017
+      uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017 # v5.5.3
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
         types: ${{ inputs.types }}
         subjectPattern: ${{ inputs.subject-pattern }}
-        ignoreLabels: ${{ inputs.ignore-labels }}
-        validateSingleCommit: ${{ inputs.validate-single-commit }}
+        ignoreLabels: |
+          release/pr
+          autorelease: pending
+        validateSingleCommit: true
