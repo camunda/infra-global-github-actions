@@ -9,11 +9,11 @@ This package contains three complementary actions for pull request management:
 
 * **[Release](./release/README.md)** - Automated release PR creation and management based on conventional commits
 * **[Automerge](./automerge/README.md)** - Automated merging of release PRs on a schedule
-* **[Validate Title](./validate-title/README.md)** - Validates PR titles against conventional commit format (recommended for side projects)
+* **[Validate Title](./validate-title/README.md)** - Validates PR titles against conventional commit format (recommended for projects which use release-please to manage releases)
 
-## PR Title Validation for Side Projects
+## PR Title Validation for Projects Using Release-Please
 
-⚠️ **Important for Side Projects**: If your repository uses the release action and "Squash & Merge" strategy, it's highly recommended to also use the [validate-title](./validate-title/README.md) action. This prevents broken releases when PR titles don't follow conventional commit format.
+⚠️ **Important for Projects Using Release-Please**: If your repository uses the release action and "Squash & Merge" strategy, it's highly recommended to also use the [validate-title](./validate-title/README.md) action. This prevents broken releases when PR titles don't follow conventional commit format. This is especially important when at the time of PR creation there is already more than 1 commit, as GitHub may generate a title which diverges from any convention.
 
 ```yaml
 # .github/workflows/validate-pr-title.yml
@@ -54,5 +54,3 @@ Once everything got merged, you'll see a new release PR which you can merge dire
 
 ## Pre-Commit Hook & PR Title Validation
 Since release-please depends on [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) to bump versions appropriately it's required to enforce the usage of these by pre-commit hooks. Just look at one of the above's examples to see how it's done.
-
-For repositories using "Squash & Merge", it's also recommended to use the [validate-title](./validate-title/README.md) action to ensure PR titles follow conventional commit format, as the PR title becomes the commit message during squash merging.
