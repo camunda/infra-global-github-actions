@@ -131,7 +131,7 @@ inputs:
     description: "The target architecture (x86, x64) of the Python or PyPy interpreter. (not supported on arm)"
   python-check-latest:
     description: "Set this option if you want the action to check for the latest available version that satisfies the version spec. (not supported on arm)"
-    default: "false"
+    default: 'false'
   python-token:
     description: "The token used to authenticate when fetching Python distributions from https://github.com/actions/python-versions. When running this action on github.com, the default value is sufficient. When running on GHES, you can pass a personal access token for github.com if you are experiencing rate limiting. (not supported on arm)"
     default: ${{ github.server_url == 'https://github.com' && github.token || '' }}
@@ -142,18 +142,22 @@ inputs:
     default: 'true'
   python-allow-prereleases:
     description: "When 'true', a version range passed to 'python-version' input will match prerelease versions if no GA versions are found. Only 'x.y' version range is supported for CPython. (not supported on arm)"
-    default: "false"
+    default: 'false'
   python-enabled:
     description: 'Whether to install python or not'
     default: 'true'
   python-deadsnakes-debug:
     description: 'Whether to use debug version of python (deadnakes arm only)'
     required: false
-    default: false
+    default: 'false'
   python-deadsnakes-nogil:
     description: 'Whether to use free-threaded version of python (deadnakes arm only)'
     required: false
-    default: false
+    default: 'false'
+  # Build-Essential package
+  build-essential-enabled:
+    description: 'Whether to install build-essential package or not'
+    default: 'false'
 
   # misc
   overwrite:
@@ -193,6 +197,12 @@ runs:
       then
           echo "java_missing=true" >> "$GITHUB_ENV"
       fi
+
+      if ! $(dpkg -l | grep -q build-essential)
+      then
+          echo "build_essential_missing=true"
+      fi
+
   # For easier debugging which version is missing
   - name: Print $GITHUB_ENV
     shell: bash
@@ -293,6 +303,13 @@ runs:
       curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
       /usr/bin/python get-pip.py
 
+  # Install Build-Essential
+  - name: Install Build-Essential
+    if: ${{ inputs.build-essential-enabled == 'true' && ( env.build_essential_missing == 'true' || inputs.overwrite == 'true' ) }}
+    shell: bash
+    run: |
+      sudo apt update && sudo apt install build-essential -y
+
   - name: Unset Environment variables
     shell: bash
     run: |
@@ -301,3 +318,4 @@ runs:
       echo "buildx_missing=" >> "$GITHUB_ENV"
       echo "python_missing=" >> "$GITHUB_ENV"
       echo "yarn_missing=" >> "$GITHUB_ENV"
+      echo "build_essential_missing=" >> "$GITHUB_ENV"
