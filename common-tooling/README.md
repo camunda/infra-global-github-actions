@@ -20,6 +20,7 @@ See following actions for further information on available inputs and their usag
 - [Setup-Python](https://github.com/actions/setup-python)
 - [Setup-Qemu-Action](https://github.com/docker/setup-qemu-action)
 - Yarn installed via Ubuntu package manager
+- `build-essential` installed via Ubuntu package manager
 
 ## Usage
 
@@ -79,6 +80,7 @@ e.g.
 | python-enabled | Whether to install python or not |
 | python-deadsnakes-debug | Whether to use debug version of python (deadnakes arm only) | false |
 | python-deadsnakes-nogil | Whether to use free-threaded version of python (deadnakes arm only) | false |
+| build-essential-enabled | Whether to install build-essential package or not | false |
 | overwrite | Defines whether on hosted runners the present version should be overwritten | false |
 
 ### Workflow Example
