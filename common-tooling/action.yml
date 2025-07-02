@@ -200,7 +200,7 @@ runs:
 
       if ! $(dpkg -l | grep -q build-essential)
       then
-          echo "build_essential_missing=true"
+          echo "build_essential_missing=true" >> "$GITHUB_ENV"
       fi
 
   # For easier debugging which version is missing
