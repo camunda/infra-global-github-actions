@@ -38,6 +38,10 @@ outputs:
     description: |
       The HEAD revision (commit sha) to be analyzed by FOSSA, determined based on the context of the event.
     value: ${{ steps.info.outputs.head-revision }}
+  job-start-time:
+    description: |
+      The start time of the current running job, in Unix timestamp format.
+    value: ${{ steps.job.outputs.start-time }}
 
 runs:
   using: composite
@@ -78,6 +82,35 @@ runs:
         echo "head-ref=${HEAD_REF}"
         echo "head-revision=${HEAD_REVISION}"
       } >> $GITHUB_OUTPUT
+    shell: bash
+  - name: Get job info
+    id: job
+    env:
+      GH_TOKEN: ${{ inputs.github-token }}
+      RUN_ID: ${{ github.run_id }}
+      RUNNER_NAME: ${{ runner.name }}
+    run: |
+      # Get jobs for the current run
+      jobs=$(
+        gh api \
+          "/repos/{owner}/{repo}/actions/runs/${RUN_ID}/jobs"
+      )
+      # Fail if results is empty or not a valid JSON
+      if [ -z "$jobs" ] || ! echo "$jobs" | jq empty > /dev/null 2>&1; then
+        echo "Retrieving jobs failed or returned invalid JSON." >&2
+        exit 1
+      fi
+
+      # Get the start time of the current running job (in progress)
+      # Safe to use runner.name to uniquely match the in progress job, as a runner (GitHub-managed or ephemeral Self-Hosted) runs only one job at a time.
+      started_at_timestamp=$(
+        echo "${jobs}" | \
+          jq -r \
+            --arg runner_name "${RUNNER_NAME}" \
+            '.jobs[] | select(.runner_name == $runner_name and .status == "in_progress") | .started_at | fromdate'
+      )
+
+      echo "start-time=${started_at_timestamp}" >> $GITHUB_OUTPUT
     shell: bash
   - name: Get additional PR info
     if: ${{ steps.info.outputs.is-pull-request == 'true' }}
