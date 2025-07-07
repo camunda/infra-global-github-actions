@@ -36,13 +36,16 @@ inputs:
     required: true
   timeout:
     description: |
-      The timeout for the fossa test command in seconds.
-      Set to 0 for no timeout.
+      Maximum time (in minutes) allowed for the 'fossa test' command to run.
+      Set to 0 to disable the timeout (no limit).
     default: "0"
     required: false
-  timeout-from:
+  timeout-start-time:
     description: |
-      timestamp in seconds from which the timeout is calculated.
+      Start time (in Unix epoch seconds) from which the timeout countdown begins.
+      If not set, the timeout countdown starts when the 'fossa test' command is executed.
+      This can be used to ensure the timeout triggers before the overall job timeout,
+      so users receive helpful context and guidance.
     required: false
 
 runs:
@@ -56,7 +59,7 @@ runs:
       TIMEOUT_FROM: ${{ inputs.timeout-from }}
     run: |
       # Adjust remaining timeout (min. 1 s)
-      TIMEOUT=$((TIMEOUT - ($(date +%s) - TIMEOUT_FROM)))
+      TIMEOUT=$((TIMEOUT*60 - ($(date +%s) - TIMEOUT_FROM)))
       if (( TIMEOUT <= 0 )); then
         TIMEOUT=1
       fi
@@ -85,7 +88,7 @@ runs:
         echo "The check runs on the FOSSA SaaS platform and may occasionally take longer." >&2
         echo "If it times out again on retry, it could be a temporary FOSSA issue." >&2
         echo "In that case, it's acceptable to merge the PR anyway." >&2
-        echo "If a license issue was introduced, it will be caught later in the base branch." >&2
+        echo "If a license issue is introduced, it will be caught later in the base branch." >&2
         exit 1
       fi
 
