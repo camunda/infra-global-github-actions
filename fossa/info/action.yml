@@ -29,7 +29,7 @@ outputs:
       The latest base branch revision (commit SHA) with FOSSA scanning results.
       Useful when the base revision has no scanning results, such as after a manual merge commit that did not trigger a workflow (and so a scan).
       Empty if none found.
-    value: ${{ steps.info-pr.outputs.base-ref-with-scanning-results }}
+    value: ${{ steps.pull-request.outputs.base-ref-with-scanning-results }}
   head-ref:
     description: |
       The HEAD ref (name) of the branch to be analyzed by FOSSA, determined based on the context of the event.
@@ -112,9 +112,9 @@ runs:
 
       echo "start-time=${started_at_timestamp}" >> $GITHUB_OUTPUT
     shell: bash
-  - name: Get additional PR info
+  - name: Get Pull-Request info
     if: ${{ steps.info.outputs.is-pull-request == 'true' }}
-    id: info-pr
+    id: pull-request
     env:
       BASE_REF: ${{ steps.info.outputs.base-ref }}
       BASE_REVISION: ${{ steps.info.outputs.base-revision }}
