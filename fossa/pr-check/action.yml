@@ -34,10 +34,34 @@ inputs:
     description: |
       The revision (commit sha) of the HEAD branch in the context of a pull request.
     required: true
+  timeout:
+    description: |
+      The timeout for the fossa test command in seconds.
+      Set to 0 for no timeout.
+    default: "0"
+    required: false
+  timeout-from:
+    description: |
+      timestamp in seconds from which the timeout is calculated.
+    required: false
 
 runs:
   using: composite
   steps:
+  - name: Adjust remaining timeout budget
+    if: inputs.timeout != '0' && inputs.timeout-from != ''
+    id: timeout
+    env:
+      TIMEOUT: ${{ inputs.timeout }}
+      TIMEOUT_FROM: ${{ inputs.timeout-from }}
+    run: |
+      # Adjust remaining timeout (min. 1 s)
+      TIMEOUT=$((TIMEOUT - ($(date +%s) - TIMEOUT_FROM)))
+      if (( TIMEOUT <= 0 )); then
+        TIMEOUT=1
+      fi
+      echo "seconds=${TIMEOUT}" | tee -a $GITHUB_OUTPUT
+    shell: bash
   - name: Check for new issues against the base ref=${{ inputs.base-ref }}
     id: check
     env:
@@ -46,9 +70,24 @@ runs:
       DIRECTORY_PATH: ${{ inputs.path }}
       FOSSA_API_KEY: ${{ inputs.api-key }}
       REVISION: ${{ inputs.revision }}
+      TIMEOUT: ${{ steps.timeout.outputs.seconds }}
     run: |
       # Run fossa test
-      results=$(fossa test "${DIRECTORY_PATH}" --config "${CONFIGURATION_FILE}" --diff "${BASE_REVISION}" --revision "${REVISION}" --format json || true)
+      results=$(timeout "${TIMEOUT}" fossa test "${DIRECTORY_PATH}" \
+        --config "${CONFIGURATION_FILE}" \
+        --diff "${BASE_REVISION}" \
+        --revision "${REVISION}" \
+        --format json || echo $?)
+
+      # Fail if the command timed out (exit code 124)
+      if [[ "${results}" == "124" ]]; then
+        echo "FOSSA test timed out." >&2
+        echo "The check runs on the FOSSA SaaS platform and may occasionally take longer." >&2
+        echo "If it times out again on retry, it could be a temporary FOSSA issue." >&2
+        echo "In that case, it's acceptable to merge the PR anyway." >&2
+        echo "If a license issue was introduced, it will be caught later in the base branch." >&2
+        exit 1
+      fi
 
       # Fail if results is empty or not a valid JSON
       if [ -z "$results" ] || ! echo "$results" | jq empty > /dev/null 2>&1; then
