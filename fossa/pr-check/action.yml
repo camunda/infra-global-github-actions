@@ -52,11 +52,11 @@ runs:
   using: composite
   steps:
   - name: Adjust remaining timeout budget
-    if: inputs.timeout != '0' && inputs.timeout-from != ''
+    if: inputs.timeout != '0' && inputs.timeout-start-time != ''
     id: timeout
     env:
       TIMEOUT: ${{ inputs.timeout }}
-      TIMEOUT_FROM: ${{ inputs.timeout-from }}
+      TIMEOUT_FROM: ${{ inputs.timeout-start-time }}
     run: |
       # Adjust remaining timeout (min. 1 s)
       TIMEOUT=$((TIMEOUT*60 - ($(date +%s) - TIMEOUT_FROM)))
