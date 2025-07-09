@@ -5,7 +5,13 @@
 
 set -e
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CHECK_SCRIPT="$SCRIPT_DIR/check.sh"
+
 echo "🧪 Running comprehensive tests for assert-no-ai-commits action..."
+echo "Using check script: $CHECK_SCRIPT"
+echo ""
 
 # Test cases to verify
 test_cases=(
@@ -53,9 +59,8 @@ run_test() {
 
     # Test the action
     export GIT_RANGE="HEAD~1..HEAD"
-    SCRIPT_PATH="/Users/maxim.danilov/repos/camunda/infra-global-github-actions/assert-no-ai-commits/check.sh"
 
-    if $SCRIPT_PATH > /tmp/test_output.log 2>&1; then
+    if $CHECK_SCRIPT > /tmp/test_output.log 2>&1; then
         echo "❌ FAILED: Should have detected AI pattern but didn't"
         echo "Output was:"
         cat /tmp/test_output.log
@@ -91,9 +96,8 @@ This is a normal human commit with proper attribution."
 
     # Test the action
     export GIT_RANGE="HEAD~1..HEAD"
-    SCRIPT_PATH="/Users/maxim.danilov/repos/camunda/infra-global-github-actions/assert-no-ai-commits/check.sh"
 
-    if $SCRIPT_PATH > /dev/null 2>&1; then
+    if $CHECK_SCRIPT > /dev/null 2>&1; then
         echo "✅ PASSED: Correctly allowed human commit"
         rm -rf "$TEST_DIR"
         return 0
