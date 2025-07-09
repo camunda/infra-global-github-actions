@@ -53,7 +53,7 @@ runs:
   steps:
   - name: Adjust remaining timeout budget
     if: inputs.timeout != '0' && inputs.timeout-start-time != ''
-    id: timeout
+    id: adjusted-timeout
     env:
       TIMEOUT: ${{ inputs.timeout }}
       TIMEOUT_FROM: ${{ inputs.timeout-start-time }}
@@ -73,7 +73,7 @@ runs:
       DIRECTORY_PATH: ${{ inputs.path }}
       FOSSA_API_KEY: ${{ inputs.api-key }}
       REVISION: ${{ inputs.revision }}
-      TIMEOUT: ${{ steps.timeout.outputs.seconds }}
+      TIMEOUT: ${{ steps.adjusted-timeout.outputs.seconds || inputs.timeout }}
     run: |
       # Run fossa test
       results=$(timeout "${TIMEOUT}" fossa test "${DIRECTORY_PATH}" \
