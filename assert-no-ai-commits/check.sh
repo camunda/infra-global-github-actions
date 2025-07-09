@@ -29,10 +29,16 @@ ai_violations=0
 # Check each commit for AI patterns
 for commit in $commits; do
     echo "Checking commit: $commit"
-    
+
     # Get commit metadata only (not diff content)
-    commit_metadata=$(git show --format=fuller --no-patch "$commit" 2>/dev/null || continue)
-    
+    commit_metadata=$(git show --format=fuller --no-patch "$commit" 2>/dev/null)
+
+    # Skip if commit metadata couldn't be retrieved
+    if [ -z "$commit_metadata" ]; then
+        echo "⚠️  Could not retrieve commit metadata for $commit, skipping"
+        continue
+    fi
+
     # Check for AI patterns in the commit metadata only
     if echo "$commit_metadata" | grep -i -E "(Co-authored-by:.*(GitHub Copilot|Copilot|ChatGPT|OpenAI|Claude|GPT|AI Assistant)|Author:.*(GitHub Copilot|Copilot|ChatGPT|OpenAI|Claude|GPT|AI Assistant)|Committer:.*(GitHub Copilot|Copilot|ChatGPT|OpenAI|Claude|GPT|AI Assistant))" > /dev/null; then
         echo "❌ AI-authored commit detected!"

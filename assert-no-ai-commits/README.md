@@ -64,9 +64,9 @@ When using AI tools for code assistance:
 4. **Example of proper usage**:
    ```
    Author: John Doe <john.doe@camunda.com>
-   
+
    feat: implement new feature
-   
+
    Added new authentication logic with assistance from GitHub Copilot
    ```
 

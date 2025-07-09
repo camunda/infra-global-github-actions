@@ -30,31 +30,31 @@ run_test() {
     local commit_message="$2"
     local author_name="$3"
     local author_email="$4"
-    
+
     echo "📋 Testing: $test_name"
-    
+
     # Create temporary test repository
     TEST_DIR=$(mktemp -d)
     cd "$TEST_DIR"
-    
+
     git init -q
     git config user.email "${author_email:-test@camunda.com}"
     git config user.name "${author_name:-Test User}"
-    
+
     # Create initial commit
     echo "test" > test.txt
     git add test.txt
     git commit -q -m "Initial commit"
-    
+
     # Create commit with AI pattern
     echo "content" >> test.txt
     git add test.txt
     git commit -q -m "$commit_message"
-    
+
     # Test the action
     export GIT_RANGE="HEAD~1..HEAD"
     SCRIPT_PATH="/Users/maxim.danilov/repos/camunda/infra-global-github-actions/assert-no-ai-commits/check.sh"
-    
+
     if $SCRIPT_PATH > /tmp/test_output.log 2>&1; then
         echo "❌ FAILED: Should have detected AI pattern but didn't"
         echo "Output was:"
@@ -71,28 +71,28 @@ run_test() {
 # Function to run positive test (should pass)
 run_positive_test() {
     local test_name="$1"
-    
+
     echo "📋 Testing: $test_name"
-    
+
     # Create temporary test repository
     TEST_DIR=$(mktemp -d)
     cd "$TEST_DIR"
-    
+
     git init -q
     git config user.email "test@camunda.com"
     git config user.name "Test User"
-    
+
     # Create normal commit
     echo "test" > test.txt
     git add test.txt
     git commit -q -m "feat: add new feature
 
 This is a normal human commit with proper attribution."
-    
+
     # Test the action
     export GIT_RANGE="HEAD~1..HEAD"
     SCRIPT_PATH="/Users/maxim.danilov/repos/camunda/infra-global-github-actions/assert-no-ai-commits/check.sh"
-    
+
     if $SCRIPT_PATH > /dev/null 2>&1; then
         echo "✅ PASSED: Correctly allowed human commit"
         rm -rf "$TEST_DIR"
