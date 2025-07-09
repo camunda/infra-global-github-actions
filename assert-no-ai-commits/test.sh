@@ -7,10 +7,10 @@ set -e
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CHECK_SCRIPT="$SCRIPT_DIR/check.sh"
+CHECK_SCRIPT="${SCRIPT_DIR}/check.sh"
 
 echo "🧪 Running comprehensive tests for assert-no-ai-commits action..."
-echo "Using check script: $CHECK_SCRIPT"
+echo "Using check script: ${CHECK_SCRIPT}"
 echo ""
 
 # Test cases to verify
@@ -37,11 +37,11 @@ run_test() {
     local author_name="$3"
     local author_email="$4"
 
-    echo "📋 Testing: $test_name"
+    echo "📋 Testing: ${test_name}"
 
     # Create temporary test repository
     TEST_DIR=$(mktemp -d)
-    cd "$TEST_DIR"
+    cd "${TEST_DIR}"
 
     git init -q
     git config user.email "${author_email:-test@camunda.com}"
@@ -55,20 +55,20 @@ run_test() {
     # Create commit with AI pattern
     echo "content" >> test.txt
     git add test.txt
-    git commit -q -m "$commit_message"
+    git commit -q -m "${commit_message}"
 
     # Test the action
     export GIT_RANGE="HEAD~1..HEAD"
 
-    if $CHECK_SCRIPT > /tmp/test_output.log 2>&1; then
+    if ${CHECK_SCRIPT} > /tmp/test_output.log 2>&1; then
         echo "❌ FAILED: Should have detected AI pattern but didn't"
         echo "Output was:"
         cat /tmp/test_output.log
-        rm -rf "$TEST_DIR"
+        rm -rf "${TEST_DIR}"
         return 1
     else
         echo "✅ PASSED: Correctly detected AI pattern"
-        rm -rf "$TEST_DIR"
+        rm -rf "${TEST_DIR}"
         return 0
     fi
 }
@@ -77,11 +77,11 @@ run_test() {
 run_positive_test() {
     local test_name="$1"
 
-    echo "📋 Testing: $test_name"
+    echo "📋 Testing: ${test_name}"
 
     # Create temporary test repository
     TEST_DIR=$(mktemp -d)
-    cd "$TEST_DIR"
+    cd "${TEST_DIR}"
 
     git init -q
     git config user.email "test@camunda.com"
@@ -97,13 +97,13 @@ This is a normal human commit with proper attribution."
     # Test the action
     export GIT_RANGE="HEAD~1..HEAD"
 
-    if $CHECK_SCRIPT > /dev/null 2>&1; then
+    if ${CHECK_SCRIPT} > /dev/null 2>&1; then
         echo "✅ PASSED: Correctly allowed human commit"
-        rm -rf "$TEST_DIR"
+        rm -rf "${TEST_DIR}"
         return 0
     else
         echo "❌ FAILED: Should have allowed human commit but didn't"
-        rm -rf "$TEST_DIR"
+        rm -rf "${TEST_DIR}"
         return 1
     fi
 }
@@ -113,15 +113,15 @@ echo "🔍 Testing Co-authored-by patterns..."
 for test_case in "${test_cases[@]}"; do
     commit_msg="feat: add new feature
 
-$test_case"
-    run_test "Co-authored-by pattern" "$commit_msg"
+${test_case}"
+    run_test "Co-authored-by pattern" "${commit_msg}"
 done
 
 # Test author/committer patterns
 echo "🔍 Testing author/committer patterns..."
 for test_case in "${ai_author_tests[@]}"; do
-    IFS=':' read -r name email <<< "$test_case"
-    run_test "AI Author: $name <$email>" "feat: add new feature" "$name" "$email"
+    IFS=':' read -r name email <<< "${test_case}"
+    run_test "AI Author: ${name} <${email}>" "feat: add new feature" "${name}" "${email}"
 done
 
 # Test normal human commits (should pass)
