@@ -1,0 +1,13 @@
+# Example workflow for camunda/camunda
+# Place this file at: .github/workflows/assert-no-ai-commits.yml
+
+---
+name: assert-no-ai-commits
+
+on: [pull_request]
+
+jobs:
+  check-ai-commits:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: camunda/infra-global-github-actions/assert-no-ai-commits@main
