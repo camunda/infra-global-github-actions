@@ -39,8 +39,10 @@ for commit in ${commits}; do
         continue
     fi
 
-    # Check for AI patterns in the commit metadata only
-    if echo "${commit_metadata}" | grep -i -E "(Co-authored-by:.*(GitHub Copilot|Copilot|ChatGPT|OpenAI|Claude|GPT|AI Assistant)|Author:.*(GitHub Copilot|Copilot|ChatGPT|OpenAI|Claude|GPT|AI Assistant)|Committer:.*(GitHub Copilot|Copilot|ChatGPT|OpenAI|Claude|GPT|AI Assistant))" > /dev/null; then
+    # Check for GitHub Copilot patterns in the commit metadata
+    # Pattern detects: Copilot in author/committer fields, copilot[bot] usernames, and GitHub Copilot email addresses
+    # To add more AI tools in the future, extend this regex with additional patterns like: |Pattern1|Pattern2
+    if echo "${commit_metadata}" | grep -i -E "(Co-authored-by:.*[Cc]opilot|Author:.*[Cc]opilot|Committer:.*[Cc]opilot|.*copilot.*\[bot\]|.*[0-9]+\+[Cc]opilot@users\.noreply\.github\.com)" > /dev/null; then
         echo "❌ AI-authored commit detected!"
         echo "Commit: ${commit}"
 

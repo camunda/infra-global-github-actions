@@ -13,21 +13,16 @@ echo "🧪 Running comprehensive tests for assert-no-ai-commits action..."
 echo "Using check script: ${CHECK_SCRIPT}"
 echo ""
 
-# Test cases to verify
+# Test cases to verify GitHub Copilot patterns
 test_cases=(
     "Co-authored-by: GitHub Copilot <noreply@github.com>"
     "Co-authored-by: Copilot <copilot@github.com>"
-    "Co-authored-by: ChatGPT <chatgpt@openai.com>"
-    "Co-authored-by: Claude AI <claude@anthropic.com>"
-    "Co-authored-by: AI Assistant <ai@example.com>"
 )
 
-# Test author/committer patterns
-ai_author_tests=(
+# Test GitHub Copilot author/committer patterns
+copilot_author_tests=(
     "GitHub Copilot:copilot@github.com"
-    "ChatGPT Bot:gpt@openai.com"
-    "Claude AI:claude@anthropic.com"
-    "AI Assistant:ai@example.com"
+    "copilot-swe-agent[bot]:198982749+Copilot@users.noreply.github.com"
 )
 
 # Function to run a single test
@@ -109,7 +104,7 @@ This is a normal human commit with proper attribution."
 }
 
 # Test co-authored-by patterns
-echo "🔍 Testing Co-authored-by patterns..."
+echo "🔍 Testing AI Co-authored-by patterns..."
 for test_case in "${test_cases[@]}"; do
     commit_msg="feat: add new feature
 
@@ -118,8 +113,8 @@ ${test_case}"
 done
 
 # Test author/committer patterns
-echo "🔍 Testing author/committer patterns..."
-for test_case in "${ai_author_tests[@]}"; do
+echo "🔍 Testing AI author/committer patterns..."
+for test_case in "${copilot_author_tests[@]}"; do
     IFS=':' read -r name email <<< "${test_case}"
     run_test "AI Author: ${name} <${email}>" "feat: add new feature" "${name}" "${email}"
 done
@@ -129,4 +124,4 @@ echo "🔍 Testing normal human commits..."
 run_positive_test "Normal human commit"
 
 echo "🎉 All tests completed!"
-echo "If all tests show ✅ PASSED, the action is working correctly."
+echo "If all tests show ✅ PASSED, the AI commit detection is working correctly."
