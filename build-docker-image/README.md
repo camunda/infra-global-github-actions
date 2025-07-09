@@ -1,6 +1,6 @@
 # build-docker-image
 
-This composite Github Action (GHA) is aimed to be used by Camunda teams for building and pushing a Docker image to any Docker registry.
+This composite Github Action (GHA) is intended to be used by Camunda teams for building and pushing a Docker image to any Docker registry.
 
 ## Usage
 

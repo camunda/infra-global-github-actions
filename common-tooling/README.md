@@ -1,6 +1,6 @@
 # common-tooling
 
-This composite Github Action (GHA) is aimed to be used by Camunda teams for configuring either hosted or self-hosted runners with some basic software. Especially useful to have the basics available on self-hosted runners since they come with close to no software.
+This composite Github Action (GHA) is intended to be used by Camunda teams for configuring either hosted or self-hosted runners with some basic software. Especially useful to have the basics available on self-hosted runners since they come with close to no software.
 
 ## Default Software
 - Buildx - latest

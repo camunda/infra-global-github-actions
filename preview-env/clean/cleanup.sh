@@ -5,7 +5,7 @@
 ## A full cleanup cycle that:
 ## - Shutdown all preview environments whose lifetime (configurable threshold) has expired and leave a comment to inform users
 ## - Leave a comment to warn users of preview environments whose lifetime is about to expire (configurable threshold).
-## - Delete any remaining inconsistant comments related to preview environments (a catch-all safety step)
+## - Delete any remaining inconsistent comments related to preview environments (a catch-all safety step)
 ##
 ## This script requires GNU's date binary
 
@@ -26,7 +26,7 @@ source "$RELATIVE_SCRIPT_PATH/common.sh"
 source "$RELATIVE_SCRIPT_PATH/github.sh"
 
 # Get pull requests that have at least one preview environment
-function get_pull_requests_with_preview_envrionments {
+function get_pull_requests_with_preview_environments {
   set -e # subshells do not inherit the -e option
 
   # Preview labels
@@ -163,7 +163,7 @@ function preview_environment_cleanup {
 
     # If lifetime has been reached, shutdown preview environment(s)
     if [ $lifetime -gt "$ttl" ]; then
-      log "Preview environement lifetime expired!"
+      log "Preview environment lifetime expired!"
       log "Unlabeling PR #$pr_number ..."
       if [ "$DRY_RUN" != "true" ]; then
         delete_pull_request_labels "$pr_id" "$label_ids"
@@ -185,7 +185,7 @@ function preview_environment_cleanup {
       )
     # If lifetime is about to be reached, warn users
     elif [ "$warning_ttl" -gt 0 ] && [ "$lifetime" -gt "$warning_ttl" ]; then
-      log "Preview environement lifetime expires soon!"
+      log "Preview environment lifetime expires soon!"
 
       # Generate warning message
       actors=$(echo "$pr_actors" | jq -r 'map("@" + .) | join(" ")')
@@ -207,7 +207,7 @@ function preview_environment_cleanup {
           "ttl-days:$ttl_days"
       )
     else
-      log "Preview environement lifetime has not expired!"
+      log "Preview environment lifetime has not expired!"
     fi
 
     # Upsert comment or delete an existing one
@@ -309,9 +309,9 @@ function cleanup_inconsistent_comments {
   log "$nb_comments_cleaned comment(s) cleaned!"
 }
 
-# Get OPEN Pull Requests that have at least one preview envrionment
+# Get OPEN Pull Requests that have at least one preview environment
 pull_requests=$(
-  get_pull_requests_with_preview_envrionments "$LABELS"
+  get_pull_requests_with_preview_environments "$LABELS"
 )
 
 log "Cleaning preview environments ..." false
