@@ -1,6 +1,6 @@
 # submit-test-status
 
-This composite Github Action (GHA) is aimed to be used by Camunda teams for submitting the test status(es) from a GHA workflow job to [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics). This allows teams to generate statistics about flakiness, runtime, etc. per test case across all branches and prioritize the worst offenders.
+This composite Github Action (GHA) is intended to be used by Camunda teams for submitting the test status(es) from a GHA workflow job to [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics). This allows teams to generate statistics about flakiness, runtime, etc. per test case across all branches and prioritize the worst offenders.
 The GHA uses [Google Big Query batch loading](https://cloud.google.com/bigquery/docs/batch-loading-data#bq) mechanism to load data into CI Analytics. It can handle a single test event, or multiple events at once. The only limitation is that the data source cannot exceed 100MB.
 
 ## Usage
@@ -57,7 +57,7 @@ All data submitted by this action is stored as one record per JSONL input line i
 
 The scope of the `submit-test-status` action is to load the  *user-provided* test status information into the central [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics) database for later analysis.
 
-It is task of the user to integrate this action into their GHA workflows by invoking it at all suitable places and providing the desired inputs.
+It is the task of the user to integrate this action into their GHA workflows by invoking it at all suitable places and providing the desired inputs.
 
 ### A sample workflow
 

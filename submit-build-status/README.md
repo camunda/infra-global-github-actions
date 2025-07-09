@@ -1,6 +1,6 @@
 # submit-build-status
 
-This composite Github Action (GHA) is aimed to be used by Camunda teams for submitting the build status of a GHA workflow job to [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics). This allows later analysis across many CI builds to identify trends.
+This composite Github Action (GHA) is intended to be used by Camunda teams for submitting the build status of a GHA workflow job to [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics). This allows later analysis across many CI builds to identify trends.
 
 ## Usage
 
@@ -51,7 +51,7 @@ The scope of the `submit-build-status` action is to persist a *user-provided* bu
 
 It is _out of scope_ for this action to extract that build status information from a GHA workflow run itself as this depends on the structure of the GHA workflow.
 
-It is task of the user to integrate this action into their GHA workflows by invoking it at all suitable places and providing the desired inputs. See the next section for one possible simple integration.
+It is the task of the user to integrate this action into their GHA workflows by invoking it at all suitable places and providing the desired inputs. See the next section for one possible simple integration.
 
 ### Workflow Example
 

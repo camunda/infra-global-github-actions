@@ -4,7 +4,7 @@ This composite GitHub Action (GHA) is aimed to clean up preview environments who
 
 Lifetime of a preview environment corresponds to the time since the last deployment activity.
 
-Users are notified by comments on the associated PR, informing them of an upcoming or completed shutdown. A great care is given to keep these comments consistent with the preview environment state, and gave the right information with possible actions.
+Users are notified by comments on the associated PR, informing them of an upcoming or completed shutdown. Great care is given to keep these comments consistent with the preview environment state, and give the right information with possible actions.
 
 ## Usage
 
@@ -25,13 +25,13 @@ A private GitHub token with following permissions is needed:
 - `Pull requests` (read & write) to remove preview environment label(s) and manage comments
 
 > ![!IMPORTANT]
-> Don't use `$GITHUB_TOKEN` otherwise no event will be tiggered when removing labels from a PR.
+> Don't use `$GITHUB_TOKEN` otherwise no event will be triggered when removing labels from a PR.
 
 ### Inputs
 | Input name | Description                                                                                                       |      Required      |   Default   |
 | :--------: | :---------------------------------------------------------------------------------------------------------------- | :----------------: | :---------: |
 |  dry-run   | Disable side effects for testing purposes |  |  `false`           |
-|  labels    | Comma-speparated list of labels used to deploy preview environment   |   :heavy_check_mark:  | `deploy-preview` |
+|  labels    | Comma-separated list of labels used to deploy preview environment   |   :heavy_check_mark:  | `deploy-preview` |
 | pull-request | Limit cleanup to a single pull request (number) and a minimal mode. Only inconsistent comments related to preview environment(s) are removed. | | |
 | repository | Target GitHub repository with preview environments to clean (in `owner/name` format) | | Current repository |
 | shutdown-message | A message template to inform users of the complete shutdown of a preview environment | :heavy_check_mark: | See [actions.yaml](./action.yml) |

@@ -1,6 +1,6 @@
 # configure-pull-request
 
-This composite Github Action (GHA) is aimed to be used by Camunda teams for configuring basic parameters of a GitHub Pull Request like labels, project and reviewers.
+This composite Github Action (GHA) is intended to be used by Camunda teams for configuring basic parameters of a GitHub Pull Request like labels, project and reviewers.
 
 ## Usage
 

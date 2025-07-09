@@ -19,7 +19,7 @@ This action should be invoked by a GHA job after installing NodeJS/Yarn in the d
 
 ### Integration
 
-It is task of the user to integrate this action into their GHA workflows by invoking it at all suitable places and providing the desired inputs. See the next section for one possible simple integration.
+It is the task of the user to integrate this action into their GHA workflows by invoking it at all suitable places and providing the desired inputs. See the next section for one possible simple integration.
 
 ### Workflow Example
 

@@ -1,6 +1,6 @@
 # generate-github-app-token-from-vault-secrets
 
-This composite GitHub Action (GHA) is aimed to be used by Camunda teams to generate a GitHub token from GitHub App secrets (ID & Private Key) stored in Vault.
+This composite GitHub Action (GHA) is intended to be used by Camunda teams to generate a GitHub token from GitHub App secrets (ID & Private Key) stored in Vault.
 
 ## Usage
 

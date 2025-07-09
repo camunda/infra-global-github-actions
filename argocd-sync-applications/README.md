@@ -1,6 +1,6 @@
 # argocd-sync-applications
 
-This composite Github Action (GHA) is aimed to be used by the Camunda Infrastructure team for synchronizing ArgoCD applications.
+This composite Github Action (GHA) is intended to be used by the Camunda Infrastructure team for synchronizing ArgoCD applications.
 
 ## Usage
 

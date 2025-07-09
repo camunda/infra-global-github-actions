@@ -8,7 +8,7 @@ inputs:
     description: If true, disables side effects (e.g. for testing purposes).
     default: "false"
   labels:
-    description: Comma-speparated list of labels used to deploy preview environment.
+    description: Comma-separated list of labels used to deploy preview environment.
     default: deploy-preview
     required: true
   pull-request:
@@ -40,7 +40,7 @@ inputs:
   token:
     description: |
       GitHub token with necessary permissions.
-      Default $GITHUB_TOKEN cannot be used, otherwise no event will be tiggered when removing labels from a PR.
+      Default $GITHUB_TOKEN cannot be used, otherwise no event will be triggered when removing labels from a PR.
     required: true
   warning-message:
     description: |

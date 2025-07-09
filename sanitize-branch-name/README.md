@@ -1,6 +1,6 @@
 # sanitize-branch-name
 
-This composite Github Action (GHA) is supposed to be used by other teams inside Camunda and mostly targeted at [preview environments](https://confluence.camunda.com/display/HAN/Preview+Environments). It's a highly opiniated function derived from its [groovy equivalent](https://github.com/camunda/jenkins-global-shared-library/blob/master/src/org/camunda/helper/GitUtilities.groovy#L4-L10).
+This composite Github Action (GHA) is supposed to be used by other teams inside Camunda and mostly targeted at [preview environments](https://confluence.camunda.com/display/HAN/Preview+Environments). It's a highly opinionated function derived from its [groovy equivalent](https://github.com/camunda/jenkins-global-shared-library/blob/master/src/org/camunda/helper/GitUtilities.groovy#L4-L10).
 
 ## Usage
 

@@ -1,6 +1,6 @@
 # submit-aborted-gha-status
 
-This composite Github Action (GHA) is aimed to be used by Camunda teams for submitting status of aborted GHA workflow jobs to [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics). This allows to identify problems with the underlying (self-hosted) runners at scale.
+This composite Github Action (GHA) is intended to be used by Camunda teams for submitting status of aborted GHA workflow jobs to [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics). This allows to identify problems with the underlying (self-hosted) runners at scale.
 
 ## Usage
 
@@ -42,7 +42,7 @@ All data submitted by this action is stored as one record in the Big Query table
 
 ### Integration
 
-It is task of the user to integrate this action into their GHA workflows by invoking it at all suitable places and providing the desired inputs. See the next section for one possible simple integration.
+It is the task of the user to integrate this action into their GHA workflows by invoking it at all suitable places and providing the desired inputs. See the next section for one possible simple integration.
 
 ### Workflow Example
 

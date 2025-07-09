@@ -1,6 +1,6 @@
 # configure-maintenance-pull-request
 
-This composite Github Action (GHA) is aimed to be used by the Camunda Infrastructure team for configuring a maintenance Pull Request according to the team guidelines.
+This composite Github Action (GHA) is intended to be used by the Camunda Infrastructure team for configuring a maintenance Pull Request according to the team guidelines.
 
 **Infra team guidelines**
 - If the PR is opened by a vendor (Renovate or Snyk):
