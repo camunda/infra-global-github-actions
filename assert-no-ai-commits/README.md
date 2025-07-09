@@ -1,6 +1,6 @@
 # assert-no-ai-commits
 
-This composite GitHub Action (GHA) is designed to prevent AI-authored commits from being merged into the main branch, in accordance with [Camunda's AI Policy](https://confluence.camunda.com/spaces/HAN/pages/245401394/Usage+of+Copilot+AI+tools+within+Engineering). The policy states that commits created by AI should be attributed to people and not be merged.
+This composite GitHub Action (GHA) is designed to prevent AI-authored commits from being merged into the main branch, in accordance with [Camunda's AI Policy](https://confluence.camunda.com/spaces/HAN/pages/245401394/Usage+of+Copilot+AI+tools+within+Engineering). The policy states that commits created by AI should be attributed to people first.
 
 ## Purpose
 
@@ -70,31 +70,6 @@ When using AI tools for code assistance:
    Added new authentication logic with assistance from GitHub Copilot
    ```
 
-## Inputs
-
-| Input name | Description | Default |
-|------------|-------------|---------|
-| `additional-allowed-ai-patterns` | String containing a regex expression for additional AI patterns to allow (if needed for specific use cases) | `''` |
-
-## Advanced Configuration
-
-If you need to allow specific AI patterns for legitimate use cases, you can use the `additional-allowed-ai-patterns` input:
-
-```yaml
----
-name: assert-no-ai-commits
-
-on: [pull_request]
-
-jobs:
-  check-ai-commits:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: camunda/infra-global-github-actions/assert-no-ai-commits@main
-      with:
-        additional-allowed-ai-patterns: "some-specific-pattern"
-```
-
 ## Error Messages
 
 When AI-authored commits are detected, the action will:
@@ -108,7 +83,6 @@ When AI-authored commits are detected, the action will:
 If you believe the action is incorrectly flagging legitimate commits, please:
 1. Check if the commit author/committer contains AI-related terms
 2. Verify there are no AI co-author trailers
-3. Contact the Infrastructure team if you believe it's a genuine false positive
 
 ## Related Actions
 

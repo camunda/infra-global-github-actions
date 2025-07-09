@@ -3,11 +3,6 @@ name: Assert No AI Commits
 
 description: Asserts that no AI-authored commits are present in the PR to prevent AI-generated code from being merged without proper human attribution.
 
-inputs:
-  additional-allowed-ai-patterns:
-    description: 'String containing a regex expression for additional AI patterns to allow (if needed for specific use cases).'
-    default: ''
-
 runs:
   using: composite
   steps:
@@ -22,5 +17,4 @@ runs:
     shell: bash
     env:
       GIT_RANGE: "origin/${{ github.base_ref }}..${{ github.event.pull_request.head.sha }}"
-      ADDITIONAL_ALLOWED_AI_PATTERNS: "${{ inputs.additional-allowed-ai-patterns }}"
     run: ${{ github.action_path }}/check.sh
