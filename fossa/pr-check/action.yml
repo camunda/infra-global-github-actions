@@ -76,15 +76,18 @@ runs:
       TIMEOUT: ${{ steps.adjusted-timeout.outputs.seconds || inputs.timeout }}
     run: |
       # Run fossa test
+      set +e
       results=$(timeout "${TIMEOUT}" fossa test "${DIRECTORY_PATH}" \
         --config "${CONFIGURATION_FILE}" \
         --diff "${BASE_REVISION}" \
         --revision "${REVISION}" \
-        --format json || echo $?)
+        --format json)
+      exit_code=$?
+      set -e
 
       # Fail if the command timed out (exit code 124)
-      if [[ "${results}" == "124" ]]; then
-        echo "FOSSA test timed out." >&2
+      if [[ "${exit_code}" == "124" ]]; then
+        echo "FOSSA test command timed out!" >&2
         echo "The check runs on the FOSSA SaaS platform and may occasionally take longer." >&2
         echo "If it times out again on retry, it could be a temporary FOSSA issue." >&2
         echo "In that case, it's acceptable to merge the PR anyway." >&2
