@@ -11,9 +11,9 @@ This composite GHA can be used in any non-public repository with a `Dockerfile` 
 | Input name                 | Description                                        |
 |----------------------------|----------------------------------------------------|
 | registry_host              | Host name of target Docker registry, e.g. `gcr.io` |
-| registry_username          | Username used for authenticating to registry host  |
-| registry_password          | Password used for authenticating to registry host  |
-| use_workload_identity_auth | Use Google Workload Identity for authenticating to registry host |
+| registry_username          | Username used for authenticating to registry host. Required if `use_workload_identity_auth` is `false`. |
+| registry_password          | Password used for authenticating to registry host. Required if `use_workload_identity_auth` is `false`. |
+| use_workload_identity_auth | Use Google Workload Identity for authenticating to registry host (takes precedence over credentials if `true`) |
 | image_name                 | Docker image name (*without* registry and Docker tag), e.g. `example/image` |
 | build_args                 | Allows defining extra build-args, supply as list with \| (pipe bar) |
 | extra_tags                 | Allows defining extra tags according to the [metadata action](https://github.com/docker/metadata-action), supply as list with \| (pipe bar) |
@@ -97,7 +97,6 @@ jobs:
     - uses: camunda/infra-global-github-actions/build-docker-image@main
       with:
         registry_host: registry.example.com
-        registry_username: ${{ secrets.YOUR_REGISTRY_USERNAME }}
-        registry_password: ${{ secrets.YOUR_REGISTRY_PASSWORD }}
+        use_workload_identity_auth: true  # preferred approach over using username/password
         image_name: my-cool/image-name
 ```
