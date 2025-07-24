@@ -150,7 +150,7 @@ jobs:
       id: setup_gcloud
       uses: google-github-actions/setup-gcloud@v2
       with:
-        project_id: camunda-${{ matrix.project }}
+        project_id: camunda-benchmark
     - name: Configure GAR
       run: |-
         gcloud auth configure-docker europe-west1-docker.pkg.dev
@@ -159,6 +159,6 @@ jobs:
       with:
         registry_host: europe-west1-docker.pkg.dev
         use_workload_identity_auth: true
-        image_name: camunda-${{ matrix.project }}/main/camunda_nginx-ldap-auth
+        image_name: camunda-benchmark/main/camunda_nginx-ldap-auth
     ...
 ```
