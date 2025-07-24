@@ -11,9 +11,9 @@ This composite GHA can be used in any non-public repository with a `Dockerfile` 
 | Input name                 | Description                                        |
 |----------------------------|----------------------------------------------------|
 | registry_host              | Host name of target Docker registry, e.g. `gcr.io` |
-| registry_username          | Username used for authenticating to registry host  |
-| registry_password          | Password used for authenticating to registry host  |
-| use_workload_identity_auth | Use Google Workload Identity for authenticating to registry host |
+| registry_username          | Username used for authenticating to registry host. Required if `use_workload_identity_auth` is `false`. |
+| registry_password          | Password used for authenticating to registry host. Required if `use_workload_identity_auth` is `false`. |
+| use_workload_identity_auth | Use Google Workload Identity for authenticating to registry host (takes precedence over credentials if `true`) |
 | image_name                 | Docker image name (*without* registry and Docker tag), e.g. `example/image` |
 | build_args                 | Allows defining extra build-args, supply as list with \| (pipe bar) |
 | extra_tags                 | Allows defining extra tags according to the [metadata action](https://github.com/docker/metadata-action), supply as list with \| (pipe bar) |
@@ -58,7 +58,9 @@ The resulting image will only be pushed to the registry in those cases:
 1. When it was built on the [repository's default Git branch](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-branches-in-your-repository/changing-the-default-branch) (e.g. `main`).
 1. When it was built for a Git branch whose name ends with `-push`.
 
-### Workflow Example
+### Workflow Examples
+
+**🔒 Standard Authentication**
 
 As an example you can use the below Github Action workflow in your repository:
 
@@ -99,5 +101,64 @@ jobs:
         registry_host: registry.example.com
         registry_username: ${{ secrets.YOUR_REGISTRY_USERNAME }}
         registry_password: ${{ secrets.YOUR_REGISTRY_PASSWORD }}
+
         image_name: my-cool/image-name
+```
+
+**🔑 Authentication using Workload Identity**
+
+*A modified example taken from [camunda/nginx-ldap-auth](https://github.com/camunda/nginx-ldap-auth/blob/master/.github/workflows/build.yml)*
+
+```yaml
+---
+name: ci
+
+...
+
+permissions:
+  id-token: write # required for workload identity authentication
+  contents: read # required for checking out the repository
+
+jobs:
+  docker:
+    runs-on: ubuntu-24.04
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Import Secrets
+      id: secrets # important to refer to it in later steps
+      uses: hashicorp/vault-action@v3.4.0
+      with:
+        url: ${{ secrets.VAULT_ADDR }}
+        method: approle
+        roleId: ${{ secrets.VAULT_ROLE_ID }}
+        secretId: ${{ secrets.VAULT_SECRET_ID }}
+        exportEnv: false # we rely on step outputs, no need for environment variables
+        secrets: |
+          ...
+          secret/data/products/infra/benchmark/workload-identity/nginx-ldap-auth WORKLOAD_IDENTITY_PROVIDER;
+          secret/data/products/infra/benchmark/workload-identity/nginx-ldap-auth SERVICE_ACCOUNT;
+
+    - name: Authenticate GCP using workload identity
+      id: gcp_auth
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ steps.secrets.outputs.WORKLOAD_IDENTITY_PROVIDER}}
+        service_account: ${{ steps.secrets.outputs.SERVICE_ACCOUNT }}
+    - name: Install GCP CLI
+      id: setup_gcloud
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: camunda-benchmark
+    - name: Configure GAR
+      run: |-
+        gcloud auth configure-docker europe-west1-docker.pkg.dev
+    - id: build
+      uses: camunda/infra-global-github-actions/build-docker-image@refactor-docker-build
+      with:
+        registry_host: europe-west1-docker.pkg.dev
+        use_workload_identity_auth: true
+        image_name: camunda-benchmark/main/camunda_nginx-ldap-auth
+    ...
 ```
