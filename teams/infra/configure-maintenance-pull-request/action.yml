@@ -34,8 +34,8 @@ runs:
         # Get the action type of the event
         echo action=${{ github.event.action }}
 
-        # Get labels if any
-        echo labels=${{ format('{0}', join(github.event.pull_request.labels.*.name)) }}
+        # Get labels if any, use '' to avoid problems with special characters like spaces, &, etc.
+        echo labels='${{ format('{0}', join(github.event.pull_request.labels.*.name)) }}'
 
         # Identify the vendor from the branch prefix
         echo vendor=${{
