@@ -141,7 +141,7 @@ runs:
     id: setup_teleport
     uses: teleport-actions/setup@v1
     with:
-      # renovate: datasource=docker depName=public.ecr.aws/gravitational/teleport-ent-distroless
+      # renovate: datasource=custom.teleport depName=public.ecr.aws/gravitational/teleport-ent-distroless
       version: 17.5.2
   - name: Authenticate with Teleport
     if: failure() && steps.setup_teleport.outcome == 'success'
