@@ -32,6 +32,16 @@
       versioningTemplate: "{{#if versioning}}{{{versioning}}}{{else}}semver{{/if}}"
     },
   ],
+  customDatasources: {
+    teleport: {
+      // Latest version for us == current one used in Camunda Teleport SaaS:
+      // curl -s https://camunda.teleport.sh/webapi/ping | jq -r '.server_version'
+      "defaultRegistryUrlTemplate": "https://camunda.teleport.sh/webapi/ping",
+      "transformTemplates": [
+        "{\"releases\": [{\"version\": $$.server_version}]}"
+      ]
+    }
+  },
   packageRules: [
     // limit the PR creation for the Renovate pre-commit hook (it's released very frequently)
     {
