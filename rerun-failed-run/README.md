@@ -22,6 +22,7 @@ If these secrets are not present, please contact the infrastructure team to set 
 | vault-role-id (required)   | The Vault Role ID.                                                                                                                           |
 | vault-secret-id (required) | The Vault Secret ID.                                                                                                                         |
 | notify-back-on-error       | When the error message does not match with the expected one, re-trigger the workflow with the parameter `notify_back_error_message`. Your calling workflow must implement the `notify_back_error_message` parameter and forward the error. This allows you to capture failures that are not related to a specific error. Default is `"false"`. |
+| rerun-whole-workflow       | If set to true, the workflow will be re-triggered in its entirety. This is useful when you want to retry the entire workflow instead of just failed jobs. Default is `"false"`. |
 
 ### Workflow Example without error propagation
 
