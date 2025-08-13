@@ -38,6 +38,14 @@ on:
           Needed by https://github.com/Codex-/return-dispatch as workaround for https://github.com/cli/cli/issues/4001
         required: false
         default: "not-set"
+      rerun-whole-workflow:
+        description: |
+          If set to true, the workflow will be re-triggered in its entirety.
+          This is useful when you want to retry the entire workflow instead of
+          just failed jobs.
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   retry:
@@ -100,13 +108,19 @@ jobs:
           GH_REPO: ${{ inputs.owner }}/${{ inputs.repository }}
           GH_TOKEN: ${{ steps.github-token.outputs.token }}
           RUN_ID: ${{ inputs.run-id }}
+          RERUN_WHOLE_WORKFLOW: ${{ inputs.rerun-whole-workflow }}
         run: |
           if [ "${DRY_RUN}" = "true" ]; then
             echo "Skipping retry since this is a dry-run ..."
           else
             echo "Triggering a new attempt of run-id=${RUN_ID} ..."
-            # Only retry failed jobs
-            gh run rerun "${RUN_ID}" --failed
+            if [ "${RERUN_WHOLE_WORKFLOW}" = "true" ]; then
+              echo "Rerunning the whole workflow ..."
+              gh run rerun "${RUN_ID}"
+            else
+              echo "Rerunning only failed jobs ..."
+              gh run rerun "${RUN_ID}" --failed
+            fi
           fi
         shell: bash
 

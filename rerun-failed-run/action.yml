@@ -37,6 +37,12 @@ inputs:
       and forward the error.
       This allows you to capture failures that are not related to a specific error.
     default: "false"
+  rerun-whole-workflow:
+    description: |
+      If set to true, the workflow will be re-triggered in its entirety.
+      This is useful when you want to retry the entire workflow instead of
+      just failed jobs.
+    default: "false"
 
 runs:
   using: composite
@@ -100,7 +106,8 @@ runs:
             "notify-back-on-error": "${{ inputs.notify-back-on-error }}",
             "owner": "${{ steps.repository.outputs.owner }}",
             "repository": "${{ steps.repository.outputs.name }}",
-            "run-id": "${{ inputs.run-id }}"
+            "run-id": "${{ inputs.run-id }}",
+            "rerun-whole-workflow": "${{ inputs.rerun-whole-workflow }}"
           }
         workflow_timeout_seconds: 120
 
