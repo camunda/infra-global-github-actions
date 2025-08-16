@@ -58,7 +58,7 @@ jobs:
         shell: bash
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Import Secrets
         id: secrets
