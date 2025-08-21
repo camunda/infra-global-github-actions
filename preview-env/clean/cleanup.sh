@@ -254,17 +254,15 @@ function cleanup_inconsistent_comments {
   comment_tag_warning=${3:-<!-- preview-env:type:warning -->}
 
   # Get OPEN pull requests (with their comments)
-  open_pull_requests=$(
-    get_pull_requests_by_states_with_last_100_comments OPEN
-  )
+  open_pull_requests_tmp_file=$(mktemp open_prs.XXXXXX.json)
+  get_pull_requests_by_states_with_last_100_comments OPEN >"$open_pull_requests_tmp_file"
 
   # Get CLOSED or MERGED pull requests (with their comments)
   # Limit to the last 100 pull requests as there is no need to scan and process the entire history at each iteration.
   # Considering the pull request closing frequency and the cleanup job execution frequency, each pull request should be processed at least once.
   # Given the frequency with which pull requests are closed and the frequency with which cleanup jobs are executed, each pull request should be processed at least once.
-  closed_merged_pull_requests=$(
-    get_pull_requests_by_states_with_last_100_comments CLOSED,MERGED false
-  )
+  closed_merged_pull_requests_tmp_file=$(mktemp closed_merged_prs.XXXXXX.json)
+  get_pull_requests_by_states_with_last_100_comments CLOSED,MERGED false >"$closed_merged_pull_requests_tmp_file"
 
   # If pull request is in MERGED or CLOSED state, any warning or shutdown comments can be safely removed.
   # If pull request is in OPEN state and NO preview label is attached, warning comments can be safely removed.
@@ -272,19 +270,19 @@ function cleanup_inconsistent_comments {
     jq -n -r \
       --arg comment_tag "$comment_tag" \
       --arg comment_tag_warning "$comment_tag_warning" \
-      --argjson open_pull_requests "$open_pull_requests" \
-      --argjson closed_merged_pull_requests "$closed_merged_pull_requests" \
+      --slurpfile open_pull_requests "$open_pull_requests_tmp_file" \
+      --slurpfile closed_merged_pull_requests "$closed_merged_pull_requests_tmp_file" \
       --argjson labels "[\"${labels//,/\",\"}\"]" \
       '
         (
-          $closed_merged_pull_requests |
+          $closed_merged_pull_requests[] |
           [
             .[].comments.nodes[] | select (.body | contains($comment_tag)).databaseId
           ]
         )
         +
         (
-          $open_pull_requests |
+          $open_pull_requests[] |
           [
             .[] |
             select (.labels | any(.nodes[]; .name | IN($labels[])) | not) |
