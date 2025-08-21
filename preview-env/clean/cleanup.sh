@@ -254,14 +254,14 @@ function cleanup_inconsistent_comments {
   comment_tag_warning=${3:-<!-- preview-env:type:warning -->}
 
   # Get OPEN pull requests (with their comments)
-  open_pull_requests_tmp_file=$(mktemp open_prs.XXXXXX.json)
+  open_pull_requests_tmp_file=$(mktemp)
   get_pull_requests_by_states_with_last_100_comments OPEN >"$open_pull_requests_tmp_file"
 
   # Get CLOSED or MERGED pull requests (with their comments)
   # Limit to the last 100 pull requests as there is no need to scan and process the entire history at each iteration.
   # Considering the pull request closing frequency and the cleanup job execution frequency, each pull request should be processed at least once.
   # Given the frequency with which pull requests are closed and the frequency with which cleanup jobs are executed, each pull request should be processed at least once.
-  closed_merged_pull_requests_tmp_file=$(mktemp closed_merged_prs.XXXXXX.json)
+  closed_merged_pull_requests_tmp_file=$(mktemp)
   get_pull_requests_by_states_with_last_100_comments CLOSED,MERGED false >"$closed_merged_pull_requests_tmp_file"
 
   # If pull request is in MERGED or CLOSED state, any warning or shutdown comments can be safely removed.
