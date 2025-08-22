@@ -1,0 +1,154 @@
+name: "Add Issue to Quality Board"
+description: "Assigns new issues labeled as bugs to the Quality Board project and updates Component & Severity fields."
+author: "Camunda QA Engineering Team"
+
+inputs:
+  github-token:
+    description: "GitHub token with access to add issues to the project."
+    required: true
+  project-number:
+    description: "The number of the Quality Board project."
+    required: false
+    default: "187"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Add issue to Quality Board project
+      uses: actions/add-to-project@v1.0.2
+      with:
+        project-url: https://github.com/orgs/camunda/projects/${{ inputs.project-number }}
+        github-token: ${{ inputs.github-token }}
+
+    - name: Get project ID
+      id: get-project-id
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const query = `
+            query($org: String!, $number: Int!) {
+              organization(login: $org) {
+                projectV2(number: $number) { id }
+              }
+            }
+          `;
+          const res = await github.graphql(query, {
+            org: "camunda",
+            number: parseInt("${{ inputs.project-number }}")
+          });
+          console.log("Project ID:", res.organization.projectV2.id);
+          core.setOutput("projectId", res.organization.projectV2.id);
+
+    - name: Get project fields
+      id: get-project-fields
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const projectId = "${{ steps.get-project-id.outputs.projectId }}";
+          const query = `
+            query($projectId: ID!) {
+              node(id: $projectId) {
+                ... on ProjectV2 {
+                  fields(first: 20) {
+                    nodes {
+                      ... on ProjectV2FieldCommon { id name }
+                      ... on ProjectV2SingleSelectField { id name options { id name } }
+                    }
+                  }
+                }
+              }
+            }
+          `;
+          const res = await github.graphql(query, { projectId });
+          console.log("Project fields:", res.node.fields.nodes);
+          core.setOutput("fields", JSON.stringify(res.node.fields.nodes));
+
+    - name: Get project item ID for issue
+      id: get-item
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const org = "camunda";
+          const projectNumber = parseInt("${{ inputs.project-number }}");
+          const issueNumber = ${{ github.event.issue.number }};
+          const maxRetries = 5;
+          const waitMs = 5000; // 5 seconds
+          let itemId = null;
+
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            let afterCursor = null;
+
+            while (true) {
+              const query = `
+                query($org: String!, $projectNumber: Int!, $after: String) {
+                  organization(login: $org) {
+                    projectV2(number: $projectNumber) {
+                      items(first: 100, after: $after) {
+                        pageInfo { hasNextPage endCursor }
+                        nodes { id content { ... on Issue { number title } } }
+                      }
+                    }
+                  }
+                }
+              `;
+              const res = await github.graphql(query, { org, projectNumber, after: afterCursor });
+              const nodes = res.organization.projectV2.items.nodes;
+              const match = nodes.find(n => n.content?.number === issueNumber);
+              if (match) {
+                itemId = match.id;
+                break;
+              }
+              if (!res.organization.projectV2.items.pageInfo.hasNextPage) break;
+              afterCursor = res.organization.projectV2.items.pageInfo.endCursor;
+            }
+
+            if (itemId) break;
+
+            console.log(`Attempt ${attempt} failed, waiting ${waitMs/1000} seconds before retry...`);
+            await new Promise(resolve => setTimeout(resolve, waitMs));
+          }
+
+          if (!itemId) console.warn("Project item ID not found after retries.");
+          console.log("Project item ID:", itemId || "not found");
+          core.setOutput("itemId", itemId || "");
+
+    - name: Update Severity & Component fields
+      if: steps.get-item.outputs.itemId != ''
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const projectId = "${{ steps.get-project-id.outputs.projectId }}";
+          const itemId = "${{ steps.get-item.outputs.itemId }}";
+          const fields = JSON.parse('${{ steps.get-project-fields.outputs.fields }}');
+          const labels = ${{ toJson(github.event.issue.labels) }};
+
+          const severityLabel = labels.find(l => l.name.startsWith("severity/"));
+          const componentLabel = labels.find(l => l.name.startsWith("component/"));
+          const severity = severityLabel ? severityLabel.name.split("/")[1] : "";
+          const component = componentLabel ? componentLabel.name.split("/")[1] : "";
+
+          const updates = { "Severity": severity, "Component": component };
+          const mutation = `
+            mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
+              updateProjectV2ItemFieldValue(input: {
+                projectId: $projectId,
+                itemId: $itemId,
+                fieldId: $fieldId,
+                value: { singleSelectOptionId: $optionId }
+              }) { projectV2Item { id } }
+            }
+          `;
+
+          for (const [fieldName, optionValue] of Object.entries(updates)) {
+            if (!optionValue) continue;
+            const field = fields.find(f => f.name === fieldName);
+            if (!field) continue;
+            const option = field.options?.find(o => o.name.toLowerCase() === optionValue.toLowerCase());
+            if (!option) continue;
+            console.log(`Updating field "${fieldName}" with value "${optionValue}"`);
+            await github.graphql(mutation, { projectId, itemId, fieldId: field.id, optionId: option.id });
+          }
