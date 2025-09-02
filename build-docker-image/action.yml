@@ -42,9 +42,9 @@ inputs:
     required: false
     default: '.'
   build_docker_file:
-    description: Path to the Dockerfile.
+    description: Path to the Dockerfile (with the context).
     required: false
-    default: "{context}/Dockerfile"
+    default: "./Dockerfile"
   build_allow:
     description: Extra privilege entitlements to give builder.
     required: false
@@ -101,6 +101,7 @@ runs:
       echo "Image name:      ${{ inputs.image_name }}"
       echo "Build-Args:      ${{ inputs.build_args }}"
       echo "Context:         ${{ inputs.build_context }}"
+      echo "Dockerfile:      ${{ inputs.build_docker_file }}"
       echo "Platforms:       ${{ inputs.build_platforms }}"
       echo "Allow:           ${{ inputs.build_allow }}"
       echo "Buildx Driver:   ${{ inputs.buildx_driver }}"
