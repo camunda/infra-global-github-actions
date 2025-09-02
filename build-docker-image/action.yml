@@ -41,6 +41,10 @@ inputs:
     description: Docker build context.
     required: false
     default: '.'
+  build_docker_file:
+    description: Path to the Dockerfile.
+    required: false
+    default: Dockerfile
   build_allow:
     description: Extra privilege entitlements to give builder.
     required: false
@@ -189,6 +193,7 @@ runs:
       add-hosts: ${{ inputs.add_hosts }}
       allow: ${{ inputs.build_allow }}
       context: ${{ inputs.build_context }}
+      file: ${{ inputs.build_docker_file }}
       builder: ${{ steps.buildx.output.name }}
       build-args: ${{ inputs.build_args }}
       platforms: ${{ inputs.build_platforms }}
