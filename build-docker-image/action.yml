@@ -42,9 +42,8 @@ inputs:
     required: false
     default: '.'
   build_docker_file:
-    description: Path to the Dockerfile (with the context).
+    description: Path to the Dockerfile relative to the build context (e.g., {context}/Dockerfile). If empty, defaults to "Dockerfile" in the build context.
     required: false
-    default: "./Dockerfile"
   build_allow:
     description: Extra privilege entitlements to give builder.
     required: false
