@@ -19,7 +19,7 @@ This composite GHA can be used in any non-public repository with a `Dockerfile` 
 | extra_tags                 | Allows defining extra tags according to the [metadata action](https://github.com/docker/metadata-action), supply as list with \| (pipe bar) |
 | force_push                 | Allows overwriting the image push behaviour, by setting to 'true' as input |
 | build_context              | Docker build context location                      |
-| build_docker_file          | Path to the Dockerfile (with the context)          |
+| build_docker_file          | Path to the Dockerfile relative to the build context (e.g., `{context}/Dockerfile`). If empty, defaults to "Dockerfile" in the build context |
 | build_allow                | Extra privilege entitlements to give builder       |
 | build_platforms            | List of [target platforms](https://docs.docker.com/engine/reference/commandline/buildx_build/#platform) for build        |
 | buildx_driver              | Driver to use for buildx builder                   |
