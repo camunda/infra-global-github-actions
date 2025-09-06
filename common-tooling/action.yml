@@ -270,7 +270,7 @@ runs:
 
   # Install Python, it's absent on self-hosted runners
   - name: Install Python3 (std install)
-    uses: actions/setup-python@v5
+    uses: actions/setup-python@v6
     # actions/setup-python doesn't yet support ARM
     if: ${{ !contains(runner.arch, 'arm') && inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:
