@@ -256,6 +256,7 @@ runs:
       token: ${{ inputs.node-token }}
       cache: ${{ inputs.node-cache }}
       cache-dependency-path: ${{ inputs.node-cache-dependency-path }}
+      package-manager-cache: false
   # Setup Maven
   - name: Setup Maven Action
     if: ${{ inputs.java-enabled == 'true' && ( env.java_missing == 'true' || inputs.overwrite == 'true' ) }}
