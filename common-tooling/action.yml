@@ -243,7 +243,7 @@ runs:
       export PATH="$PATH:`yarn global bin`"
   # Install node
   - name: Install NodeJS
-    uses: actions/setup-node@v4
+    uses: actions/setup-node@v5
     if: ${{ inputs.node-enabled == 'true' && ( env.node_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:
       always-auth: ${{ inputs.node-always-auth }}
@@ -256,6 +256,7 @@ runs:
       token: ${{ inputs.node-token }}
       cache: ${{ inputs.node-cache }}
       cache-dependency-path: ${{ inputs.node-cache-dependency-path }}
+      package-manager-cache: false
   # Setup Maven
   - name: Setup Maven Action
     if: ${{ inputs.java-enabled == 'true' && ( env.java_missing == 'true' || inputs.overwrite == 'true' ) }}
