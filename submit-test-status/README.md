@@ -7,13 +7,21 @@ The GHA uses [Google Big Query batch loading](https://cloud.google.com/bigquery/
 
 This composite GHA can be used in any repository that was set up to provide credentials for accessing the central Google Big Query (BQ) database (credentials via Vault).
 
+**This action supports two input methods:**
+
+1. **File Path Method**: Provide a path to a file containing test results in JSONL format
+2. **Inline Data Method**: Provide test event data directly as a multi-line string
+
 ### Inputs
 
-| Input name           | Description                                        |
-|----------------------|----------------------------------------------------|
-| test_event_record    | Multi-line string that contains the details of the test events in [JSONL format](https://jsonlines.org). One test event per line. |
-| job_name_override    | Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB`, useful e.g. for matrix builds |
-| gcp_credentials_json | Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file |
+| Input name               | Description                                        | Required |
+|--------------------------|----------------------------------------------------| ---------|
+| test_results_file_path   | Path to a file containing test event(s) in JSONL format. Required keys are test_name and test_status. | No* |
+| test_event_record        | Test event(s) in JSONL format. Required keys are test_name and test_status. | No* |
+| job_name_override        | Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB`, useful e.g. for matrix builds | No |
+| gcp_credentials_json     | Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file | Yes |
+
+*Note: Either `test_results_file_path` OR `test_event_record` must be provided (not both). If neither is provided, the action will skip submission gracefully.
 
 Please check out Camunda's [Github Actions Recipes](https://github.com/camunda/github-actions-recipes#secrets=) for how to retrieve secrets from Vault.
 
@@ -59,10 +67,12 @@ The scope of the `submit-test-status` action is to load the  *user-provided* tes
 
 It is the task of the user to integrate this action into their GHA workflows by invoking it at all suitable places and providing the desired inputs.
 
-### A sample workflow
+### Sample workflows
+
+#### Method 1: Using file path input (recommended for larger datasets)
 
 ```yaml
-name: sample workflow to upload test data to CI Analytics
+name: Upload test results using file path
 on:
   workflow_dispatch: {}
 
@@ -72,7 +82,33 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: upload test results to CI Analytics
+    # Your test step that generates a JSONL file
+    - name: Run tests and generate results
+      run: |
+        # Your test command that outputs results to a file
+        echo '{"test_name":"test 99","test_status":"success"}' > test_results.jsonl
+        echo '{"test_name":"test 999","test_status":"failed"}' >> test_results.jsonl
+
+    - name: Upload test results to CI Analytics
+      uses: camunda/infra-global-github-actions/submit-test-status@main
+      with:
+        gcp_credentials_json: ${{ secrets.YOUR_GCP_CREDENTIALS }}
+        test_results_file_path: test_results.jsonl
+```
+#### DEPRECATED Method 2: Using inline data input
+
+```yaml
+name: Upload test results using inline data
+on:
+  workflow_dispatch: {}
+
+jobs:
+  upload-test-records:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Upload test results to CI Analytics
       uses: camunda/infra-global-github-actions/submit-test-status@main
       with:
         gcp_credentials_json: ${{ secrets.YOUR_GCP_CREDENTIALS }}
