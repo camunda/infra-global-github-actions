@@ -9,26 +9,15 @@ This composite GHA can be used in any repository that was set up to provide cred
 
 ### Inputs
 
-| Input name             | Description                                        | Required |
-|------------------------|----------------------------------------------------|----------|
-| test_results_file_path | Path to a test results file containing test events in [JSONL format](https://jsonlines.org). Each line must contain at least `test_name` and `test_status` keys. | No |
-| test_event_record      | Multi-line string that contains the details of the test events in [JSONL format](https://jsonlines.org). One test event per line. Alternative to `test_results_file_path`. | No |
-| job_name_override      | Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB`, useful e.g. for matrix builds | No |
-| gcp_credentials_json   | Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file | Yes |
-| big_query_table_name   | BigQuery table name for testing purposes. Defaults to production table. | No |
-
-**Note**: Either `test_results_file_path` OR `test_event_record` must be provided.
+| Input name           | Description                                        |
+|----------------------|----------------------------------------------------|
+| test_event_record    | Multi-line string that contains the details of the test events in [JSONL format](https://jsonlines.org). One test event per line. |
+| job_name_override    | Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB`, useful e.g. for matrix builds |
+| gcp_credentials_json | Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file |
 
 Please check out Camunda's [Github Actions Recipes](https://github.com/camunda/github-actions-recipes#secrets=) for how to retrieve secrets from Vault.
 
-## Input Methods
-
-This action supports two ways to provide test data:
-
-1. **File Path**: Use `test_results_file_path` to point to an existing JSONL file containing test results
-2. **Inline Data**: Use `test_event_record` to provide test data directly as a multi-line string
-
-Input details for test data format (applies to both methods)
+Input details for `test_event_record`
 
 | Field Name                       | Field Type | Field Mode | Description/Purpose |
 |----------------------------------|------------|------------|---------------------|
@@ -70,9 +59,7 @@ The scope of the `submit-test-status` action is to load the  *user-provided* tes
 
 It is the task of the user to integrate this action into their GHA workflows by invoking it at all suitable places and providing the desired inputs.
 
-### Sample workflows
-
-#### Method 1: -- DEPRECATED -- Using inline test data
+### A sample workflow
 
 ```yaml
 name: sample workflow to upload test data to CI Analytics
@@ -93,35 +80,4 @@ jobs:
           {"test_name":"test 99","test_status":"success"}
           {"test_name":"test 999","test_status":"failed"}
           {"test_name":"test 9999","test_duration_milliseconds":1234,"test_class_name":"9","test_status":"flaky"}
-```
-
-#### Method 2: Using a test results file
-
-```yaml
-name: sample workflow to upload test results file to CI Analytics
-on:
-  workflow_dispatch: {}
-
-jobs:
-  upload-test-file:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Generate test results file
-      run: |
-        # Example: convert JUnit XML to JSONL (replace with your actual command if needed)
-
-        TEST_RESULTS_FILE=$(mktemp --suffix=.jsonl)
-        echo "test_results_file=${TEST_RESULTS_FILE}" >> $GITHUB_OUTPUT
-        find . -iname 'TEST-*.xml' | python3 .ci/scripts/ci/observe-build-status/junit-test-results-to-jsonl.py > "${TEST_RESULTS_FILE}"
-
-        echo "Generated $(wc -l < "${TEST_RESULTS_FILE}") test results"
-      id: run-tests
-
-    - name: upload test results to CI Analytics
-      uses: camunda/infra-global-github-actions/submit-test-status@main
-      with:
-        gcp_credentials_json: ${{ secrets.YOUR_GCP_CREDENTIALS }}
-        test_results_file_path: "${{ steps.run-tests.outputs.test_results_file }}"
 ```
