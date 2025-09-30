@@ -4,9 +4,13 @@ name: Submit Test Status
 description: Submits test status records from a GHA workflow job to CI Analytics. See https://confluence.camunda.com/display/HAN/CI+Analytics
 
 inputs:
+  test_results_file_path:
+    description: Path to a file containing test event(s) in JSONL format. Required keys are test_name and test_status.
+    required: false
+
   test_event_record:
     description: Test event(s) in JSONL format. Required keys are test_name and test_status.
-    required: true
+    required: false
 
   gcp_credentials_json:
     description: Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file.
@@ -33,58 +37,111 @@ runs:
       echo "-----"
       echo "Job name override: ${{ inputs.job_name_override }} (default job name: $GITHUB_JOB)"
       echo "BQ table name (for testing): ${{ inputs.big_query_table_name }}"
+      echo "Test results file path: '${{ inputs.test_results_file_path }}'"
+      echo "Test event record provided: ${{ inputs.test_event_record != '' }}"
 
-  - name: login to Google Cloud
-    id: auth
-    uses: google-github-actions/auth@v3
-    with:
-      credentials_json: '${{ inputs.gcp_credentials_json }}'
-
-  - name: setup Google Cloud SDK
-    uses: google-github-actions/setup-gcloud@v3
-
-  - name: Print Google Cloud SDK version used
-    shell: bash
-    run: |
-      gcloud info
+      # Show what the load input step will do
+      if [ -n "${{ inputs.test_results_file_path }}" ]; then
+        echo "Will use file path input method: ${{ inputs.test_results_file_path }}"
+      elif [ -n "${{ inputs.test_event_record }}" ]; then
+        echo "Will use inline data input method"
+      else
+        echo "INFO: No input detected - will skip CI Analytics submission (no test issues to report)"
+      fi
+      echo "-----"
 
   - name: ensure that jq is available
     uses: dcarbone/install-jq-action@v3.2.0
-
-  - name: download table schema from CI Analytics
-    shell: bash
-    env:
-      BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
-    run: |
-      mkdir ${{ runner.temp }}/sts
-      $BQ_COMMAND show \
-        --format prettyjson \
-        "${{ inputs.big_query_table_name }}" \
-      | jq '.schema.fields' > ${{ runner.temp }}/sts/table_schema.json
 
   - name: load input
     shell: bash
     env:
       TEMP_DIR: ${{ runner.temp }}/sts
     run: |
-      cat <<EOF > $TEMP_DIR/input_test_event_record.json
-      ${{ inputs.test_event_record }}
-      EOF
+      mkdir -p "$TEMP_DIR"
 
-  - name: validate input
+      echo "Checking inputs..."
+      echo "test_results_file_path: '${{ inputs.test_results_file_path }}'"
+      echo "test_event_record length: ${#test_event_record}"
+
+      if [ -n "${{ inputs.test_results_file_path }}" ]; then
+        # Method 1: Use provided file path
+        INPUT_FILE="${{ inputs.test_results_file_path }}"
+        echo "Using file path input method: $INPUT_FILE"
+
+        # Verify the file exists
+        if [ ! -f "$INPUT_FILE" ]; then
+          echo "ERROR: File not found: $INPUT_FILE"
+          exit 1
+        fi
+
+      elif [ -n "${{ inputs.test_event_record }}" ]; then
+        # Method 2: Create file from inline input
+        INPUT_FILE="$TEMP_DIR/input_test_event_record.jsonl"
+        echo "Using inline data input method, creating: $INPUT_FILE"
+
+        # Write the test event record to file
+        printf '%s\n' '${{ inputs.test_event_record }}' > "$INPUT_FILE"
+
+      else
+        # No input provided - this might be okay if no flaky/failed tests exist
+        echo "INFO: No input provided."
+        echo "This could mean:"
+        echo "1. No test_results_file_path was provided, AND"
+        echo "2. No test_event_record was provided (possibly no flaky/failed tests)"
+        echo ""
+        echo "If using inline method and no flaky/failed tests exist, this is expected behavior."
+        echo "Skipping CI Analytics submission - no test issues to report."
+        echo "PROCEED_WITH_SUBMISSION=false" >> $GITHUB_ENV
+        exit 0
+      fi
+
+      echo "Final INPUT_FILE: $INPUT_FILE"
+      echo "INPUT_FILE=$INPUT_FILE" >> $GITHUB_ENV
+      echo "PROCEED_WITH_SUBMISSION=true" >> $GITHUB_ENV
+
+  - name: validate input for file format
+    if: env.PROCEED_WITH_SUBMISSION == 'true'
     shell: bash
-    env:
-      TEMP_DIR: ${{ runner.temp }}/sts
     run: |
       # validate input for the presence of mandatory keys
-      INVALID_LINES=$(jq -c 'select((has("test_name") and has("test_status")) | not)' "$TEMP_DIR/input_test_event_record.json")
+      INVALID_LINES=$(jq -c 'select((has("test_name") and has("test_status")) | not)' "$INPUT_FILE")
       if [ -n "$INVALID_LINES" ]; then
         echo "JSONL input validation failed. The following lines are invalid:"
         echo "$INVALID_LINES"
         exit 1
       fi
 
+  - name: login to Google Cloud
+    if: env.PROCEED_WITH_SUBMISSION == 'true'
+    id: auth
+    uses: google-github-actions/auth@v3
+    with:
+      credentials_json: '${{ inputs.gcp_credentials_json }}'
+
+  - name: setup Google Cloud SDK
+    if: env.PROCEED_WITH_SUBMISSION == 'true'
+    uses: google-github-actions/setup-gcloud@v3
+
+  - name: Print Google Cloud SDK version used
+    if: env.PROCEED_WITH_SUBMISSION == 'true'
+    shell: bash
+    run: |
+      gcloud info
+
+  - name: download table schema from CI Analytics
+    if: env.PROCEED_WITH_SUBMISSION == 'true'
+    shell: bash
+    env:
+      BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
+    run: |
+      $BQ_COMMAND show \
+        --format prettyjson \
+        "${{ inputs.big_query_table_name }}" \
+      | jq '.schema.fields' > ${{ runner.temp }}/sts/table_schema.json
+
   - name: submit to CI Analytics
+    if: env.PROCEED_WITH_SUBMISSION == 'true'
     shell: bash
     env:
       TEMP_DIR: ${{ runner.temp }}/sts
@@ -98,7 +155,7 @@ runs:
         --arg BUILD_ID "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT" \
         --arg JOB_NAME "${{ (inputs.job_name_override == '') && '$GITHUB_JOB' || inputs.job_name_override }}" \
         '. + {"report_time": $REPORT_TIME} + {"ci_url": $CI_URL} + {"build_id": $BUILD_ID} + {"job_name": $JOB_NAME}' \
-        $TEMP_DIR/input_test_event_record.json > $TEMP_DIR/test_event_record.json
+         "$INPUT_FILE" > $TEMP_DIR/enriched_test_event_records.jsonl
 
       # upload data to CI Analytics
       BQ_TABLE=$(echo "${{ inputs.big_query_table_name }}" | cut -d':' -f2)
@@ -106,5 +163,5 @@ runs:
         --source_format=NEWLINE_DELIMITED_JSON \
         --project_id=$GCP_PROJECT \
         $BQ_TABLE \
-        $TEMP_DIR/test_event_record.json \
+        $TEMP_DIR/enriched_test_event_records.jsonl \
         $TEMP_DIR/table_schema.json
