@@ -43,7 +43,7 @@ runs:
       # Show what the load input step will do
       if [ -n "${{ inputs.test_results_file_path }}" ]; then
         echo "Will use file path input method: ${{ inputs.test_results_file_path }}"
-      elif [ -n "${{ inputs.test_event_record }}" ]; then
+      elif [ -n '${{ inputs.test_event_record }}' ]; then
         echo "Will use inline data input method"
       else
         echo "INFO: No input detected - will skip CI Analytics submission (no test issues to report)"
@@ -75,13 +75,14 @@ runs:
           exit 1
         fi
 
-      elif [ -n "${{ inputs.test_event_record }}" ]; then
+      elif [ -n '${{ inputs.test_event_record }}' ]; then
         # Method 2: Create file from inline input
         INPUT_FILE="$TEMP_DIR/input_test_event_record.jsonl"
         echo "Using inline data input method, creating: $INPUT_FILE"
 
-        # Write the test event record to file
-        printf '%s\n' '${{ inputs.test_event_record }}' > "$INPUT_FILE"
+        # Write the test event record to file using environment variable method (handles all characters safely)
+        export JSONDATA='${{ inputs.test_event_record }}'
+        printf '%s\n' "$JSONDATA" > "$INPUT_FILE"
 
       else
         # No input provided - this might be okay if no flaky/failed tests exist
