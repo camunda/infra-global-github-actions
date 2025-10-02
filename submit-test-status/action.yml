@@ -62,7 +62,6 @@ runs:
 
       echo "Checking inputs..."
       echo "test_results_file_path: '${{ inputs.test_results_file_path }}'"
-      echo "test_event_record length: ${#test_event_record}"
 
       if [ -n "${{ inputs.test_results_file_path }}" ]; then
         # Method 1: Use provided file path
@@ -83,6 +82,7 @@ runs:
         # Write the test event record to file using environment variable method (handles all characters safely)
         export JSONDATA='${{ inputs.test_event_record }}'
         printf '%s\n' "$JSONDATA" > "$INPUT_FILE"
+        echo "Collected $(wc -l < "$INPUT_FILE") test results from the records provided"
 
       else
         # No input provided - this might be okay if no flaky/failed tests exist
