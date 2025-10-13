@@ -1,0 +1,44 @@
+name: fossa create-release
+
+description: Run FOSSA CLI "release-group create-release" command
+
+inputs:
+  api-key:
+    description: The API key to access fossa.com
+    required: true
+  branch:
+    description: Name of the branch to be created the release from
+    required: true
+  configuration-file:
+    description: Path to the FOSSA configuration file
+    required: false
+    default: .fossa.yml
+  release-group-title:
+    description: Title of the release group to create the release in
+    required: true
+  release-number:
+    description: Version number of the release to be created
+    required: true
+  revision-id:
+    description: ID of the scanned revision
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Run FOSSA release-group create-release
+      env:
+        API_KEY: ${{ inputs.api-key }}
+        BRANCH: ${{ inputs.branch }}
+        CONFIGURATION_FILE: ${{ inputs.configuration-file }}
+        RELEASE_GROUP_TITLE: ${{ inputs.release-group-title }}
+        RELEASE_NUMBER: ${{ inputs.release-number }}
+        REVISION_ID: ${{ inputs.revision-id }}
+      run: |
+        set -e # Exit on error
+        fossa release-group create-release \
+          --config "${CONFIGURATION_FILE}" \
+          --project-branch "${BRANCH}" \
+          --project-revision "${REVISION_ID}" \
+          --release "${RELEASE_NUMBER}" \
+          --title "${RELEASE_GROUP_TITLE}"
+      shell: bash
