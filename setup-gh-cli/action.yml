@@ -1,0 +1,24 @@
+name: Setup GitHub CLI
+
+description: Install GitHub CLI (gh) if not already available
+
+runs:
+  using: composite
+  steps:
+  - name: Install GH CLI
+    shell: bash
+    run: |
+      # Check if gh is already installed
+      if command -v gh &> /dev/null; then
+        echo "GitHub CLI is already installed: $(gh --version)"
+        exit 0
+      fi
+
+      # Install via official installation script (works on both hosted and self-hosted runners)
+      curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+      && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+      && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+      && sudo apt update \
+      && sudo apt install gh -y
+
+      echo "GitHub CLI installed successfully: $(gh --version)"
