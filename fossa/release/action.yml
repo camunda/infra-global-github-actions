@@ -1,44 +1,124 @@
-name: fossa create-release
+name: fossa create-release and report
 
-description: Run FOSSA CLI "release-group create-release" command
+description: Create FOSSA release and generate attribution / SBOM report
 
 inputs:
   api-key:
     description: The API key to access fossa.com
     required: true
-  branch:
-    description: Name of the branch to be created the release from
-    required: true
-  configuration-file:
-    description: Path to the FOSSA configuration file
-    required: false
-    default: .fossa.yml
-  release-group-title:
-    description: Title of the release group to create the release in
+  release-group-id:
+    description: ID of the release group
     required: true
   release-number:
     description: Version number of the release to be created
     required: true
-  revision-id:
-    description: ID of the scanned revision
+  project-id:
+    description: Project ID (locator)
     required: true
+  branch:
+    description: Name of the branch
+    required: true
+  revision-id:
+    description: Git commit hash of the scanned revision
+    required: true
+  report-format:
+    # https://docs.fossa.com/reference/queuereleasegroupattributionreport
+    description: Report format (e.g., TXT, CYCLONEDX_JSON)
+    required: true
+
 runs:
   using: composite
   steps:
-    - name: Run FOSSA release-group create-release
+    - name: Create FOSSA release
+      id: create-release
       env:
-        API_KEY: ${{ inputs.api-key }}
-        BRANCH: ${{ inputs.branch }}
-        CONFIGURATION_FILE: ${{ inputs.configuration-file }}
-        RELEASE_GROUP_TITLE: ${{ inputs.release-group-title }}
+        FOSSA_API_KEY: ${{ inputs.api-key }}
+        RELEASE_GROUP_ID: ${{ inputs.release-group-id }}
         RELEASE_NUMBER: ${{ inputs.release-number }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        BRANCH: ${{ inputs.branch }}
         REVISION_ID: ${{ inputs.revision-id }}
       run: |
-        set -e # Exit on error
-        fossa release-group create-release \
-          --config "${CONFIGURATION_FILE}" \
-          --project-branch "${BRANCH}" \
-          --project-revision "${REVISION_ID}" \
-          --release "${RELEASE_NUMBER}" \
-          --title "${RELEASE_GROUP_TITLE}"
+        set -e
+
+        # See https://docs.fossa.com/reference/createreleasegroupreleases
+        HTTP_CODE=$(curl --silent --output response.json --write-out "%{http_code}" \
+          --request POST \
+          --header "accept: application/json" \
+          --header "authorization: Bearer ${FOSSA_API_KEY}" \
+          --header "content-type: application/json" \
+          --url "https://app.fossa.com/api/project_group/${RELEASE_GROUP_ID}/release" \
+          --data '{
+            "title": "'"${RELEASE_NUMBER}"'",
+            "projects": [
+              {
+                "projectId": "'"${PROJECT_ID}"'",
+                "branch": "'"${BRANCH}"'",
+                "revisionId": "'"${PROJECT_ID}"'$'"${REVISION_ID}"'"
+              }
+            ]
+          }')
+
+        if [ "${HTTP_CODE}" != "200" ]; then
+          echo "Error: API request failed with HTTP status ${HTTP_CODE}"
+          echo "Response:"
+          cat response.json
+          exit 1
+        fi
+
+        # Extract release ID from response
+        RELEASE_ID=$(jq -r '.id' response.json)
+
+        if [ -z "${RELEASE_ID}" ] || [ "${RELEASE_ID}" = "null" ]; then
+          echo "Error: Failed to extract release ID from response"
+          cat response.json
+          exit 1
+        fi
+
+        echo "Successfully created release with ID: ${RELEASE_ID}"
+        echo "release-id=${RELEASE_ID}" >> ${GITHUB_OUTPUT}
+
+        rm -f response.json
+      shell: bash
+
+    - name: Generate SBOM/attribution report
+      if: success()
+      env:
+        FOSSA_API_KEY: ${{ inputs.api-key }}
+        RELEASE_GROUP_ID: ${{ inputs.release-group-id }}
+        RELEASE_ID: ${{ steps.create-release.outputs.release-id }}
+        REPORT_FORMAT: ${{ inputs.report-format }}
+      run: |
+        set -e
+
+        # Build URL with query parameters, enable all options
+        # See https://docs.fossa.com/reference/queuereleasegroupattributionreport
+        URL="https://app.fossa.com/api/project_group/${RELEASE_GROUP_ID}/release/${RELEASE_ID}/attribution/${REPORT_FORMAT}"
+        URL+="?includeDeepDependencies=true"
+        URL+="&includeDirectDependencies=true"
+        URL+="&includeLicenseList=true"
+        URL+="&includeLicenseScan=true"
+        URL+="&includeProjectLicense=true"
+        URL+="&includeCopyrightList=true"
+        URL+="&includeFileMatches=true"
+        URL+="&includeOpenVulnerabilities=true"
+        URL+="&includeClosedVulnerabilities=true"
+        URL+="&includeDependencySummary=true"
+        URL+="&includeLicenseHeaders=true"
+        URL+="&isPublishing=true"
+
+        HTTP_CODE=$(curl --silent --output attribution.txt --write-out "%{http_code}" \
+          --request POST \
+          --header "accept: application/json" \
+          --header "Authorization: Bearer ${FOSSA_API_KEY}" \
+          --url "${URL}")
+
+        if [ "${HTTP_CODE}" != "200" ]; then
+          echo "Error: Attribution API request failed with HTTP status ${HTTP_CODE}"
+          echo "Response:"
+          cat attribution.txt
+          exit 1
+        fi
+
+        echo "Successfully generated SBOM/attribution report"
       shell: bash
