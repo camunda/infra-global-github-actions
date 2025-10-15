@@ -1,0 +1,101 @@
+name: fossa wait-for-scan
+
+description: Wait for FOSSA scan to complete before proceeding with release creation
+
+inputs:
+  api-key:
+    description: The API key to access fossa.com
+    required: true
+  project-id:
+    description: Project ID (locator)
+    required: true
+  branch:
+    description: Name of the branch
+    required: true
+  revision-id:
+    description: Git commit hash of the scanned revision
+    required: true
+  timeout:
+    description: Maximum time to wait for scan completion in seconds
+    required: false
+    default: '600'
+  poll-interval:
+    description: Seconds between status checks
+    required: false
+    default: '30'
+
+runs:
+  using: composite
+  steps:
+    - name: Wait for FOSSA scan completion
+      env:
+        FOSSA_API_KEY: ${{ inputs.api-key }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        BRANCH: ${{ inputs.branch }}
+        REVISION_ID: ${{ inputs.revision-id }}
+        TIMEOUT: ${{ inputs.timeout }}
+        POLL_INTERVAL: ${{ inputs.poll-interval }}
+      run: |
+        set -e
+
+        echo "Waiting for FOSSA scan to complete..."
+        echo "Project: ${PROJECT_ID}"
+        echo "Branch: ${BRANCH}"
+        echo "Revision: ${REVISION_ID}"
+        echo "Timeout: ${TIMEOUT} seconds"
+        echo "Poll interval: ${POLL_INTERVAL} seconds"
+
+        # Build the locator: {project-id}${revision-id}
+        LOCATOR="${PROJECT_ID}\$${REVISION_ID}"
+        echo "Locator: ${LOCATOR}"
+
+        # API endpoint - only need the count endpoint
+        COUNT_API_URL="https://app.fossa.com/api/counts/builds?locator=${LOCATOR}"
+
+        START_TIME=$(date +%s)
+        MAX_TIME=$((START_TIME + TIMEOUT))
+
+        echo "Waiting for FOSSA analysis to complete..."
+        echo "Analysis is complete when build count returns to 0"
+
+        while true; do
+          CURRENT_TIME=$(date +%s)
+          
+          if [ ${CURRENT_TIME} -gt ${MAX_TIME} ]; then
+            echo "Error: Timeout reached waiting for scan to complete"
+            echo "Waited ${TIMEOUT} seconds without completion"
+            exit 1
+          fi
+
+          echo "Checking build count... ($(date))"
+          
+          # Check build count - API returns plain number
+          HTTP_CODE=$(curl --silent --output count_response.json --write-out "%{http_code}" \
+            --request GET \
+            --header "accept: application/json" \
+            --header "Authorization: Bearer ${FOSSA_API_KEY}" \
+            --url "${COUNT_API_URL}")
+
+          if [ "${HTTP_CODE}" != "200" ]; then
+            echo "Error: Count API request failed with HTTP status ${HTTP_CODE}"
+            echo "Response:"
+            cat count_response.json 2>/dev/null || echo "No response file"
+            rm -f count_response.json
+            exit 1
+          fi
+
+          # Check build count - API returns plain number
+          BUILD_COUNT=$(cat count_response.json 2>/dev/null || echo "0")
+          echo "Build count: ${BUILD_COUNT}"
+          rm -f count_response.json
+          
+          if [ "${BUILD_COUNT}" = "0" ]; then
+            echo "✓ Analysis completed! Build count returned to 0."
+            exit 0
+          else
+            echo "Analysis still in progress (${BUILD_COUNT} active builds)..."
+            echo "Waiting ${POLL_INTERVAL} seconds before next check..."
+            sleep ${POLL_INTERVAL}
+          fi
+        done
+      shell: bash
