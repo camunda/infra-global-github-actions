@@ -119,7 +119,10 @@ runs:
       LICENSE_ISSUES_COUNT: ${{ steps.check.outputs.license-issues-count }}
       PROJECT: ${{ inputs.project }}
     run: |
-      echo "This PR introduces new license issues that must be addressed prior to merging."
+      echo ""
+      echo "⚠️ License issues have been detected that must be addressed prior to merging."
+      echo "NOTE: These issues might be in rare cases pre-existing from the base branch and not introduced by this PR. In that case these can be ignored."
+      echo ""
       echo "HOW-TO: https://confluence.camunda.com/spaces/HAN/pages/277024795/FOSSA#FOSSA-Handlelicenseissues"
       echo "License Issues:"
       echo "${LICENSE_ISSUES}" | jq -r '.[] | "- Package: \(.revisionId)\n  License: \(.license)\n  Issue URL: \(.issueDashURL)\n"'
