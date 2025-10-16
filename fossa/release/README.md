@@ -59,7 +59,7 @@ See [FOSSA API documentation](https://docs.fossa.com/reference/queuereleasegroup
 
 **Common formats**:
 - `TXT` - Plain text attribution report
-- `HTML` - HTML attribution report  
+- `HTML` - HTML attribution report
 - `CYCLONEDX_JSON` - CycloneDX SBOM in JSON format
 - `SPDX_JSON` - SPDX SBOM in JSON format
 - `CSV` - CSV format report

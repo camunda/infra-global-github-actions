@@ -65,7 +65,7 @@ runs:
 
         while true; do
           CURRENT_TIME=$(date +%s)
-          
+
           if [ ${CURRENT_TIME} -gt ${MAX_TIME} ]; then
             echo "Error: Timeout reached waiting for scan to complete"
             echo "Waited ${TIMEOUT} seconds without completion"
@@ -73,7 +73,7 @@ runs:
           fi
 
           echo "Checking revision status... ($(date))"
-          
+
           # Check revision status
           HTTP_CODE=$(curl --silent --output revision_response.json --write-out "%{http_code}" \
             --request GET \
@@ -94,9 +94,9 @@ runs:
           DEPENDENCY_COUNT=$(jq -r '.dependency_count // 0' revision_response.json 2>/dev/null || echo "0")
           IS_STEADY=$(jq -r '.isSteady // false' revision_response.json 2>/dev/null || echo "false")
           REVISION_SCANS_COUNT=$(jq -r '.revisionScans | length' revision_response.json 2>/dev/null || echo "0")
-          
+
           echo "Resolved: ${RESOLVED}, Dependencies: ${DEPENDENCY_COUNT}, Steady: ${IS_STEADY}, Scans: ${REVISION_SCANS_COUNT}"
-          
+
           if [ "${RESOLVED}" = "true" ] && [ "${DEPENDENCY_COUNT}" -gt "0" ] && [ "${REVISION_SCANS_COUNT}" -gt "0" ]; then
             echo "✓ Analysis completed successfully!"
             echo "  - Revision resolved: ${RESOLVED}"

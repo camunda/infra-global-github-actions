@@ -65,9 +65,9 @@ runs:
         for i in "${!GROUP_TYPES[@]}"; do
           GROUP_TYPE="${GROUP_TYPES[$i]}"
           GROUP_ID="${GROUP_IDS[$i]}"
-          
+
           echo "Creating ${GROUP_TYPE} release in group: ${GROUP_ID}"
-          
+
           # See https://docs.fossa.com/reference/createreleasegroupreleases
           HTTP_CODE=$(curl --silent --output ${GROUP_TYPE}_response.json --write-out "%{http_code}" \
             --request POST \
@@ -138,14 +138,14 @@ runs:
           RELEASE_ID="${RELEASE_IDS[$i]}"
           FORMAT="${FORMATS[$i]}"
           GENERATE="${GENERATE_FLAGS[$i]}"
-          
+
           if [ "${GENERATE}" != "true" ]; then
             echo "Skipping ${REPORT_TYPE} report generation (disabled)"
             continue
           fi
 
           echo "Generating ${REPORT_TYPE} report in format: ${FORMAT}"
-          
+
           # Build URL with query parameters, enable all options
           # See https://docs.fossa.com/reference/queuereleasegroupattributionreport
           URL="https://app.fossa.com/api/project_group/${GROUP_ID}/release/${RELEASE_ID}/attribution/${FORMAT}"

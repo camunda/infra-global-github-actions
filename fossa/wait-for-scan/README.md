@@ -36,7 +36,7 @@ This action uses FOSSA's revisions endpoint to check for scan completion:
 3. **This action waits**: For the revision to be fully resolved with results
 
 **Implementation**:
-1. Builds a locator in the format `{project-id}${revision-id}` 
+1. Builds a locator in the format `{project-id}${revision-id}`
 2. URL-encodes the locator ($ → %24, + → %2B, / → %2F)
 3. Polls the FOSSA `/api/revisions/{encoded-locator}` endpoint
 4. Checks multiple completion criteria:
