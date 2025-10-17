@@ -81,8 +81,9 @@ runs:
         --config "${CONFIGURATION_FILE}" \
         --diff "${BASE_REVISION}" \
         --revision "${REVISION}" \
-        --format json)
+        --format json 2> >(tee fossa_error.log >&2))
       exit_code=$?
+      error_output=$(cat fossa_error.log || echo "")
       set -e
 
       # Fail if the command timed out (exit code 124)
@@ -93,6 +94,16 @@ runs:
         echo "In that case, it's acceptable to merge the PR anyway." >&2
         echo "If a license issue is introduced, it will be caught later in the base branch." >&2
         exit 1
+      fi
+
+      # Check for specific error patterns in stderr when exit code is 1
+      if [[ "${exit_code}" == "1" ]]; then
+        if echo "$error_output" | grep -q "Revision for locator.*was not found.*Please ensure provided project and revision exists in FOSSA org"; then
+          echo "⚠️ No FOSSA analysis found for the base branch commit to compare against this PR for introduced licensing issues." >&2
+          echo "Try rebasing to use a newer base commit." >&2
+          echo "If the issue persists, it’s acceptable to merge the PR. Any newly introduced license issues will be detected in the next base branch scan." >&2
+          exit 1
+        fi
       fi
 
       # Fail if results is empty or not a valid JSON
