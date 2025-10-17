@@ -57,6 +57,10 @@ runs:
       run: |
         set -e
 
+        # Build the locator
+        LOCATOR="${PROJECT_ID}\$${REVISION_ID}"
+        echo "Locator: ${LOCATOR}"
+
         # Define arrays for group types and IDs
         GROUP_TYPES=("attribution" "sbom")
         GROUP_IDS=("${ATTRIBUTION_GROUP_ID}" "${SBOM_GROUP_ID}")
@@ -81,7 +85,7 @@ runs:
                 {
                   "projectId": "'"${PROJECT_ID}"'",
                   "branch": "'"${BRANCH}"'",
-                  "revisionId": "'"${PROJECT_ID}"'$'"${REVISION_ID}"'"
+                  "revisionId": "'"${LOCATOR}"'"
                 }
               ]
             }')
