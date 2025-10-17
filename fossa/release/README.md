@@ -30,12 +30,21 @@ This action creates FOSSA releases and generates attribution and SBOM reports to
 | `sbom-release-group-id` | Release group ID for SBOM reports | Yes | - |
 | `release-number` | Version number of the release to be created | Yes | - |
 | `project-id` | Project ID (locator) | Yes | - |
-| `branch` | Name of the branch | Yes | - |
+| `branch` | Name of the (release) branch | Yes | - |
 | `revision-id` | Git commit hash of the scanned revision | Yes | - |
 | `attribution-format` | Format for attribution report (e.g., TXT, HTML) | No | `TXT` |
 | `sbom-format` | Format for SBOM report (e.g., CYCLONEDX_JSON, SPDX_JSON) | No | `CYCLONEDX_JSON` |
 | `generate-attribution` | Whether to generate attribution report | No | `true` |
 | `generate-sbom` | Whether to generate SBOM report | No | `true` |
+
+- Release Group is a [FOSSA concept](https://docs.fossa.com/docs/release-groups) to organize releases. Among others, they're used to publish different report types (attribution, SBOM) to different audiences (internal, public).
+- An SBOM (Software Bill of Materials) details a comprehensive list of all software components (including open source and proprietary libraries) that make up your application. They are essential for identifying vulnerabilities, managing dependencies, and sharing component inventories with partners, auditors, or customers.
+- Attribution reports are focused on license compliance and proper acknowledgment of open source software authors.
+- At the time of writing, each release can only publish one report type and format, so this action creates separate releases for attribution and SBOM reports.
+- This action assumes that the specified release groups already exist in FOSSA. As these groups are typically set up once per project, you can create them manually in the FOSSA web app or via the API, having the proper access rights.
+
+Notes on choosing the branch
+- Although FOSSA allows releases to be created on any branch, it's recommended to use a dedicated release branch (e.g., `release/8.x`) rather than feature branches. This ensures that reports are consistently associated with stable release versions.
 
 ## How it works
 

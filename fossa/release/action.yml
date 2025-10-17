@@ -1,6 +1,6 @@
 name: fossa create-release and reports
 
-description: Create FOSSA release and generate attribution and SBOM reports to different release groups
+description: Creates FOSSA releases in separate groups and generates attribution and SBOM reports with configurable formats
 
 inputs:
   api-key:
