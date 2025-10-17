@@ -36,5 +36,11 @@ runs:
           --strict \
           --config "${CONFIGURATION_FILE}" \
           --branch "${BRANCH}" \
-          --revision "${REVISION_ID}"
+          --revision "${REVISION_ID}" 2>&1 | tee fossa_analyze_output.log
+
+        # Check for failure patterns in the output
+        if grep -qE "(projects scanned.*failed.*[^0] failed|Error:.*An issue occurred|Command execution failed)" fossa_analyze_output.log; then
+          echo "⚠️ FOSSA analyze encountered issues! Check the output above for details." >&2
+          exit 1
+        fi
       shell: bash
