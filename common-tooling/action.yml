@@ -243,7 +243,7 @@ runs:
       export PATH="$PATH:`yarn global bin`"
   # Install node
   - name: Install NodeJS
-    uses: actions/setup-node@v5
+    uses: actions/setup-node@v6
     if: ${{ inputs.node-enabled == 'true' && ( env.node_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:
       always-auth: ${{ inputs.node-always-auth }}
