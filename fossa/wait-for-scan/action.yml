@@ -66,15 +66,6 @@ runs:
         # Dry-run mode check
         if [ "${DRY_RUN}" = "true" ]; then
           echo "==== DRY-RUN MODE ===="
-          echo "Configuration:"
-          echo "  Project: ${PROJECT_ID}"
-          echo "  Branch: ${BRANCH}"
-          echo "  Revision: ${REVISION_ID}"
-          echo "  Locator: ${LOCATOR}"
-          echo "  Encoded locator: ${ENCODED_LOCATOR}"
-          echo "  Timeout: ${TIMEOUT} seconds"
-          echo "  Poll interval: ${POLL_INTERVAL} seconds"
-          echo ""
           echo "API endpoint: ${API_URL}"
           echo ""
           echo "Would execute curl command:"
