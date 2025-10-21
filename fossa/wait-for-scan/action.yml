@@ -1,0 +1,142 @@
+name: fossa wait-for-scan
+
+description: Wait for FOSSA scan to complete before proceeding with release creation
+
+inputs:
+  api-key:
+    description: The API key to access fossa.com
+    required: true
+  project-id:
+    description: Project ID (locator)
+    required: true
+  branch:
+    description: Name of the branch
+    required: true
+  revision-id:
+    description: Git commit hash of the scanned revision
+    required: true
+  timeout:
+    description: Maximum time to wait for scan completion in seconds
+    required: false
+    default: '600'
+  poll-interval:
+    description: Seconds between status checks
+    required: false
+    default: '30'
+  dry-run:
+    description: 'Enable dry-run mode (print commands without executing)'
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Wait for FOSSA scan completion
+      env:
+        FOSSA_API_KEY: ${{ inputs.api-key }}
+        PROJECT_ID: ${{ inputs.project-id }}
+        BRANCH: ${{ inputs.branch }}
+        REVISION_ID: ${{ inputs.revision-id }}
+        TIMEOUT: ${{ inputs.timeout }}
+        POLL_INTERVAL: ${{ inputs.poll-interval }}
+        DRY_RUN: ${{ inputs.dry-run }}
+      run: |
+        set -e
+
+        echo "Waiting for FOSSA scan to complete..."
+        echo "Project: ${PROJECT_ID}"
+        echo "Branch: ${BRANCH}"
+        echo "Revision: ${REVISION_ID}"
+        echo "Timeout: ${TIMEOUT} seconds"
+        echo "Poll interval: ${POLL_INTERVAL} seconds"
+
+        # Build the locator: {project-id}${revision-id}
+        # Sample project-id: custom+50756/camunda/camunda-cloud-management-apps@console-sm-frontend
+        LOCATOR="${PROJECT_ID}\$${REVISION_ID}"
+        echo "Locator: ${LOCATOR}"
+
+        # URL encode the locator for the revisions endpoint
+        # Handle special characters: $ → %24, + → %2B, / → %2F, @ → %40, : → %3A
+        ENCODED_LOCATOR=$(printf '%s' "${LOCATOR}" | sed 's/\$/%24/g; s/+/%2B/g; s/\//%2F/g; s/@/%40/g; s/:/%3A/g')
+        echo "Encoded locator: ${ENCODED_LOCATOR}"
+
+        # API endpoint - use revisions endpoint to check if scan is resolved
+        API_URL="https://app.fossa.com/api/revisions/${ENCODED_LOCATOR}"
+
+        # Dry-run mode check
+        if [ "${DRY_RUN}" = "true" ]; then
+          echo "==== DRY-RUN MODE ===="
+          echo "API endpoint: ${API_URL}"
+          echo ""
+          echo "Would execute curl command:"
+          echo "  curl --request GET \\"
+          echo "    --header 'accept: application/json' \\"
+          echo "    --header 'Authorization: Bearer ***' \\"
+          echo "    --url '${API_URL}'"
+          echo ""
+          echo "Polling behavior:"
+          echo "  - Check revision status every ${POLL_INTERVAL} seconds"
+          echo "  - Look for: resolved=true, dependency_count>0, revisionScans.length>0"
+          echo "  - Timeout after ${TIMEOUT} seconds"
+          echo ""
+          echo "✓ Dry-run completed successfully (no API calls executed)"
+          exit 0
+        fi
+
+        START_TIME=$(date +%s)
+        MAX_TIME=$((START_TIME + TIMEOUT))
+
+        echo "Waiting for FOSSA analysis to complete..."
+        echo "Analysis is complete when revision is resolved with scan data"
+
+        while true; do
+          CURRENT_TIME=$(date +%s)
+
+          if [ ${CURRENT_TIME} -gt ${MAX_TIME} ]; then
+            echo "Error: Timeout reached waiting for scan to complete"
+            echo "Waited ${TIMEOUT} seconds without completion"
+            exit 1
+          fi
+
+          echo "Checking revision status... ($(date))"
+
+          # Check revision status
+          HTTP_CODE=$(curl --silent --output revision_response.json --write-out "%{http_code}" \
+            --request GET \
+            --header "accept: application/json" \
+            --header "Authorization: Bearer ${FOSSA_API_KEY}" \
+            --url "${API_URL}")
+
+          if [ "${HTTP_CODE}" != "200" ]; then
+            echo "Error: Revisions API request failed with HTTP status ${HTTP_CODE}"
+            echo "Response:"
+            cat revision_response.json 2>/dev/null || echo "No response file"
+            rm -f revision_response.json
+            exit 1
+          fi
+
+          # Check if revision is resolved and has scan data
+          RESOLVED=$(jq -r '.resolved // false' revision_response.json 2>/dev/null || echo "false")
+          DEPENDENCY_COUNT=$(jq -r '.dependency_count // 0' revision_response.json 2>/dev/null || echo "0")
+          IS_STEADY=$(jq -r '.isSteady // false' revision_response.json 2>/dev/null || echo "false")
+          REVISION_SCANS_COUNT=$(jq -r '.revisionScans | length' revision_response.json 2>/dev/null || echo "0")
+
+          echo "Resolved: ${RESOLVED}, Dependencies: ${DEPENDENCY_COUNT}, Steady: ${IS_STEADY}, Scans: ${REVISION_SCANS_COUNT}"
+
+          if [ "${RESOLVED}" = "true" ] && [ "${DEPENDENCY_COUNT}" -gt "0" ] && [ "${REVISION_SCANS_COUNT}" -gt "0" ]; then
+            echo "✓ Analysis completed successfully!"
+            echo "  - Revision resolved: ${RESOLVED}"
+            echo "  - Dependencies found: ${DEPENDENCY_COUNT}"
+            echo "  - License count: $(jq -r '.license_count // 0' revision_response.json 2>/dev/null || echo "0")"
+            echo "  - Revision scans: ${REVISION_SCANS_COUNT}"
+            echo "  - Is steady: ${IS_STEADY}"
+            rm -f revision_response.json
+            exit 0
+          else
+            echo "Analysis still in progress..."
+            echo "Waiting ${POLL_INTERVAL} seconds before next check..."
+            rm -f revision_response.json
+            sleep ${POLL_INTERVAL}
+          fi
+        done
+      shell: bash
