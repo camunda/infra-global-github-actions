@@ -19,6 +19,7 @@ This action creates FOSSA releases and generates attribution and SBOM reports to
     sbom-format: 'CYCLONEDX_JSON'  # optional, default CYCLONEDX_JSON
     generate-attribution: 'true'  # optional, default true
     generate-sbom: 'true'  # optional, default true
+    dry-run: 'false'  # optional, default false
 ```
 
 ## Inputs
@@ -36,6 +37,7 @@ This action creates FOSSA releases and generates attribution and SBOM reports to
 | `sbom-format` | Format for SBOM report (e.g., CYCLONEDX_JSON, SPDX_JSON) | No | `CYCLONEDX_JSON` |
 | `generate-attribution` | Whether to generate attribution report | No | `true` |
 | `generate-sbom` | Whether to generate SBOM report | No | `true` |
+| `dry-run` | Enable dry-run mode (print commands without executing) | No | `'false'` |
 
 - Release Group is a [FOSSA concept](https://docs.fossa.com/docs/release-groups) to organize releases. Among others, they're used to publish different report types (attribution, SBOM) to different audiences (internal, public).
 - An SBOM (Software Bill of Materials) details a comprehensive list of all software components (including open source and proprietary libraries) that make up your application. They are essential for identifying vulnerabilities, managing dependencies, and sharing component inventories with partners, auditors, or customers.
@@ -101,3 +103,27 @@ Use this action after `fossa/wait-for-scan`:
 - **API Failures**: HTTP errors cause immediate failure with response details
 - **Missing Release IDs**: Validation ensures release creation succeeded before report generation
 - **Conditional Execution**: Reports only generate if release creation succeeds
+
+## Dry-Run Mode
+
+Enable `dry-run: 'true'` to see what the action would do without making actual API calls:
+
+```yaml
+- name: Test release configuration
+  uses: ./fossa/release
+  with:
+    api-key: ${{ secrets.FOSSA_API_KEY }}
+    attribution-release-group-id: '1234'
+    sbom-release-group-id: '5678'
+    release-number: '8.8.0'
+    project-id: 'custom+50756/camunda-cloud/identity'
+    branch: ${{ github.ref_name }}
+    revision-id: ${{ github.sha }}
+    dry-run: 'true'
+```
+
+**Dry-run output includes**:
+- **Release creation**: POST request details, headers, and JSON payload for each release group
+- **Mock release IDs**: Generates fake IDs (`mock-attribution-release-id-12345`, `mock-sbom-release-id-12345`) for testing
+- **Report generation**: POST request URLs with all query parameters for each report type
+- **Configuration validation**: Ensures all inputs are correctly formatted

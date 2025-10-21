@@ -23,6 +23,10 @@ inputs:
     description: Seconds between status checks
     required: false
     default: '30'
+  dry-run:
+    description: 'Enable dry-run mode (print commands without executing)'
+    required: false
+    default: 'false'
 
 runs:
   using: composite
@@ -35,6 +39,7 @@ runs:
         REVISION_ID: ${{ inputs.revision-id }}
         TIMEOUT: ${{ inputs.timeout }}
         POLL_INTERVAL: ${{ inputs.poll-interval }}
+        DRY_RUN: ${{ inputs.dry-run }}
       run: |
         set -e
 
@@ -46,6 +51,7 @@ runs:
         echo "Poll interval: ${POLL_INTERVAL} seconds"
 
         # Build the locator: {project-id}${revision-id}
+        # Sample project-id: custom+50756/camunda/camunda-cloud-management-apps@console-sm-frontend
         LOCATOR="${PROJECT_ID}\$${REVISION_ID}"
         echo "Locator: ${LOCATOR}"
 
@@ -56,6 +62,35 @@ runs:
 
         # API endpoint - use revisions endpoint to check if scan is resolved
         API_URL="https://app.fossa.com/api/revisions/${ENCODED_LOCATOR}"
+
+        # Dry-run mode check
+        if [ "${DRY_RUN}" = "true" ]; then
+          echo "==== DRY-RUN MODE ===="
+          echo "Configuration:"
+          echo "  Project: ${PROJECT_ID}"
+          echo "  Branch: ${BRANCH}"
+          echo "  Revision: ${REVISION_ID}"
+          echo "  Locator: ${LOCATOR}"
+          echo "  Encoded locator: ${ENCODED_LOCATOR}"
+          echo "  Timeout: ${TIMEOUT} seconds"
+          echo "  Poll interval: ${POLL_INTERVAL} seconds"
+          echo ""
+          echo "API endpoint: ${API_URL}"
+          echo ""
+          echo "Would execute curl command:"
+          echo "  curl --request GET \\"
+          echo "    --header 'accept: application/json' \\"
+          echo "    --header 'Authorization: Bearer ***' \\"
+          echo "    --url '${API_URL}'"
+          echo ""
+          echo "Polling behavior:"
+          echo "  - Check revision status every ${POLL_INTERVAL} seconds"
+          echo "  - Look for: resolved=true, dependency_count>0, revisionScans.length>0"
+          echo "  - Timeout after ${TIMEOUT} seconds"
+          echo ""
+          echo "✓ Dry-run completed successfully (no API calls executed)"
+          exit 0
+        fi
 
         START_TIME=$(date +%s)
         MAX_TIME=$((START_TIME + TIMEOUT))

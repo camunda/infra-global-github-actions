@@ -14,6 +14,7 @@ This action waits for a FOSSA scan to complete before proceeding. It's designed 
     revision-id: ${{ github.sha }}
     timeout: 600  # optional, default 10 minutes
     poll-interval: 30  # optional, default 30 seconds
+    dry-run: 'false'  # optional, default false
 ```
 
 ## Inputs
@@ -26,6 +27,7 @@ This action waits for a FOSSA scan to complete before proceeding. It's designed 
 | `revision-id` | Git commit hash of the scanned revision | Yes | - |
 | `timeout` | Maximum time to wait for scan completion in seconds | No | `600` (10 min) |
 | `poll-interval` | Seconds between status checks | No | `30` |
+| `dry-run` | Enable dry-run mode (print commands without executing) | No | `'false'` |
 
 ## How it works
 
@@ -73,3 +75,25 @@ Use this action in the following sequence:
 
 - **Timeout**: If analysis doesn't complete within the specified timeout period, the action will exit with an error
 - **API Errors**: Non-200 HTTP responses cause immediate failure (no retries) - indicates authentication, authorization, or server issues
+
+## Dry-Run Mode
+
+Enable `dry-run: 'true'` to see what the action would do without making actual API calls:
+
+```yaml
+- name: Test wait-for-scan configuration
+  uses: ./fossa/wait-for-scan
+  with:
+    api-key: ${{ secrets.FOSSA_API_KEY }}
+    project-id: 'custom+50756/camunda-cloud/identity'
+    branch: ${{ github.ref_name }}
+    revision-id: ${{ github.sha }}
+    dry-run: 'true'
+```
+
+**Dry-run output includes**:
+- All configuration parameters
+- The exact API endpoint URL
+- curl command structure (with redacted API key)
+- Polling behavior description
+- Success exit without waiting

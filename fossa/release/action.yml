@@ -40,6 +40,10 @@ inputs:
     description: Whether to generate SBOM report
     required: false
     default: 'true'
+  dry-run:
+    description: 'Enable dry-run mode (print commands without executing)'
+    required: false
+    default: 'false'
 
 runs:
   using: composite
@@ -54,6 +58,7 @@ runs:
         PROJECT_ID: ${{ inputs.project-id }}
         BRANCH: ${{ inputs.branch }}
         REVISION_ID: ${{ inputs.revision-id }}
+        DRY_RUN: ${{ inputs.dry-run }}
       run: |
         set -e
 
@@ -72,23 +77,50 @@ runs:
 
           echo "Creating ${GROUP_TYPE} release in group: ${GROUP_ID}"
 
+          # Prepare JSON payload
+          JSON_PAYLOAD='{
+            "title": "'"${RELEASE_NUMBER}"'",
+            "projects": [
+              {
+                "projectId": "'"${PROJECT_ID}"'",
+                "branch": "'"${BRANCH}"'",
+                "revisionId": "'"${LOCATOR}"'"
+              }
+            ]
+          }'
+
+          API_URL="https://app.fossa.com/api/project_group/${GROUP_ID}/release"
+
+          # Dry-run mode
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "==== DRY-RUN: ${GROUP_TYPE} release ===="
+            echo "POST ${API_URL}"
+            echo ""
+            echo "Headers:"
+            echo "  accept: application/json"
+            echo "  authorization: Bearer ***"
+            echo "  content-type: application/json"
+            echo ""
+            echo "Body:"
+            echo "${JSON_PAYLOAD}" | jq '.'
+            echo ""
+
+            # Generate mock release ID
+            RELEASE_ID="mock-${GROUP_TYPE}-release-id-12345"
+            echo "Mock release ID: ${RELEASE_ID}"
+            echo "${GROUP_TYPE}-release-id=${RELEASE_ID}" >> ${GITHUB_OUTPUT}
+            echo ""
+            continue
+          fi
+
           # See https://docs.fossa.com/reference/createreleasegroupreleases
           HTTP_CODE=$(curl --silent --output ${GROUP_TYPE}_response.json --write-out "%{http_code}" \
             --request POST \
             --header "accept: application/json" \
             --header "authorization: Bearer ${FOSSA_API_KEY}" \
             --header "content-type: application/json" \
-            --url "https://app.fossa.com/api/project_group/${GROUP_ID}/release" \
-            --data '{
-              "title": "'"${RELEASE_NUMBER}"'",
-              "projects": [
-                {
-                  "projectId": "'"${PROJECT_ID}"'",
-                  "branch": "'"${BRANCH}"'",
-                  "revisionId": "'"${LOCATOR}"'"
-                }
-              ]
-            }')
+            --url "${API_URL}" \
+            --data "${JSON_PAYLOAD}")
 
           if [ "${HTTP_CODE}" != "200" ]; then
             echo "Error: ${GROUP_TYPE} release creation failed with HTTP status ${HTTP_CODE}"
@@ -125,6 +157,7 @@ runs:
         SBOM_FORMAT: ${{ inputs.sbom-format }}
         GENERATE_ATTRIBUTION: ${{ inputs.generate-attribution }}
         GENERATE_SBOM: ${{ inputs.generate-sbom }}
+        DRY_RUN: ${{ inputs.dry-run }}
       run: |
         set -e
 
@@ -165,6 +198,34 @@ runs:
           URL+="&includeDependencySummary=true"
           URL+="&includeLicenseHeaders=true"
           URL+="&isPublishing=true"
+
+          # Dry-run mode
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "==== DRY-RUN: ${REPORT_TYPE} report ===="
+            echo "POST ${URL}"
+            echo ""
+            echo "Headers:"
+            echo "  accept: application/json"
+            echo "  Authorization: Bearer ***"
+            echo ""
+            echo "Query parameters:"
+            echo "  includeDeepDependencies=true"
+            echo "  includeDirectDependencies=true"
+            echo "  includeLicenseList=true"
+            echo "  includeLicenseScan=true"
+            echo "  includeProjectLicense=true"
+            echo "  includeCopyrightList=true"
+            echo "  includeFileMatches=true"
+            echo "  includeOpenVulnerabilities=true"
+            echo "  includeClosedVulnerabilities=true"
+            echo "  includeDependencySummary=true"
+            echo "  includeLicenseHeaders=true"
+            echo "  isPublishing=true"
+            echo ""
+            echo "✓ Would generate ${REPORT_TYPE} report in ${FORMAT} format"
+            echo ""
+            continue
+          fi
 
           HTTP_CODE=$(curl --silent --output ${REPORT_TYPE}-report.txt --write-out "%{http_code}" \
             --request POST \
