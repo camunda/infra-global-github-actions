@@ -72,23 +72,28 @@ runs:
       CONFIGURATION_FILE: ${{ inputs.configuration-file }}
       DIRECTORY_PATH: ${{ inputs.path }}
       FOSSA_API_KEY: ${{ inputs.api-key }}
+      FOSSA_TEST_ERROR_LOG: ${{ runner.temp }}/fossa_test_error.log
       REVISION: ${{ inputs.revision }}
       TIMEOUT: ${{ steps.adjusted-timeout.outputs.seconds || inputs.timeout }}
+      TMP_DIR: ${{ runner.temp }}
     run: |
       # Run fossa test
+      mkdir -p "${TMP_DIR}"
+
       set +e
       results=$(timeout "${TIMEOUT}" fossa test "${DIRECTORY_PATH}" \
         --config "${CONFIGURATION_FILE}" \
         --diff "${BASE_REVISION}" \
         --revision "${REVISION}" \
-        --format json 2> >(tee fossa_error.log >&2))
+        --format json 2> >(tee "${FOSSA_TEST_ERROR_LOG}" >&2))
       exit_code=$?
-      error_output=$(cat fossa_error.log || echo "")
+      error_output=$(cat "${FOSSA_TEST_ERROR_LOG}" || echo "")
+      rm "${FOSSA_TEST_ERROR_LOG}" > /dev/null || true
       set -e
 
       # Fail if the command timed out (exit code 124)
       if [[ "${exit_code}" == "124" ]]; then
-        echo "FOSSA test command timed out!" >&2
+        echo "⚠️ FOSSA test command timed out!" >&2
         echo "The check runs on the FOSSA SaaS platform and may occasionally take longer." >&2
         echo "If it times out again on retry, it could be a temporary FOSSA issue." >&2
         echo "In that case, it's acceptable to merge the PR anyway." >&2
@@ -135,6 +140,8 @@ runs:
       echo "NOTE: These issues might be in rare cases pre-existing from the base branch and not introduced by this PR. In that case these can be ignored."
       echo ""
       echo "HOW-TO: https://confluence.camunda.com/spaces/HAN/pages/277024795/FOSSA#FOSSA-Handlelicenseissues"
+      echo "After addressing the issue, re-run this check. Mention the resolved license issue in the PR description for transparency, and tag the owning team if relevant."
+      echo ""
       echo "License Issues:"
       echo "${LICENSE_ISSUES}" | jq -r '.[] | "- Package: \(.revisionId)\n  License: \(.license)\n  Issue URL: \(.issueDashURL)\n"'
       echo "Adding an annotation to the GitHub job for visibility and exiting with error..."

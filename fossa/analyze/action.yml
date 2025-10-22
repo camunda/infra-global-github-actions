@@ -23,24 +23,30 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Run FOSSA analyze
-      env:
-        BRANCH: ${{ inputs.branch }}
-        CONFIGURATION_FILE: ${{ inputs.configuration-file }}
-        DIRECTORY_PATH: ${{ inputs.path }}
-        FOSSA_API_KEY: ${{ inputs.api-key }}
-        REVISION_ID: ${{ inputs.revision-id }}
-      run: |
-        set -e # Exit on error
-        fossa analyze "${DIRECTORY_PATH}" \
-          --strict \
-          --config "${CONFIGURATION_FILE}" \
-          --branch "${BRANCH}" \
-          --revision "${REVISION_ID}" 2>&1 | tee fossa_analyze_output.log
+  - name: Run FOSSA analyze
+    env:
+      BRANCH: ${{ inputs.branch }}
+      CONFIGURATION_FILE: ${{ inputs.configuration-file }}
+      DIRECTORY_PATH: ${{ inputs.path }}
+      FOSSA_ANALYZE_OUTPUT_LOG: ${{ runner.temp }}/fossa_analyze_output.log
+      FOSSA_API_KEY: ${{ inputs.api-key }}
+      REVISION_ID: ${{ inputs.revision-id }}
+      TMP_DIR: ${{ runner.temp }}
+    run: |
+      set -e # Exit on error
+      mkdir -p "${TMP_DIR}"
 
-        # Check for failure patterns in the output
-        if grep -qE "(projects scanned.*failed.*[^0] failed|Error:.*An issue occurred|Command execution failed)" fossa_analyze_output.log; then
-          echo "⚠️ FOSSA analyze encountered issues! Check the output above for details." >&2
-          exit 1
-        fi
-      shell: bash
+      fossa analyze "${DIRECTORY_PATH}" \
+        --strict \
+        --config "${CONFIGURATION_FILE}" \
+        --branch "${BRANCH}" \
+        --revision "${REVISION_ID}" 2>&1 | tee "${FOSSA_ANALYZE_OUTPUT_LOG}"
+
+      # Check for failure patterns in the output
+      if grep -qE "(projects scanned.*failed.*[^0] failed|Error:.*An issue occurred|Command execution failed)" "${FOSSA_ANALYZE_OUTPUT_LOG}"; then
+        echo "⚠️ FOSSA analyze encountered issues! Check the output above for details." >&2
+        exit 1
+      fi
+
+      rm "${FOSSA_ANALYZE_OUTPUT_LOG}" 2>/dev/null || true
+    shell: bash
