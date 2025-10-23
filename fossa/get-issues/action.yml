@@ -1,0 +1,111 @@
+name: Get FOSSA Issues
+
+description: Retrieve issues from FOSSA
+
+inputs:
+  api-key:
+    description: The API key to access fossa.com
+    required: true
+  project-locator:
+    description: FOSSA project locator (as seen in FOSSA project settings)
+    required: true
+  revision-ids:
+    description: |
+      List of the scanned revisions (Git commit hashes) to get issues for (comma-separated)
+      if not provided, will use the latest revision of tracked branches (as set in FOSSA UI)
+    required: false
+
+outputs:
+  issues:
+    description: JSON array of issues for each revision ID
+    value: ${{ steps.issues.outputs.issues }}
+
+runs:
+  using: composite
+  steps:
+  - name: Get Project info
+    id: project
+    env:
+      FOSSA_API_KEY: ${{ inputs.api-key }}
+      PROJECT_LOCATOR: ${{ inputs.project-locator }}
+    run: |
+      set -euo pipefail
+
+      # URL encode the project locator
+      locator_encoded=$(printf '%s' "$PROJECT_LOCATOR" | jq -sRr @uri)
+
+      # Fetch project data with tracked branches
+      data=$(curl -s -H "Authorization: Bearer $FOSSA_API_KEY" \
+        "https://app.fossa.com/api/projects/${locator_encoded}/?ref_type=branch")
+
+      # Extract tracked branches and last revision IDs as compact JSON array
+      tracked_branches=$(
+        echo "$data" | \
+        jq -c '
+            (.tracking_branches // []) as $tracked |
+            [
+                .references[]? | select(.type == "branch" and (.name | IN($tracked[]))) |
+                {
+                  branch: .name,
+                  revision: (.revision_id | split("$")[1])
+                }
+            ]'
+      )
+
+      # Extract project title
+      title=$(echo "$data" | jq -r '.title')
+
+      {
+        echo "locator-encoded=$locator_encoded"
+        echo "title=$title"
+        echo "tracked-branches=$tracked_branches"
+      } >> $GITHUB_OUTPUT
+    shell: bash
+  - name: Get FOSSA issues
+    id: issues
+    env:
+      FOSSA_API_KEY: ${{ inputs.api-key }}
+      PROJECT_LOCATOR_ENCODED: ${{ steps.project.outputs.locator-encoded }}
+      PROJECT_TITLE: ${{ steps.project.outputs.title }}
+      REVISION_IDS: ${{ inputs.revision-ids }}
+      TRACKED_BRANCHES: ${{ steps.project.outputs.tracked-branches }}
+    run: |
+      set -euo pipefail
+
+      # Determine revisions to check
+      if [ -n "${REVISION_IDS}" ]; then
+        echo "Using provided revision IDs: ${REVISION_IDS}"
+        REVISION_IDS=$(echo "${REVISION_IDS}" | jq -R 'split(",") | map({revision: .})')
+      else
+        echo "No revision IDs provided, using tracked branches' latest revisions."
+        REVISION_IDS=${TRACKED_BRANCHES}
+      fi
+
+      # Get issues
+      issues="[]"
+      for item in $(echo "${REVISION_IDS}" | jq -c '.[]'); do
+        revision=$(echo "$item" | jq -r '.revision')
+        branch_encoded=$(echo "$item" | jq -r '.branch // empty' | tr -d '\n' | jq -sRr @uri)
+
+        issues_data=$(
+          curl -s -G "https://app.fossa.com/api/v2/issues/categories" \
+            -d "scope[type]=project" \
+            -d "scope[id]=$PROJECT_LOCATOR_ENCODED" \
+            -d "scope[revision]=$revision" \
+            -H "Authorization: Bearer $FOSSA_API_KEY"
+        )
+
+        issues_url="${branch_encoded:+https://app.fossa.com/projects/$PROJECT_LOCATOR_ENCODED/refs/branch/$branch_encoded/$revision/issues}"
+
+        issues=$(
+          echo "$issues" | \
+          jq --argjson item "$item" --argjson issues_data "$issues_data" --arg title "$PROJECT_TITLE" --arg url "$issues_url" -c '
+            . + [
+              ($item + {"project-title": $title, issues: $issues_data, url: $url})
+            ]
+          '
+        )
+      done
+
+      echo "issues=$issues" | tee -a $GITHUB_OUTPUT
+    shell: bash
