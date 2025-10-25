@@ -211,7 +211,7 @@ runs:
       echo "$template" >> $GITHUB_STEP_SUMMARY
   - name: Upload deployment status as artifact
     if: always()
-    uses: actions/upload-artifact@v4
+    uses: actions/upload-artifact@v5
     with:
       name: deployment-status-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.app_name }}
       path: status_${{ inputs.app_name }}.md
