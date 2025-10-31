@@ -40,7 +40,6 @@ runs:
       repository: ${{ inputs.repository || github.repository }}
       token: ${{ inputs.github-token }}
       fetch-depth: 0
-      ref: ${{ inputs.branch || (github.event.pull_request && github.event.pull_request.head.sha) || github.ref }}
 
   - name: Check for Copilot commits
     id: check

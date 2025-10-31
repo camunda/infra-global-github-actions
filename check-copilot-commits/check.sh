@@ -3,7 +3,7 @@
 set -euo pipefail
 
 # Check for Copilot commits in range
-COPILOT_COMMITS=$(git log --grep="Co-authored-by:.*[Cc]opilot" --pretty=format:"%H" "$BASE_BRANCH..$BRANCH" || true)
+COPILOT_COMMITS=$(git log --grep="Co-authored-by:.*[Cc]opilot" --pretty=format:"%H" "origin/$BASE_BRANCH..origin/$BRANCH" || true)
 
 if [ -n "$COPILOT_COMMITS" ]; then
     echo "Found Copilot co-authored commits:"
