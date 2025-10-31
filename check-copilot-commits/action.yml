@@ -1,0 +1,54 @@
+---
+name: Check Copilot Commits
+
+description: Checks if there are any commits co-authored by GitHub Copilot in the specified branch or commit range.
+
+inputs:
+  repository:
+    description: 'Repository to check (format: owner/repo)'
+    required: true
+  branch:
+    description: 'Branch to check for copilot commits'
+    required: true
+  base-branch:
+    description: 'Base branch to compare against'
+    required: true
+    default: 'main'
+  github-token:
+    description: 'GitHub token for accessing the repository. Required if checking a different repository.'
+    required: false
+    default: ${{ github.token }}
+  fail-on-copilot-commits:
+    description: 'Whether to fail the action if Copilot commits are found. Set to false to only report findings.'
+    required: false
+    default: 'true'
+
+outputs:
+  copilot-commits-found:
+    description: "Whether Copilot commits were found (true/false)"
+    value: ${{ steps.check.outputs.copilot_commits_found }}
+  copilot-commits-hashes:
+    description: "Commit hashes of Copilot co-authored commits"
+    value: ${{ steps.check.outputs.copilot_commits_hashes }}
+
+runs:
+  using: composite
+  steps:
+  - name: Checkout repository
+    uses: actions/checkout@v4
+    with:
+      repository: ${{ inputs.repository || github.repository }}
+      token: ${{ inputs.github-token }}
+      fetch-depth: 0
+      ref: ${{ inputs.branch || (github.event.pull_request && github.event.pull_request.head.sha) || github.ref }}
+
+  - name: Check for Copilot commits
+    id: check
+    shell: bash
+    env:
+      REPOSITORY: ${{ inputs.repository || github.repository }}
+      BRANCH: ${{ inputs.branch || (github.event.pull_request && github.event.pull_request.head.ref) || github.ref_name }}
+      BASE_BRANCH: ${{ inputs.base-branch }}
+      FAIL_ON_COPILOT_COMMITS: ${{ inputs.fail-on-copilot-commits }}
+      GITHUB_TOKEN: ${{ inputs.github-token }}
+    run: ${{ github.action_path }}/check.sh
