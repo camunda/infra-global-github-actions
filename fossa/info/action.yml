@@ -46,7 +46,7 @@ outputs:
 runs:
   using: composite
   steps:
-  - uses: camunda/infra-global-github-actions/setup-gh-cli@bbe4898296e7a322e39ed6242881fc7d8bfcb7b0
+  - uses: camunda/infra-global-github-actions/setup-gh-cli@dfb4ec1558f2998e4ae3e704766cad77da52d48c
   - name: Get context info
     id: info
     env:
