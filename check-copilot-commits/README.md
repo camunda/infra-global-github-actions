@@ -1,6 +1,6 @@
 # Check Copilot Commits
 
-Checks for commits co-authored by GitHub Copilot and fails if found.
+Checks for commits (co-)authored by GitHub Copilot and fails if found.
 
 ## Usage
 

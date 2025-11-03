@@ -1,7 +1,7 @@
 ---
 name: Check Copilot Commits
 
-description: Checks if there are any commits co-authored by GitHub Copilot in the specified branch or commit range.
+description: Checks if there are any commits (co-)authored by GitHub Copilot in the specified branch or commit range.
 
 inputs:
   repository:
@@ -28,7 +28,7 @@ outputs:
     description: "Whether Copilot commits were found (true/false)"
     value: ${{ steps.check.outputs.copilot_commits_found }}
   copilot-commits-hashes:
-    description: "Commit hashes of Copilot co-authored commits"
+    description: "Commit hashes of Copilot (co-)authored commits"
     value: ${{ steps.check.outputs.copilot_commits_hashes }}
 
 runs:

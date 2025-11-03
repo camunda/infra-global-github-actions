@@ -10,7 +10,7 @@ COPILOT_AUTHOR_COMMITS=$(git log --author=".*[Cc]opilot.*" --pretty=format:"%H" 
 COPILOT_COMMITS=$(echo -e "$COPILOT_COAUTHOR_COMMITS\n$COPILOT_AUTHOR_COMMITS" | grep -v '^$' | sort | uniq || true)
 
 if [ -n "$COPILOT_COMMITS" ]; then
-    echo "Found Copilot co-authored commits:"
+    echo "Found Copilot (co-)authored commits:"
     while IFS= read -r hash; do
         echo "Hash: $hash"
         echo "URL: https://github.com/$REPOSITORY/commit/$hash"
