@@ -2,8 +2,12 @@
 
 set -euo pipefail
 
-# Check for Copilot commits in range
-COPILOT_COMMITS=$(git log --grep="Co-authored-by:.*[Cc]opilot" --pretty=format:"%H" "origin/$BASE_BRANCH..origin/$BRANCH" || true)
+# Check for Copilot commits in range - both co-authored and authored by Copilot
+COPILOT_COAUTHOR_COMMITS=$(git log --grep="Co-authored-by:.*[Cc]opilot" --pretty=format:"%H" "origin/$BASE_BRANCH..origin/$BRANCH" || true)
+COPILOT_AUTHOR_COMMITS=$(git log --author=".*[Cc]opilot.*" --pretty=format:"%H" "origin/$BASE_BRANCH..origin/$BRANCH" || true)
+
+# Combine and deduplicate
+COPILOT_COMMITS=$(echo -e "$COPILOT_COAUTHOR_COMMITS\n$COPILOT_AUTHOR_COMMITS" | grep -v '^$' | sort | uniq || true)
 
 if [ -n "$COPILOT_COMMITS" ]; then
     echo "Found Copilot co-authored commits:"
