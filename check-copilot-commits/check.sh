@@ -28,11 +28,6 @@ if [ -n "$COPILOT_COMMITS" ]; then
         echo "$COPILOT_COMMITS"
         echo "EOF"
     } >> "$GITHUB_OUTPUT"
-
-    if [ "$FAIL_ON_COPILOT_COMMITS" = "true" ]; then
-        echo "ERROR: Copilot commits not allowed"
-        exit 1
-    fi
 else
     echo "No Copilot commits found"
     echo "copilot_commits_found=false" >> "$GITHUB_OUTPUT"

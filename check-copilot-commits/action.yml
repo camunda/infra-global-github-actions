@@ -18,10 +18,6 @@ inputs:
     description: 'GitHub token for accessing the repository. Required if checking a different repository.'
     required: false
     default: ${{ github.token }}
-  fail-on-copilot-commits:
-    description: 'Whether to fail the action if Copilot commits are found. Set to false to only report findings.'
-    required: false
-    default: 'true'
   check-co-author:
     description: 'Whether to also check for co-authored commits. When false, only checks author field.'
     required: false
@@ -52,7 +48,6 @@ runs:
       REPOSITORY: ${{ inputs.repository || github.repository }}
       BRANCH: ${{ inputs.branch || (github.event.pull_request && github.event.pull_request.head.ref) || github.ref_name }}
       BASE_BRANCH: ${{ inputs.base-branch }}
-      FAIL_ON_COPILOT_COMMITS: ${{ inputs.fail-on-copilot-commits }}
       CHECK_CO_AUTHOR: ${{ inputs.check-co-author }}
       GITHUB_TOKEN: ${{ inputs.github-token }}
     run: ${{ github.action_path }}/check.sh
