@@ -1,7 +1,7 @@
 ---
 name: Check Copilot Commits
 
-description: Checks if there are any commits (co-)authored by GitHub Copilot in the specified branch or commit range.
+description: Checks if there are any commits authored by GitHub Copilot in the specified branch or commit range. Optionally checks co-authored commits too.
 
 inputs:
   repository:
@@ -22,13 +22,17 @@ inputs:
     description: 'Whether to fail the action if Copilot commits are found. Set to false to only report findings.'
     required: false
     default: 'true'
+  check-co-author:
+    description: 'Whether to also check for co-authored commits. When false, only checks author field.'
+    required: false
+    default: 'false'
 
 outputs:
   copilot-commits-found:
     description: "Whether Copilot commits were found (true/false)"
     value: ${{ steps.check.outputs.copilot_commits_found }}
   copilot-commits-hashes:
-    description: "Commit hashes of Copilot (co-)authored commits"
+    description: "Commit hashes of Copilot authored commits (and co-authored if enabled)"
     value: ${{ steps.check.outputs.copilot_commits_hashes }}
 
 runs:
@@ -49,5 +53,6 @@ runs:
       BRANCH: ${{ inputs.branch || (github.event.pull_request && github.event.pull_request.head.ref) || github.ref_name }}
       BASE_BRANCH: ${{ inputs.base-branch }}
       FAIL_ON_COPILOT_COMMITS: ${{ inputs.fail-on-copilot-commits }}
+      CHECK_CO_AUTHOR: ${{ inputs.check-co-author }}
       GITHUB_TOKEN: ${{ inputs.github-token }}
     run: ${{ github.action_path }}/check.sh
