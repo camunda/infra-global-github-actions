@@ -4,6 +4,9 @@ This composite GitHub Action can be used to retrigger runs which have failed.
 
 ### Usage
 
+> [!IMPORTANT]
+> This action must be called only once per workflow run (preferably in a separate job as shown in the examples below). Calling it multiple times within the same workflow run will trigger simultaneous retry attempts, which will lead to issues.
+
 To call this action, you need to provide:
 - the ID of a failed GitHub Action workflow run to rerun
 - an error message that needs to be present in the workflow run logs
