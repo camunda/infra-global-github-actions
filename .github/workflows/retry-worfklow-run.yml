@@ -17,6 +17,16 @@ on:
       run-id:
         description: Id of the workflow run to retry
         required: true
+      attempt:
+        description: |
+          Attempt number of the workflow run to retry.
+          If specified, the retry is only performed when the provided attempt number
+          matches the current latest attempt of the workflow run.
+
+          This prevents rare cases where a retry for an older attempt is still pending
+          while a newer attempt has already started, preventing outdated retries from
+          interfering with the latest attempt.
+        required: false
       owner:
         description: Owner of the GitHub repository of the workflow run to retry
         required: true
@@ -51,6 +61,7 @@ jobs:
   retry:
     name: Retry workflow run
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Echo distinct id '${{ inputs.distinct_id }}' to enable codex-/return-dispatch to find this workflow run
         run: |
@@ -81,8 +92,9 @@ jobs:
           owner: ${{ inputs.owner }}
           repositories: ${{ inputs.repository }}
 
-      - name: Wait for worfklow run-id=${{ inputs.run-id }} to complete, repo=${{ inputs.owner }}/${{ inputs.repository }}
+      - name: Wait for workflow run-id=${{ inputs.run-id }} to complete, repo=${{ inputs.owner }}/${{ inputs.repository }}
         env:
+          ATTEMPT: ${{ inputs.attempt }}
           GH_REPO: ${{ inputs.owner }}/${{ inputs.repository }}
           GH_TOKEN: ${{ steps.github-token.outputs.token }}
           RUN_ID: ${{ inputs.run-id }}
@@ -90,8 +102,10 @@ jobs:
           # Wait until the workflow run is completed
 
           echo "Waiting for the workflow run to complete ..."
+          ATTEMPT_GH_CLI_FLAG="${ATTEMPT:+--attempt $ATTEMPT}"
           while true; do
-            status=$(gh run view "${RUN_ID}" --json status --jq '.status')
+            # shellcheck disable=SC2086
+            status=$(gh run view "${RUN_ID}" ${ATTEMPT_GH_CLI_FLAG} --json status --jq '.status')
             echo "Current status: ${status}"
             if [ "${status}" = "completed" ]; then
               break
@@ -110,18 +124,24 @@ jobs:
           owner: ${{ inputs.owner }}
           repository: ${{ inputs.repository }}
           run-id: ${{ inputs.run-id }}
+          attempt: ${{ inputs.attempt }}
 
-      - name: Retry worfklow run for repo=${{ inputs.owner }}/${{ inputs.repository }} and run-id=${{ inputs.run-id }}
+      - name: Retry workflow run for repo=${{ inputs.owner }}/${{ inputs.repository }} and run-id=${{ inputs.run-id }}
         if: steps.errors.outputs.found == 'true' || inputs.error-messages == '[]'
         env:
+          ATTEMPT: ${{ inputs.attempt }}
           DRY_RUN: ${{ inputs.dry-run }}
           GH_REPO: ${{ inputs.owner }}/${{ inputs.repository }}
           GH_TOKEN: ${{ steps.github-token.outputs.token }}
           RUN_ID: ${{ inputs.run-id }}
           RERUN_WHOLE_WORKFLOW: ${{ inputs.rerun-whole-workflow }}
         run: |
+          # trigger a new run retrying failed jobs or the whole workflow
+          last_attempt=$(gh run view "${RUN_ID}" --json attempt --jq '.attempt')
           if [ "${DRY_RUN}" = "true" ]; then
             echo "Skipping retry since this is a dry-run ..."
+          elif [ -n "${ATTEMPT}" ] && [ "${last_attempt}" -ne "$ATTEMPT" ]; then
+            echo "The specified attempt number to retry '$ATTEMPT' does not match the latest attempt number ${last_attempt}, meaning the workflow has been retried already for this attempt. Aborting ..."
           else
             echo "Triggering a new attempt of run-id=${RUN_ID} ..."
             if [ "${RERUN_WHOLE_WORKFLOW}" = "true" ]; then
