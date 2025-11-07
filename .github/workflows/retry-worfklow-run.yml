@@ -87,8 +87,18 @@ jobs:
           GH_TOKEN: ${{ steps.github-token.outputs.token }}
           RUN_ID: ${{ inputs.run-id }}
         run: |
+          # Wait until the workflow run is completed
+
           echo "Waiting for the workflow run to complete ..."
-          gh run watch "${RUN_ID}"
+          while true; do
+            status=$(gh run view "${RUN_ID}" --json status --jq '.status')
+            echo "Current status: ${status}"
+            if [ "${status}" = "completed" ]; then
+              break
+            fi
+            sleep 3
+          done
+        shell: bash
 
       - name: Check annotations and job logs for errors
         id: errors
