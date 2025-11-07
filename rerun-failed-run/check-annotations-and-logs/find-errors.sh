@@ -9,11 +9,16 @@ GH_REPO=${GH_REPO?}
 GH_TOKEN=${GH_TOKEN?}
 RELATIVE_SCRIPT_PATH=$(dirname "$0")
 RUN_ID=${RUN_ID?}
+ATTEMPT_GH_API_PATH="${ATTEMPT:+/attempts/$ATTEMPT}"
+ATTEMPT_GH_CLI_FLAG="${ATTEMPT:+--attempt $ATTEMPT}"
+
 
 # Fetch failed logs of the workflow run, i.e. with an exit status != 0
 
+# shellcheck disable=SC2086
 logs=$(
   gh run view "$RUN_ID" \
+    ${ATTEMPT_GH_CLI_FLAG} \
     --exit-status --log-failed || true
 )
 
@@ -21,7 +26,7 @@ logs=$(
 # Id of the WorkflowRun object is needed to fetch annotations from GitHub GraphQL API
 node_id=$(
   gh api \
-    "/repos/{owner}/{repo}/actions/runs/${RUN_ID}" \
+    "/repos/{owner}/{repo}/actions/runs/${RUN_ID}${ATTEMPT_GH_API_PATH}" \
     --jq '.node_id'
 )
 annotations=$(

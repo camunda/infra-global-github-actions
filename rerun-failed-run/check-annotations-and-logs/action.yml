@@ -19,6 +19,9 @@ inputs:
     description: GitHub repository of the workflow run to check
   run-id:
     description: Id of the workflow run to check
+  attempt:
+    description: The attempt number of the workflow run to check
+    required: false
 
 outputs:
   found:
@@ -32,6 +35,7 @@ runs:
   - name: Check for errors in workflow run
     id: errors
     env:
+      ATTEMPT: ${{ inputs.attempt }}
       ERROR_MESSAGES: ${{ inputs.error-messages }}
       GH_REPO: ${{ inputs.owner }}/${{ inputs.repository }}
       GH_TOKEN: ${{ inputs.github-token }}

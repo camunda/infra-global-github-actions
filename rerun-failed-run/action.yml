@@ -107,6 +107,7 @@ runs:
             "owner": "${{ steps.repository.outputs.owner }}",
             "repository": "${{ steps.repository.outputs.name }}",
             "run-id": "${{ inputs.run-id }}",
+            "attempt": "${{ github.run_attempt }}",
             "rerun-whole-workflow": "${{ inputs.rerun-whole-workflow }}"
           }
         workflow_timeout_seconds: 120
