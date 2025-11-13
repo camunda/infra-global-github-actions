@@ -6,7 +6,8 @@ description: |
 
 inputs:
   github-token:
-    description: GitHub token with access to workflow runs
+    description: |
+      GitHub token with access to workflow runs (actions: read)
     required: true
   repository:
     description: |
