@@ -1,0 +1,141 @@
+name: Workflow Run Statistics
+
+description: |
+  Retrieves workflow run statistics for specified workflows and branches in a repository.
+  Returns counts of successful, failed, and other workflow run statuses within a specified time range.
+
+inputs:
+  github-token:
+    description: GitHub token with access to workflow runs
+    required: true
+  repository:
+    description: |
+      Repository to check in the format 'owner/repo'.
+      If not provided, uses the current repository.
+    required: false
+    default: ${{ github.repository }}
+  workflows:
+    description: |
+      List of workflows to check in the format 'workflow-identifier:branch' (one per line).
+      Workflow identifier can be:
+      - Workflow name: 'CI:main'
+      - Workflow ID: '12345:main'
+      - Workflow filename: 'ci.yml:main'
+      Example:
+        CI:main
+        Release:stable/8.6
+        build.yml:main
+        67890:develop
+    required: true
+  # TODO: Add support for precise time window (e.g., time-from and time-to)
+  lookback-minutes:
+    description: |
+      Number of minutes to look back from current time for workflow statistics.
+      Example: '360' for last 6 hours, '60' for last hour
+    required: true
+
+outputs:
+  stats:
+    description: JSON array with statistics for each workflow/branch combination
+    value: ${{ steps.collect-stats.outputs.stats }}
+
+runs:
+  using: composite
+  steps:
+    - name: Collect workflow run statistics
+      id: collect-stats
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPOSITORY: ${{ inputs.repository }}
+        WORKFLOWS: ${{ inputs.workflows }}
+        LOOKBACK_MINUTES: ${{ inputs.lookback-minutes }}
+      run: |
+        set -euo pipefail
+
+        stats=[]
+        owner="${REPOSITORY%/*}"
+        repo_name="${REPOSITORY#*/}"
+
+        # Build date filter parameters
+        TIME_FROM=$(date -u -d "$LOOKBACK_MINUTES minutes ago" +"%Y-%m-%dT%H:%M:%SZ")
+        date_params="-f created=>$TIME_FROM"
+
+        echo "Collecting statistics from $TIME_FROM onwards ($LOOKBACK_MINUTES minutes window)"
+
+        # Read all lines, even if there's NO trailing newline
+        while IFS= read -r workflow_branch; do
+          [[ -z "$workflow_branch" ]] && continue   # skip empty lines
+
+          # Trim whitespace and validate format
+          workflow_branch=$(echo "$workflow_branch" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+          if [[ ! "$workflow_branch" =~ ^[^:]+:[^:]+$ ]]; then
+            echo "  Error: Invalid format '$workflow_branch'. Expected 'workflow-name:branch'"
+            exit 1
+          fi
+
+          # Parse workflow:branch
+          workflow="${workflow_branch%:*}"
+          branch="${workflow_branch#*:}"
+
+          # Skip if workflow name or branch is empty
+          [[ -z "$workflow" ]] || [[ -z "$branch" ]] && continue
+
+          echo "Processing: $workflow @ $branch"
+
+          # Determine workflow ID
+          if [[ "$workflow" =~ ^[0-9]+$ ]]; then
+            workflow_id="$workflow"
+            echo "  Using workflow ID: $workflow_id"
+          else
+            # Single API call to get all workflows, then filter
+            field=$([[ "$workflow" =~ \.(yml|yaml)$ ]] && echo "path" || echo "name")
+            workflow_id=$(gh api "repos/$owner/$repo_name/actions/workflows" --jq ".workflows[] | select(.$field == \"$workflow\") | .id")
+            echo "  Looking up workflow: $workflow"
+          fi
+
+          if [ -z "$workflow_id" ]; then
+            echo "  Error: Workflow '$workflow' not found"
+            exit 1
+          fi
+
+          # Determine workflow URLs
+          workflow_data=$(gh api "repos/$owner/$repo_name/actions/workflows/$workflow_id" --jq '{path, html_url}')
+          workflow_html_url=$(echo "$workflow_data" | jq -r '.html_url')
+          workflow_filename=$(echo "$workflow_data" | jq -r '.path' | sed 's/.*\///')
+          workflow_url="https://github.com/$owner/$repo_name/actions/workflows/$workflow_filename"
+
+          # Fetch workflow runs using GitHub API
+          runs=$(gh api \
+            -X GET \
+            "/repos/$owner/$repo_name/actions/workflows/$workflow_id/runs" \
+            -f "branch=$branch" $date_params \
+            --paginate \
+            --jq ".workflow_runs[]"
+          )
+
+          # Extract workflow run statistics
+          run_stats=$(echo "$runs" | jq -s '{
+            total: length,
+            success: [.[] | select(.conclusion == "success")] | length,
+            failure: [.[] | select(.conclusion == "failure")] | length,
+            cancelled: [.[] | select(.conclusion == "cancelled")] | length,
+            skipped: [.[] | select(.conclusion == "skipped")] | length,
+            in_progress: [.[] | select(.status == "in_progress")] | length,
+            queued: [.[] | select(.status == "queued")] | length
+          }')
+
+          # Final result array
+          stats=$(echo "$stats" | jq -c \
+            --arg workflow "$workflow" \
+            --arg branch "$branch" \
+            --arg url "$workflow_url?query=branch%3A$branch" \
+            --arg html_url "$workflow_html_url" \
+            --argjson run_stats "$run_stats" \
+            '. + [{ workflow: $workflow, branch: $branch, url: $url, html_url: $html_url } + $run_stats]')
+
+        done <<< "$WORKFLOWS"
+
+        echo "$stats" | jq .
+
+        echo "stats=$stats" >> "$GITHUB_OUTPUT"
+      shell: bash
