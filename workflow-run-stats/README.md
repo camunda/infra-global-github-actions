@@ -56,6 +56,19 @@ A GitHub Action that collects workflow run statistics over a specified time wind
     "skipped": 0,
     "in_progress": 0,
     "queued": 0
+  },
+  {
+    "workflow": "Release",
+    "branch": "main",
+    "url": "https://github.com/owner/repo/actions/workflows/release.yml?query=branch%3Amain",
+    "html_url": "https://github.com/owner/repo/actions/workflows/release.yml",
+    "total": 10,
+    "success": 7,
+    "failure": 2,
+    "cancelled": 1,
+    "skipped": 0,
+    "in_progress": 0,
+    "queued": 0
   }
 ]
 ```
@@ -92,7 +105,6 @@ jobs:
           repository: ${{ github.repository }}
           workflows: |
             CI:main
-            Release:main
           lookback-minutes: '360'
 
       - name: Alert on failures

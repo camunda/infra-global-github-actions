@@ -1,0 +1,112 @@
+#  Monitor the retry-workflow-run workflow for failures and send Slack alerts
+name: Retry workflow run with errors - Monitoring
+
+on:
+  schedule:
+    # Run every 3 hours
+    - cron: '0 */3 * * *'
+  workflow_dispatch:
+    inputs:
+      lookback-minutes:
+        description: 'Number of minutes to look back from current time (default: 360 for 6 hours)'
+        required: false
+        default: '360'
+      max-failures:
+        description: 'Number of failed runs to trigger alert (default: 5)'
+        required: false
+        default: '5'
+
+jobs:
+  monitor-retry-workflow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Import Secrets
+        id: secrets
+        uses: hashicorp/vault-action@v3.4.0
+        with:
+          url: ${{ secrets.VAULT_ADDR }}
+          method: approle
+          roleId: ${{ secrets.VAULT_ROLE_ID }}
+          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          secrets: |
+            secret/data/products/infra/ci/infra-core SLACK_WEBHOOK_INFRA_ALERTS;
+
+      - name: Get workflow statistics
+        id: stats
+        uses: ./workflow-run-stats
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          workflows: |
+            .github/workflows/retry-worfklow-run.yml:main
+          lookback-minutes: ${{ inputs.lookback-minutes || '360' }}
+
+      - name: Send Slack notification
+        if: fromJson(steps.stats.outputs.stats)[0].failure > (inputs.max-failures || 5)
+        uses: slackapi/slack-github-action@v2
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "header",
+                  "text": {
+                    "type": "plain_text",
+                    "text": ":warning: Workflow Failures Detected"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*${{ fromJson(steps.stats.outputs.stats)[0].failure }}* failed runs for workflow *<${{ fromJson(steps.stats.outputs.stats)[0].html_url }}|${{ fromJson(steps.stats.outputs.stats)[0].workflow }}>* on branch *${{ fromJson(steps.stats.outputs.stats)[0].branch }}* in repository *${{ github.repository }}* detected in the last ${{ inputs.lookback-minutes || '360' }} minutes"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<${{ fromJson(steps.stats.outputs.stats)[0].url }}|View Workflow Runs>"
+                  }
+                },
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "<https://github.com/camunda/infra-core/wiki/GHA_Failure_Workflow_Retry_Workflow_Run|View Runbook>"
+                  }
+                }
+              ]
+            }
+          webhook: ${{ steps.secrets.outputs.SLACK_WEBHOOK_INFRA_ALERTS }}
+          webhook-type: incoming-webhook
+
+  notify-on-failure:
+    if: always() && needs.monitor-retry-workflow.result == 'failure'
+    needs:
+    - monitor-retry-workflow
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+    - name: Import Secrets
+      id: secrets
+      uses: hashicorp/vault-action@v3.4.0
+      with:
+        url: ${{ secrets.VAULT_ADDR }}
+        method: approle
+        roleId: ${{ secrets.VAULT_ROLE_ID }}
+        secretId: ${{ secrets.VAULT_SECRET_ID }}
+        exportEnv: false  # we rely on step outputs, no need for environment variables
+        secrets: |
+          secret/data/products/infra/ci/infra-core SLACK_WEBHOOK_INFRA_ALERTS;
+    - name: Send Slack notification
+      uses: 8398a7/action-slack@v3
+      with:
+        text: ":no_entry: Failed GHA workflow run, see runbook: https://github.com/camunda/infra-core/wiki/GHA_Failure_Workflow_Retry_Workflow_Run"
+        status: failure
+        channel: \#infra-alerts
+        fields: repo,action,eventName,ref,workflowRun,job
+      env:
+        SLACK_WEBHOOK_URL: ${{ steps.secrets.outputs.SLACK_WEBHOOK_INFRA_ALERTS }}
