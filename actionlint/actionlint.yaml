@@ -53,6 +53,8 @@ self-hosted-runner:
     - n1-standard-32-netssd-preempt
     - n1-standard-8-netssd-preempt
     - n1-standard-8-netssd-preempt-quick
+    # by GitHub but not known to actionlint
+    - macos-15-intel
 
 # Configuration variables in array of strings defined in your repository or
 # organization. `null` means disabling configuration variables check.
