@@ -6,7 +6,7 @@ inputs:
   version:
     description: Version of the FOSSA CLI to install
     # renovate: datasource=github-releases depName=fossas/fossa-cli
-    default: 3.12.1
+    default: 3.12.2
     required: true
 runs:
   using: composite
