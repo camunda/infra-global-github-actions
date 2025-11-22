@@ -35,7 +35,7 @@ runs:
   using: composite
   steps:
   - name: Checkout repository
-    uses: actions/checkout@v5
+    uses: actions/checkout@v6
     with:
       repository: ${{ inputs.repository || github.repository }}
       token: ${{ inputs.github-token }}
