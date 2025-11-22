@@ -18,6 +18,7 @@ inputs:
     required: false
     default: |
       feat
+      feat!
       fix
       docs
       style
