@@ -116,12 +116,15 @@ runs:
         exit 1
       fi
 
+      blacklisted_dep_issues=$(echo "$results" | jq -c '.issues | map(select(.type == "blacklisted_dependency"))')
+      blacklisted_dep_issues_count=$(echo "$blacklisted_dep_issues" | jq '. | length')
       license_issues=$(echo "$results" | jq -c '.issues | map(select(.type == "policy_flag"))')
       license_issues_count=$(echo "$license_issues" | jq '. | length')
       security_issues=$(echo "$results" | jq -c '.issues | map(select(.type == "vulnerability"))')
       security_issues_count=$(echo "$security_issues" | jq '. | length')
 
       echo "License issues: ${license_issues_count}"
+      echo "Quality (blacklisted dependency) issues: ${blacklisted_dep_issues_count} (non-license issues are currently ignored)"
       echo "Security issues: ${security_issues_count} (non-license issues are currently ignored)"
 
       echo "license-issues=${license_issues}" >> $GITHUB_OUTPUT
