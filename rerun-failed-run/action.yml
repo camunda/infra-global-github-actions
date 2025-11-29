@@ -91,7 +91,7 @@ runs:
       shell: bash
 
     - name: Trigger retry-worfklow-run.yml
-      uses: codex-/return-dispatch@v2
+      uses: codex-/return-dispatch@v3
       id: dispatch
       with:
         owner: camunda
