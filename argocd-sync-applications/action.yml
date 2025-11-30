@@ -17,7 +17,7 @@ inputs:
   cli-version:
     description: Version of the ArgoCD CLI to use.
     # renovate: datasource=docker depName=quay.io/argoproj/argocd
-    default: 3.2.0
+    default: 3.2.1
   max-waiting-time-health:
     description: |
       The time (in seconds) to wait for the ArgoCD application to be healthy.
