@@ -1,0 +1,20 @@
+---
+name: Assert No AI Commits
+
+description: Asserts that no AI-authored commits are present in the PR to prevent AI-generated code from being merged without proper human attribution.
+
+runs:
+  using: composite
+  steps:
+  - uses: actions/checkout@v4
+    if: ${{ github.event.pull_request }}
+    with:
+      fetch-depth: 0
+      ref: ${{ github.event.pull_request.head.sha }}
+
+  - name: Check for AI-authored commits
+    if: ${{ github.event.pull_request }}
+    shell: bash
+    env:
+      GIT_RANGE: "origin/${{ github.base_ref }}..${{ github.event.pull_request.head.sha }}"
+    run: ${{ github.action_path }}/check.sh
