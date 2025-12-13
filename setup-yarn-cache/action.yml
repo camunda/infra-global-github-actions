@@ -62,7 +62,7 @@ runs:
 
   - name: Save global Yarn cache on non-PRs
     if: ${{ steps.is-cache-create-branch.outputs.result == 'true' }}
-    uses: actions/cache@v4
+    uses: actions/cache@v5
     with:
       # need to use an environment variable here, thx to https://github.com/PHP-CS-Fixer/PHP-CS-Fixer/pull/7415
       path: "${{ env.CUSTOM_YARN_GLOBAL_CACHE_DIR }}"
@@ -75,7 +75,7 @@ runs:
   - name: Restore global Yarn cache always
     # Restore cache (but don't save it) if we're not on main or stable/* branches and cache is not disabled
     if: ${{ steps.is-cache-create-branch.outputs.result != 'true' && steps.is-cache-enabled.outputs.is-cache-enabled == 'true' }}
-    uses: actions/cache/restore@v4
+    uses: actions/cache/restore@v5
     with:
       path: "${{ env.CUSTOM_YARN_GLOBAL_CACHE_DIR }}"
       key: ${{ runner.environment }}-${{ runner.os }}-yarn-${{ hashFiles(format('{0}/yarn.lock', inputs.directory)) }}
