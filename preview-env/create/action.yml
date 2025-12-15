@@ -52,7 +52,7 @@ runs:
   using: composite
   steps:
   - name: Restore cache
-    uses: actions/cache@v4
+    uses: actions/cache@v5
     id: tool-cache-argocd
     with:
       path: /usr/local/bin/argocd
