@@ -11,7 +11,7 @@ You can see the list of checks supported by `actionlint` [here](https://github.c
 
 | Input Name              | Default Value | Description  |
 |-------------------------|---------------|-------------------------------------------------------------------------|
-| `version`               | "1.7.4"       | Actionlint version that will be downloaded  |
+| `version`               | "1.7.9"       | Actionlint version that will be downloaded  |
 | `ignore`                |               | Multiline field. Allow you to customized ignored errors using regular expression. One ignore pattern per line |
 | `use_shellcheck`        | "false"       | Enable actionlint to use shellcheck for all shell scripts in the repository. |
 

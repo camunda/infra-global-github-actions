@@ -6,7 +6,7 @@ description: Linting for GitHub workflows
 inputs:
   version:
     description: Actionlint version
-    default: "1.7.4"
+    default: "1.7.9"
   ignore:
     description: Multiline; Ignore errors by messaging using regular expression.
   use_shellcheck:
