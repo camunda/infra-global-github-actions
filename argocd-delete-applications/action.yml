@@ -1,0 +1,144 @@
+name: Delete ArgoCD Applications
+
+description: |
+  Delete ArgoCD applications by name or label selector, with optional age filtering.
+
+inputs:
+  argocd-token:
+    description: ArgoCD token with sufficient permissions to delete applications.
+    required: true
+  github-token:
+    description: GitHub token to avoid rate limiting when downloading ArgoCD CLI.
+    required: true
+  server:
+    description: URL of the ArgoCD server.
+    default: argocd.int.camunda.com
+  app-name:
+    description: |
+      Specific ArgoCD application name to delete.
+      Either app-name or label-selector must be provided.
+    required: false
+  label-selector:
+    description: |
+      Label selector to filter applications (comma or newline-separated).
+      e.g., 'preview-env=smoke-test,repo=camunda/camunda'
+      Either app-name or label-selector must be provided.
+    required: false
+  min-age:
+    description: Minimum age since creation (e.g. 2d, 12h, 30m, 45s). Apps younger are skipped.
+    default: "0"
+  cascade:
+    description: |
+      Whether to perform a cascading deletion of resources managed by the app.
+      If true, deletes the app and all its resources. If false, only deletes the app.
+    default: "true"
+  cli-version:
+    description: Version of the ArgoCD CLI to use.
+    # renovate: datasource=docker depName=quay.io/argoproj/argocd
+    default: "3.2.1"
+
+runs:
+  using: composite
+  steps:
+    - name: Validate inputs
+      if: inputs.app-name == '' && inputs.label-selector == ''
+      shell: bash
+      run: |
+        echo "❌ Either 'app-name' or 'label-selector' must be provided"
+        exit 1
+
+    - name: Setup ArgoCD CLI
+      uses: clowdhaus/argo-cd-action@v3.2.0
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+      with:
+        command: version
+        options: --client
+        version: ${{ inputs.cli-version }}
+
+    - name: Build app list to delete
+      id: build-list
+      shell: bash
+      env:
+        ARGOCD_AUTH_TOKEN: ${{ inputs.argocd-token }}
+        ARGOCD_OPTS: "--grpc-web"
+        ARGOCD_SERVER: ${{ inputs.server }}
+        APP_NAME: ${{ inputs.app-name }}
+        LABEL_SELECTOR: ${{ inputs.label-selector }}
+        MIN_AGE: ${{ inputs.min-age }}
+      run: |
+        # Convert human-readable duration to seconds (e.g. 2d, 12h, 30m, 45s)
+        time2seconds() {
+          echo "$1" | sed 's/d/*24*3600 +/g; s/h/*3600 +/g; s/m/*60 +/g; s/s/+/g; s/+[ ]*$//g' | bc
+        }
+
+        # Normalize label-selector: support both newline and comma separation
+        label_selector=$(echo "${LABEL_SELECTOR}" | tr '\n' ',' | sed 's/,,*/,/g' | sed 's/^,//;s/,$//')
+
+        min_age_seconds=$(time2seconds "$MIN_AGE")
+        echo "⏱️ Min age: $MIN_AGE ($min_age_seconds seconds)"
+
+        apps_to_delete="[]"
+        current_time=$(date +%s)
+
+        # Get apps: single app or by label selector
+        if [[ -n "$APP_NAME" ]]; then
+          echo "🔍 Fetching app: $APP_NAME"
+          apps_json=$(argocd app get "$APP_NAME" -o json | jq '[.]')
+        else
+          echo "🏷️ Finding apps with label: $label_selector"
+          apps_json=$(argocd app list -l "$label_selector" -o json)
+        fi
+
+        app_count=$(echo "$apps_json" | jq 'length')
+        if [[ "$app_count" -eq 0 ]]; then
+          echo "ℹ️ No apps found"
+          echo "apps=[]" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+
+        echo "📋 Found $app_count app(s)"
+
+        # Filter by age and build list
+        while read -r app; do
+          name=$(echo "$app" | jq -r '.metadata.name')
+
+          if [[ "$min_age_seconds" != "0" ]]; then
+            created=$(echo "$app" | jq -r '.metadata.creationTimestamp')
+            created_ts=$(date -jf "%Y-%m-%dT%H:%M:%SZ" "$created" +%s 2>/dev/null || date -d "$created" +%s)
+            age=$((current_time - created_ts))
+            if [[ $age -lt $min_age_seconds ]]; then
+              echo "⏳ $name: age ${age}s < min-age ${min_age_seconds}s, skipping"
+              continue
+            fi
+          fi
+
+          apps_to_delete=$(echo "$apps_to_delete" | jq --arg n "$name" '. += [$n]')
+        done < <(echo "$apps_json" | jq -c '.[]')
+
+        echo "🗑️ Apps to delete: $(echo "$apps_to_delete" | jq -c '.')"
+        echo "apps=$(echo "$apps_to_delete" | jq -c '.')" >> "$GITHUB_OUTPUT"
+
+    - name: Delete apps
+      if: steps.build-list.outputs.apps != '[]'
+      shell: bash
+      env:
+        ARGOCD_AUTH_TOKEN: ${{ inputs.argocd-token }}
+        ARGOCD_OPTS: "--grpc-web"
+        ARGOCD_SERVER: ${{ inputs.server }}
+        CASCADE: ${{ inputs.cascade }}
+        APPS: ${{ steps.build-list.outputs.apps }}
+      run: |
+        failed=0
+
+        while read -r name; do
+          echo "🗑️ Deleting: $name"
+          argocd app delete "$name" --yes --cascade="$CASCADE" || { echo "❌ Failed: $name"; failed=1; }
+        done < <(echo "$APPS" | jq -r '.[]')
+
+        if [[ $failed -ne 0 ]]; then
+          echo "❌ Some deletions failed"
+          exit 1
+        fi
+
+        echo "✅ All apps deleted successfully"
