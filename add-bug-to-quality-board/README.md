@@ -1,6 +1,6 @@
 # Add to Quality Board
 
-This GitHub Action automatically adds new issues labeled as `kind/bug` to the [Camunda Quality Board project](https://github.com/orgs/camunda/projects/187) and updates the Severity & Component fields based on issue labels.
+This GitHub Action automatically adds new issues labeled as `kind/bug` to a GitHub Project (defaults to the [Camunda Quality Board project](https://github.com/orgs/camunda/projects/187)) and updates the Severity & Component fields based on issue labels. The action works with any organization's project.
 
 ## Usage
 
@@ -21,7 +21,8 @@ jobs:
         uses: camunda/infra-global-github-actions/add-bug-to-quality-board@main
         with:
           github-token: ${{ secrets.ADD_TO_QUALITY_BOARD_PAT }}
-          project-number: "187"   # Optional, defaults to 187
+          project-number: "187"            # Optional, defaults to 187
+          component-label: "component/zeebe"  # Optional, adds a component label to the issue
         if: >
           # Only run this job for issues labeled as 'kind/bug' and
           # for the relevant GitHub issue events that indicate a new or updated issue.
@@ -38,10 +39,13 @@ jobs:
 | Input           | Description                                                                                |
 | --------------  | -------------------------------------------------------------------------------------------|
 | `github-token`  | **Required.** A GitHub token with permission to access projects and update issues.         |
-| `project-number`| **Optional.** The number of the GitHub Project where the issues is added. 187 by default   |
+| `project-number`| **Optional.** The number of the GitHub Project where the issue is added. Defaults to 187.  |
+| `component-label`| **Optional.** A component label to add to the issue (e.g., 'component/zeebe'). If not provided, no label is added. |
 
 ## How it works
-* Adds the issue to the [Quality Board project](https://github.com/orgs/camunda/projects/187) (project number 187).
+* Adds the issue to the specified GitHub Project (defaults to project number 187).
+* Automatically detects the repository owner/organization and uses it for all project operations.
+* Optionally adds a component label to the issue if `component-label` input is provided.
 * Extracts component/* and severity/* labels from the issue.
 * Updates the corresponding project fields with the extracted values.
 * Only runs if the issue has the kind/bug label.

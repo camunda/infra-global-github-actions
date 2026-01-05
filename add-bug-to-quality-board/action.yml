@@ -10,14 +10,32 @@ inputs:
     description: "The number of the Quality Board project."
     required: false
     default: "187"
+  component-label:
+    description: "Optional component label to add to the issue (e.g., 'component/zeebe')."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
   steps:
+    - name: Add component label to issue
+      if: ${{ inputs.component-label != '' }}
+      uses: actions/github-script@v8
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          await github.rest.issues.addLabels({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            labels: ['${{ inputs.component-label }}']
+          });
+          console.log('Added label: ${{ inputs.component-label }}');
+
     - name: Add issue to Quality Board project
       uses: actions/add-to-project@v1.0.2
       with:
-        project-url: https://github.com/orgs/camunda/projects/${{ inputs.project-number }}
+        project-url: https://github.com/orgs/${{ github.repository_owner }}/projects/${{ inputs.project-number }}
         github-token: ${{ inputs.github-token }}
 
     - name: Get project ID
@@ -34,7 +52,7 @@ runs:
             }
           `;
           const res = await github.graphql(query, {
-            org: "camunda",
+            org: context.repo.owner,
             number: parseInt("${{ inputs.project-number }}")
           });
           console.log("Project ID:", res.organization.projectV2.id);
@@ -71,9 +89,9 @@ runs:
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          const org = "camunda";
+          const org = context.repo.owner;
           const projectNumber = parseInt("${{ inputs.project-number }}");
-          const issueNumber = ${{ github.event.issue.number }};
+          const issueNumber = context.issue.number;
           const maxRetries = 5;
           const waitMs = 5000; // 5 seconds
           let itemId = null;
