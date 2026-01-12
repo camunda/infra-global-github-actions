@@ -136,13 +136,13 @@ runs:
     # in case of the app didn't reach healthy state.
     # Events only get requested if a GitHub token with appropriate rights
     # is passed from the caller workflow.
-  - name: Setup Teleport
+  - name: Install Teleport
     if: failure() && inputs.github_token != ''
     id: setup_teleport
     uses: teleport-actions/setup@v1
     with:
-      # renovate: datasource=custom.teleport depName=public.ecr.aws/gravitational/teleport-ent-distroless
-      version: 18.5.1
+      proxy: camunda.teleport.sh:443
+      version: auto
   - name: Authenticate with Teleport
     if: failure() && steps.setup_teleport.outcome == 'success'
     id: auth_teleport
