@@ -109,7 +109,7 @@ runs:
       status: failure
       channel: '#infra-alerts' # overwritten by webhook config
       fields: repo,pullRequest
-      mention: 'subteam^S01K6MZC3AQ' # DRI is @infra-medic
+      mention: 'subteam^S06P4H8M7R8' # DRI is @infra-security-dri
       if_mention: always
     env:
       SLACK_WEBHOOK_URL: ${{ inputs.slack-webhook-url }}
