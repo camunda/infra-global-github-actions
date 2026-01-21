@@ -1,6 +1,6 @@
 name: fossa create-release and reports
 
-description: Creates FOSSA releases in separate groups and generates attribution and SBOM reports with configurable formats
+description: Creates FOSSA releases in separate groups, generates attribution and SBOM reports with configurable formats, waits for publication, and sends Slack notifications on timeout
 
 inputs:
   api-key:
@@ -44,6 +44,13 @@ inputs:
     description: 'Enable dry-run mode (print commands without executing)'
     required: false
     default: 'false'
+  slack-notify:
+    description: 'Send Slack notifications on publication timeout'
+    required: false
+    default: 'false'
+  slack-webhook-infra-alerts:
+    description: 'Slack webhook URL for infrastructure alerts'
+    required: false
 
 runs:
   using: composite
@@ -243,3 +250,243 @@ runs:
           echo "Successfully generated ${REPORT_TYPE} report"
         done
       shell: bash
+
+    - name: Wait for reports to be published
+      id: wait-for-publication
+      if: success()
+      env:
+        FOSSA_API_KEY: ${{ inputs.api-key }}
+        ATTRIBUTION_GROUP_ID: ${{ inputs.attribution-release-group-id }}
+        SBOM_GROUP_ID: ${{ inputs.sbom-release-group-id }}
+        ATTRIBUTION_RELEASE_ID: ${{ steps.create-releases.outputs.attribution-release-id }}
+        SBOM_RELEASE_ID: ${{ steps.create-releases.outputs.sbom-release-id }}
+        ATTRIBUTION_FORMAT: ${{ inputs.attribution-format }}
+        SBOM_FORMAT: ${{ inputs.sbom-format }}
+        GENERATE_ATTRIBUTION: ${{ inputs.generate-attribution }}
+        GENERATE_SBOM: ${{ inputs.generate-sbom }}
+        DRY_RUN: ${{ inputs.dry-run }}
+      run: |
+        set -e
+
+        MAX_WAIT_TIME=60
+        POLL_INTERVAL=5
+
+        # poll a release group for publication status
+        poll_release() {
+          local REPORT_TYPE=$1
+          local GROUP_ID=$2
+          local RELEASE_ID=$3
+          local FORMAT=$4
+          local GENERATE=$5
+
+          if [ "${GENERATE}" != "true" ]; then
+            echo "${REPORT_TYPE}: Skipping (generation disabled)"
+            return 0
+          fi
+
+          # Determine expected publishedOnPortal value based on format
+          # Format inputs: "TXT" or "CYCLONEDX_JSON"
+          # API returns: "attribution_txt" or "cyclonedx_json"
+          local EXPECTED_STATUS
+          case "${FORMAT}" in
+            TXT)
+              EXPECTED_STATUS="attribution_txt"
+              ;;
+            CYCLONEDX_JSON)
+              EXPECTED_STATUS="cyclonedx_json"
+              ;;
+            *)
+              echo "⚠️  ${REPORT_TYPE}: Unsupported format '${FORMAT}'"
+              echo "⚠️  Supported formats: TXT, CYCLONEDX_JSON"
+              return 1
+              ;;
+          esac
+
+          if [ "${DRY_RUN}" = "true" ]; then
+            echo "==== DRY-RUN: ${REPORT_TYPE} publication check ===="
+            echo "GET https://app.fossa.com/api/project_group/${GROUP_ID}/releases?count=10&page=1"
+            echo ""
+            echo "Would poll for release ID: ${RELEASE_ID}"
+            echo "Expected publishedOnPortal: ${EXPECTED_STATUS}"
+            echo "Max wait time: ${MAX_WAIT_TIME} seconds"
+            echo "✓ Would wait for ${REPORT_TYPE} report publication"
+            echo ""
+            return 0
+          fi
+
+          local ELAPSED=0
+          local PUBLISHED=false
+
+          echo "${REPORT_TYPE}: Waiting for publication (release ID: ${RELEASE_ID}, expected status: ${EXPECTED_STATUS})..."
+
+          while [ ${ELAPSED} -lt ${MAX_WAIT_TIME} ]; do
+            # Query the releases API
+            HTTP_CODE=$(curl --silent --output ${REPORT_TYPE}_status.json --write-out "%{http_code}" \
+              --request GET \
+              --header "accept: application/json" \
+              --header "authorization: Bearer ${FOSSA_API_KEY}" \
+              --url "https://app.fossa.com/api/project_group/${GROUP_ID}/releases?count=10&page=1")
+
+            if [ "${HTTP_CODE}" != "200" ]; then
+              echo "⚠️  ${REPORT_TYPE}: Failed to check status (HTTP ${HTTP_CODE})"
+              cat ${REPORT_TYPE}_status.json
+              rm -f ${REPORT_TYPE}_status.json
+              sleep ${POLL_INTERVAL}
+              ELAPSED=$((ELAPSED + POLL_INTERVAL))
+              continue
+            fi
+
+            # Find our release in the response and check publishedOnPortal
+            PUBLISHED_STATUS=$(jq -r ".releases[] | select(.id == ${RELEASE_ID}) | .publishedOnPortal" ${REPORT_TYPE}_status.json)
+
+            if [ -z "${PUBLISHED_STATUS}" ]; then
+              echo "⚠️  ${REPORT_TYPE}: Release ${RELEASE_ID} not found in response"
+              rm -f ${REPORT_TYPE}_status.json
+              sleep ${POLL_INTERVAL}
+              ELAPSED=$((ELAPSED + POLL_INTERVAL))
+              continue
+            fi
+
+            echo "${REPORT_TYPE}: Current status: ${PUBLISHED_STATUS} (elapsed: ${ELAPSED}s)"
+
+            if [ "${PUBLISHED_STATUS}" = "${EXPECTED_STATUS}" ]; then
+              echo "✓ ${REPORT_TYPE}: Successfully published!"
+              PUBLISHED=true
+              rm -f ${REPORT_TYPE}_status.json
+              return 0
+            elif [ "${PUBLISHED_STATUS}" = "null" ] || [ "${PUBLISHED_STATUS}" = "pending" ]; then
+              # Still processing, continue waiting
+              rm -f ${REPORT_TYPE}_status.json
+              sleep ${POLL_INTERVAL}
+              ELAPSED=$((ELAPSED + POLL_INTERVAL))
+            else
+              # Unexpected status
+              echo "⚠️  ${REPORT_TYPE}: Unexpected status '${PUBLISHED_STATUS}' (expected '${EXPECTED_STATUS}')"
+              rm -f ${REPORT_TYPE}_status.json
+              sleep ${POLL_INTERVAL}
+              ELAPSED=$((ELAPSED + POLL_INTERVAL))
+            fi
+          done
+
+          # Timeout reached
+          if [ "${PUBLISHED}" = "false" ]; then
+            echo "⚠️  WARNING: ${REPORT_TYPE} report publication timeout after ${MAX_WAIT_TIME} seconds"
+            echo "⚠️  Last known status: ${PUBLISHED_STATUS}"
+            echo "⚠️  The report may still be processing. Check FOSSA portal manually."
+            rm -f ${REPORT_TYPE}_status.json
+            return 1
+          fi
+        }
+
+        # Export function for parallel execution
+        export -f poll_release
+        export FOSSA_API_KEY MAX_WAIT_TIME POLL_INTERVAL DRY_RUN
+
+        # Poll both reports in parallel using background jobs
+        ATTRIBUTION_FAILED=0
+        SBOM_FAILED=0
+
+        poll_release "attribution" "${ATTRIBUTION_GROUP_ID}" "${ATTRIBUTION_RELEASE_ID}" "${ATTRIBUTION_FORMAT}" "${GENERATE_ATTRIBUTION}" &
+        ATTRIBUTION_PID=$!
+
+        poll_release "sbom" "${SBOM_GROUP_ID}" "${SBOM_RELEASE_ID}" "${SBOM_FORMAT}" "${GENERATE_SBOM}" &
+        SBOM_PID=$!
+
+        # Wait for both background jobs and capture their exit codes
+        wait ${ATTRIBUTION_PID} || ATTRIBUTION_FAILED=$?
+        wait ${SBOM_PID} || SBOM_FAILED=$?
+
+        # Report results
+        echo ""
+        echo "==== Publication Status Summary ===="
+        if [ ${ATTRIBUTION_FAILED} -eq 0 ] && [ "${GENERATE_ATTRIBUTION}" = "true" ]; then
+          echo "✓ Attribution report: Published"
+        elif [ "${GENERATE_ATTRIBUTION}" = "true" ]; then
+          echo "⚠️  Attribution report: Publication timeout (see warnings above)"
+        fi
+
+        if [ ${SBOM_FAILED} -eq 0 ] && [ "${GENERATE_SBOM}" = "true" ]; then
+          echo "✓ SBOM report: Published"
+        elif [ "${GENERATE_SBOM}" = "true" ]; then
+          echo "⚠️  SBOM report: Publication timeout (see warnings above)"
+        fi
+
+        # Don't fail the workflow if reports timeout, just warn
+        if [ ${ATTRIBUTION_FAILED} -ne 0 ] || [ ${SBOM_FAILED} -ne 0 ]; then
+          echo ""
+          echo "::warning::One or more FOSSA reports did not publish within the timeout period. Notify @infra-medic to check the FOSSA portal manually."
+          echo "publication-timeout=true" >> ${GITHUB_OUTPUT}
+        else
+          echo "publication-timeout=false" >> ${GITHUB_OUTPUT}
+        fi
+
+        # Set individual report status outputs
+        echo "attribution-published=$([[ ${ATTRIBUTION_FAILED} -eq 0 ]] && echo 'true' || echo 'false')" >> ${GITHUB_OUTPUT}
+        echo "sbom-published=$([[ ${SBOM_FAILED} -eq 0 ]] && echo 'true' || echo 'false')" >> ${GITHUB_OUTPUT}
+
+        exit 0
+      shell: bash
+
+    - name: Send Slack notification
+      if: always() && steps.wait-for-publication.outputs.publication-timeout == 'true' && inputs.slack-notify == 'true'
+      uses: slackapi/slack-github-action@v2
+      with:
+        payload: |
+          {
+            "text": "⚠️ FOSSA Report Publication Timeout",
+            "blocks": [
+              {
+                "type": "header",
+                "text": {
+                  "type": "plain_text",
+                  "text": "⚠️ FOSSA Report Publication Timeout"
+                }
+              },
+              {
+                "type": "section",
+                "fields": [
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Repository:*\n${{ github.repository }}"
+                  },
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Release:*\n${{ inputs.release-number }}"
+                  },
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Branch:*\n${{ inputs.branch }}"
+                  },
+                  {
+                    "type": "mrkdwn",
+                    "text": "*Workflow:*\n<${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View Run>"
+                  }
+                ]
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "*Report Status:*\n${{ steps.wait-for-publication.outputs.attribution-published == 'true' && '✓' || '⚠️' }} Attribution Report (${{ inputs.attribution-format }})\n${{ steps.wait-for-publication.outputs.sbom-published == 'true' && '✓' || '⚠️' }} SBOM Report (${{ inputs.sbom-format }})"
+                }
+              },
+              {
+                "type": "section",
+                "text": {
+                  "type": "mrkdwn",
+                  "text": "One or more reports did not publish within the timeout period. Please check the FOSSA portal manually:\n• <https://app.fossa.com/projects/project_group/${{ inputs.attribution-release-group-id }}|Attribution Release Group>\n• <https://app.fossa.com/projects/project_group/${{ inputs.sbom-release-group-id }}|SBOM Release Group>\n\nFor manual license report management, check the <https://confluence.camunda.com/spaces/SRE/pages/277024793/FOSSA#FOSSA-LicenseReportManagement|Handbook>."
+                }
+              },
+              {
+                "type": "context",
+                "elements": [
+                  {
+                    "type": "mrkdwn",
+                    "text": "cc: @infra-medic"
+                  }
+                ]
+              }
+            ]
+          }
+        webhook: ${{ inputs.slack-webhook-infra-alerts }}
+        webhook-type: incoming-webhook
