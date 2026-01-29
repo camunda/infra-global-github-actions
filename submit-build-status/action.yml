@@ -75,23 +75,24 @@ runs:
     uses: google-github-actions/auth@v3
     with:
       credentials_json: '${{ inputs.gcp_credentials_json }}'
-
-  - name: Setup Google Cloud SDK
-    uses: google-github-actions/setup-gcloud@v3
-
-  - name: Print Google Cloud SDK version used
-    shell: bash
-    run: |
-      gcloud info
+      token_format: 'access_token'
 
   - name: Submit build status to CI Analytics
     shell: bash
     env:
-      BG_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
       BUILD_BASE_REF: "${{ github.base_ref && format('refs/heads/{0}', github.base_ref) || github.event.merge_group.base_ref }}"
       BUILD_HEAD_REF: "${{ github.head_ref && format('refs/heads/{0}', github.head_ref) || github.event.merge_group.head_ref }}"
+      ACCESS_TOKEN: "${{ steps.auth.outputs.access_token }}"
     run: |
-      cat <<EOF | tr '\n' ' ' | $BG_COMMAND insert "${{ inputs.big_query_table_name }}"
+      # Parse BigQuery table name (format: project_id:dataset.table)
+      TABLE_NAME="${{ inputs.big_query_table_name }}"
+      PROJECT_ID="${TABLE_NAME%%:*}"
+      DATASET_TABLE="${TABLE_NAME#*:}"
+      DATASET="${DATASET_TABLE%%.*}"
+      TABLE="${DATASET_TABLE#*.}"
+
+      # Build JSON row with conditional fields
+      JSON_ROW=$(cat <<EOF
       {
         "report_time": "$(date '+%Y-%m-%d %H:%M:%S')",
         "ci_url": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY",
@@ -111,5 +112,24 @@ runs:
         ${{ (inputs.user_description == '') && ' ' || format(', "user_description": "{0}"', inputs.user_description) }}
       }
       EOF
+      )
 
-    # See https://github.com/actions/runner/issues/409#issuecomment-1013325196 for above ternary operator!
+      # Create insertAll request payload
+      PAYLOAD=$(cat <<EOF
+      {
+        "rows": [
+          {
+            "json": $JSON_ROW
+          }
+        ]
+      }
+      EOF
+      )
+
+      # Submit to BigQuery REST API
+      echo "Submitting build status to BigQuery..."
+      curl -fsS -X POST \
+        "https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT_ID}/datasets/${DATASET}/tables/${TABLE}/insertAll" \
+        -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+        -H "Content-Type: application/json" \
+        -d "$PAYLOAD"
