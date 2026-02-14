@@ -22,7 +22,7 @@ runs:
   using: composite
   steps:
   - name: Process patches
-    uses: mikefarah/yq@v4.52.2
+    uses: mikefarah/yq@v4.52.3
     id: process
     env:
       OPTIONS: ${{ inputs.options }}
