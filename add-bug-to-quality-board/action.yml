@@ -14,6 +14,10 @@ inputs:
     description: "Optional component label to add to the issue (e.g., 'component/zeebe')."
     required: false
     default: ""
+  labels:
+    description: "Optional list of labels to add/consider (comma or newline separated)."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -31,6 +35,34 @@ runs:
             labels: ['${{ inputs.component-label }}']
           });
           console.log('Added label: ${{ inputs.component-label }}');
+
+    - name: Add provided labels to issue
+      if: ${{ inputs.labels != '' }}
+      uses: actions/github-script@v8
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const raw = `${{ inputs.labels }}`;
+
+          // Support comma-separated and/or newline-separated lists
+          const parsed = raw
+            .split(/\r?\n|,/g)
+            .map(s => s.trim())
+            .filter(Boolean);
+
+          if (parsed.length === 0) {
+            console.log("No labels parsed from inputs.labels");
+            return;
+          }
+
+          await github.rest.issues.addLabels({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            labels: parsed
+          });
+
+          console.log("Added labels:", parsed);
 
     - name: Add issue to Quality Board project
       uses: actions/add-to-project@v1.0.2
@@ -142,10 +174,31 @@ runs:
           const projectId = "${{ steps.get-project-id.outputs.projectId }}";
           const itemId = "${{ steps.get-item.outputs.itemId }}";
           const fields = JSON.parse('${{ steps.get-project-fields.outputs.fields }}');
-          const labels = ${{ toJson(github.event.issue.labels) }};
 
-          const severityLabel = labels.find(l => l.name.startsWith("severity/"));
-          const componentLabel = labels.find(l => l.name.startsWith("component/"));
+          // Labels from the GitHub event payload (objects with `.name`)
+          const eventLabels = ${{ toJson(github.event.issue.labels) }};
+
+          // Extra labels passed via action input (string list)
+          const rawExtra = `${{ inputs.labels }}`;
+          const extraLabels = rawExtra
+            .split(/\r?\n|,/g)
+            .map(s => s.trim())
+            .filter(Boolean);
+
+          // Backwards-compatible single component label input
+          const componentInput = `${{ inputs.component-label }}`.trim();
+
+          // Normalize to objects with `.name` so we can reuse existing logic.
+          // This ensures the provided labels are considered immediately in this run,
+          // even though `github.event.issue.labels` won't refresh after addLabels().
+          const effectiveLabels = [
+            ...(eventLabels || []),
+            ...extraLabels.map(name => ({ name })),
+            ...(componentInput ? [{ name: componentInput }] : [])
+          ];
+
+          const severityLabel = effectiveLabels.find(l => l.name?.startsWith("severity/"));
+          const componentLabel = effectiveLabels.find(l => l.name?.startsWith("component/"));
           const severity = severityLabel ? severityLabel.name.split("/")[1] : "";
           const component = componentLabel ? componentLabel.name.split("/")[1] : "";
 
