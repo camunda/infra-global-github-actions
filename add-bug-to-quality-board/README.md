@@ -21,8 +21,9 @@ jobs:
         uses: camunda/infra-global-github-actions/add-bug-to-quality-board@main
         with:
           github-token: ${{ secrets.ADD_TO_QUALITY_BOARD_PAT }}
-          project-number: "187"            # Optional, defaults to 187
+          project-number: "187"               # Optional, defaults to 187
           component-label: "component/zeebe"  # Optional, adds a component label to the issue
+          version-label: "version/8.9"        # Optional, adds a version label to the issue
         if: >
           # Only run this job for issues labeled as 'kind/bug' and
           # for the relevant GitHub issue events that indicate a new or updated issue.
@@ -41,13 +42,16 @@ jobs:
 | `github-token`  | **Required.** A GitHub token with permission to access projects and update issues.         |
 | `project-number`| **Optional.** The number of the GitHub Project where the issue is added. Defaults to 187.  |
 | `component-label`| **Optional.** A component label to add to the issue (e.g., 'component/zeebe'). If not provided, no label is added. |
+| `version-label` | **Optional.** A version label to add to the issue (e.g., 'version/8.9'). If not provided, no label is added. |
 
 ## How it works
 * Adds the issue to the specified GitHub Project (defaults to project number 187).
 * Automatically detects the repository owner/organization and uses it for all project operations.
 * Optionally adds a component label to the issue if `component-label` input is provided.
+* Optionally adds a version label to the issue if `version-label` input is provided.
 * Extracts component/* and severity/* labels from the issue.
 * Updates the corresponding project fields with the extracted values.
+* Posts a comment on the issue if required labels (severity/* or component/*) are missing, prompting users to add them.
 * Only runs if the issue has the kind/bug label.
 * **Component handling:**
   * Only components that are defined as custom fields in the Quality Board project are considered.
@@ -56,8 +60,9 @@ jobs:
 
 ## Prerequisites
 * Bug issues have the label `kind/bug`
-* Component labels follow the pattern component/COMPONENTNAME
-* Severity labels follow the pattern severity/SEVERITYLEVEL
+* Component labels follow the pattern `component/COMPONENTNAME`
+* Severity labels follow the pattern `severity/SEVERITYLEVEL`
+* Version labels follow the pattern `version/VERSION`
 
 ## Author
 Camunda QA Engineering Team
