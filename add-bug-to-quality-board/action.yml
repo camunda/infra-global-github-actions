@@ -1,5 +1,5 @@
 name: "Add Issue to Quality Board"
-description: "Assigns new issues labeled as bugs to the Quality Board project and updates Component & Severity fields."
+description: "Assigns new issues labeled as bugs to the Quality Board project and updates Severity, Likelihood & Component fields."
 author: "Camunda QA Engineering Team"
 
 inputs:
@@ -15,7 +15,7 @@ inputs:
     required: false
     default: ""
   version-label:
-    description: "Optional version label to add to the issue (e.g., 'version/8.7')."
+    description: "Optional version label to add to the issue (e.g., 'affects/8.9')."
     required: false
     default: ""
 
@@ -42,13 +42,20 @@ runs:
       with:
         github-token: ${{ inputs.github-token }}
         script: |
-          await github.rest.issues.addLabels({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: context.issue.number,
-            labels: ['${{ inputs.version-label }}']
-          });
-          console.log('Added label: ${{ inputs.version-label }}');
+          const labels = ${{ toJson(github.event.issue.labels) }};
+          const hasVersionLabel = labels.some(l => l.name.startsWith("affects/"));
+
+          if (hasVersionLabel) {
+            console.log('Issue already has a version label, skipping...');
+          } else {
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              labels: ['${{ inputs.version-label }}']
+            });
+            console.log('Added label: ${{ inputs.version-label }}');
+          }
 
     - name: Add issue to Quality Board project
       uses: actions/add-to-project@v1.0.2
@@ -151,7 +158,7 @@ runs:
           console.log("Project item ID:", itemId || "not found");
           core.setOutput("itemId", itemId || "");
 
-    - name: Update Severity & Component fields
+    - name: Update Severity, Likelihood & Component fields
       if: steps.get-item.outputs.itemId != ''
       uses: actions/github-script@v8
       with:
@@ -163,27 +170,33 @@ runs:
           const labels = ${{ toJson(github.event.issue.labels) }};
 
           const severityLabel = labels.find(l => l.name.startsWith("severity/"));
+          const likelihoodLabel = labels.find(l => l.name.startsWith("likelihood/"));
           const componentLabel = labels.find(l => l.name.startsWith("component/"));
-          const severity = severityLabel ? severityLabel.name.split("/")[1] : "";
-          const component = componentLabel ? componentLabel.name.split("/")[1] : "";
+          let severity = severityLabel ? severityLabel.name.split("/")[1] : "";
+          let likelihood = likelihoodLabel ? likelihoodLabel.name.split("/")[1] : "";
+          let component = componentLabel ? componentLabel.name.split("/")[1] : "";
 
-          const missingLabels = [];
-          if (!severity) missingLabels.push("severity/*");
-          if (!component) missingLabels.push("component/*");
+          const labelsToAdd = [];
+          if (!severity) {
+            labelsToAdd.push("severity/unknown");
+            severity = "unknown";
+          }
+          if (!likelihood) {
+            labelsToAdd.push("likelihood/unknown");
+            likelihood = "unknown";
+          }
 
-          if (missingLabels.length > 0) {
-            const commentBody = `⚠️ This issue has been added to the Quality Board, but is missing the following required labels:\n\n${missingLabels.map(l => `- \`${l}\``).join('\n')}\n\nPlease add the appropriate label(s) to ensure proper tracking and categorization.`;
-
-            await github.rest.issues.createComment({
+          if (labelsToAdd.length > 0) {
+            await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              body: commentBody
+              labels: labelsToAdd
             });
-            console.log(`Added comment about missing labels: ${missingLabels.join(', ')}`);
+            console.log(`Added missing labels: ${labelsToAdd.join(', ')}`);
           }
 
-          const updates = { "Severity": severity, "Component": component };
+          const updates = { "Severity": severity, "Likelihood": likelihood, "Component": component };
           const mutation = `
             mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
               updateProjectV2ItemFieldValue(input: {
