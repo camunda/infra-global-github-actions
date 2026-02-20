@@ -22,7 +22,10 @@ jobs:
         with:
           github-token: ${{ secrets.ADD_TO_QUALITY_BOARD_PAT }}
           project-number: "187"            # Optional, defaults to 187
-          component-label: "component/zeebe"  # Optional, adds a component label to the issue
+          component-label: "component/zeebe"  # Optional, adds a single component label to the issue
+          labels: |                        # Optional, comma or newline separated list of labels
+            component/zeebe
+            severity/critical
         if: >
           # Only run this job for issues labeled as 'kind/bug' and
           # for the relevant GitHub issue events that indicate a new or updated issue.
@@ -40,13 +43,15 @@ jobs:
 | --------------  | -------------------------------------------------------------------------------------------|
 | `github-token`  | **Required.** A GitHub token with permission to access projects and update issues.         |
 | `project-number`| **Optional.** The number of the GitHub Project where the issue is added. Defaults to 187.  |
-| `component-label`| **Optional.** A component label to add to the issue (e.g., 'component/zeebe'). If not provided, no label is added. |
+| `component-label`| **Optional.** A single component label to add to the issue (e.g., `component/zeebe`). Kept for backwards compatibility. If not provided, no label is added. |
+| `labels`        | **Optional.** A list of labels to add to the issue and consider when setting project fields. Supports comma-separated or newline-separated values (e.g., `component/zeebe,severity/critical`). `component/*` and `severity/*` labels in this list are used to update the corresponding project fields. |
 
 ## How it works
 * Adds the issue to the specified GitHub Project (defaults to project number 187).
 * Automatically detects the repository owner/organization and uses it for all project operations.
-* Optionally adds a component label to the issue if `component-label` input is provided.
-* Extracts component/* and severity/* labels from the issue.
+* Optionally adds a single component label to the issue if `component-label` input is provided.
+* Optionally adds multiple labels to the issue if `labels` input is provided (comma or newline separated).
+* Extracts component/* and severity/* labels from the issue, the `labels` input, and the `component-label` input.
 * Updates the corresponding project fields with the extracted values.
 * Only runs if the issue has the kind/bug label.
 * **Component handling:**
