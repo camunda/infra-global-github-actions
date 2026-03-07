@@ -186,7 +186,7 @@ runs:
 
   - name: Build and push Docker image
     id: build-push
-    uses: docker/build-push-action@v6
+    uses: docker/build-push-action@v7
     env:
       DOCKER_BUILD_SUMMARY: ${{ inputs.job_summary }}
     with:
