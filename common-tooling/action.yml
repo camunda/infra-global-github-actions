@@ -262,6 +262,7 @@ runs:
     if: ${{ inputs.java-enabled == 'true' && ( env.java_missing == 'true' || inputs.overwrite == 'true' ) }}
     uses: s4u/setup-maven-action@v1.19.0
     with:
+      checkout-enabled: false
       java-version: ${{ inputs.java-version }}
       java-distribution: ${{ inputs.java-distribution }}
       maven-version: ${{ inputs.java-maven-version }}
