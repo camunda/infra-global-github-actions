@@ -301,9 +301,9 @@ runs:
     run: |
       sudo update-alternatives --install /usr/bin/python python /usr/bin/python3 1
 
-      : # install pip
+      : # install pip — requires --break-system-packages on Ubuntu 24.04+ (PEP 668)
       curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-      /usr/bin/python get-pip.py
+      /usr/bin/python get-pip.py --break-system-packages
 
   # Install Build-Essential
   - name: Install Build-Essential
