@@ -45,7 +45,7 @@ jobs:
 
       - name: Send Slack notification
         if: fromJson(steps.stats.outputs.stats)[0].failure > (inputs.max-failures || 5)
-        uses: slackapi/slack-github-action@v2
+        uses: slackapi/slack-github-action@v3
         with:
           payload: |
             {
