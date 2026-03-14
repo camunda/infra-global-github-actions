@@ -24,7 +24,7 @@ runs:
         fi
     - name: Upsert Deployment Result Summary
       if: steps.deployment-status-artifacts.outputs.found == 'true'
-      uses: mshick/add-pr-comment@v2
+      uses: mshick/add-pr-comment@v3
       with:
         message-path: |
           ${{ github.action_path }}/templates/comment-header.md
