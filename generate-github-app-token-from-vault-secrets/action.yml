@@ -122,7 +122,7 @@ runs:
 
   - name: Generate a Github App token
     id: github-token
-    uses: actions/create-github-app-token@v2
+    uses: actions/create-github-app-token@v3
     with:
       app-id: ${{ steps.app-id.outputs.id }}
       private-key: ${{ steps.app-private-key.outputs.private-key }}
