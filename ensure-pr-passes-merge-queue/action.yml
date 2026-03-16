@@ -1,0 +1,55 @@
+# Monitors a PR's merge queue lifecycle: waits for the PR to be merged,
+# handles evictions by re-enabling auto-merge, and detects failures.
+# owner: @camunda/monorepo-devops-team
+name: Ensure PR passes merge queue
+description: >
+  Polls the merge queue status for a PR until it is merged, closed, evicted
+  too many times, or the timeout expires.
+
+inputs:
+  pr-number:
+    description: 'The pull request number to monitor'
+    required: true
+  app-token:
+    description: 'GitHub App installation token used for GraphQL queries and re-enabling auto-merge'
+    required: true
+  repository-owner:
+    description: 'Repository owner (e.g. camunda)'
+    required: true
+  repository-name:
+    description: 'Repository name (e.g. camunda)'
+    required: true
+  timeout-minutes:
+    description: 'Maximum time to wait for the merge (in minutes)'
+    required: false
+    default: '60'
+  max-evictions:
+    description: 'Maximum number of merge queue evictions before giving up'
+    required: false
+    default: '3'
+  dry-run:
+    description: 'If true, only observe without re-enabling auto-merge on eviction'
+    required: false
+    default: 'false'
+
+outputs:
+  result:
+    description: 'The outcome: "merged", "closed", "evicted", or "timeout"'
+    value: ${{ steps.monitor.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+    - name: Ensure PR passes merge queue
+      id: monitor
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.app-token }}
+        PR_NUMBER: ${{ inputs.pr-number }}
+        TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
+        MAX_EVICTIONS: ${{ inputs.max-evictions }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        REPO_OWNER: ${{ inputs.repository-owner }}
+        REPO_NAME: ${{ inputs.repository-name }}
+      run: |
+        bash "$GITHUB_ACTION_PATH/monitor-merge-queue.sh"
