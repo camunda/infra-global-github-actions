@@ -1,0 +1,79 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "changelog-sections": [
+    {
+      "type": "feat",
+      "section": "Features"
+    },
+    {
+      "type": "fix",
+      "section": "Bugfixes"
+    },
+    {
+      "type": "docs",
+      "section": "Documentation"
+    },
+    {
+      "type": "chore",
+      "section": "Miscellaneous"
+    },
+    {
+      "type": "deps",
+      "section": "Dependency Upgrades"
+    },
+    {
+      "type": "ci",
+      "section": "CI/CD"
+    },
+    {
+      "type": "refactor",
+      "section": "Code Refactoring"
+    }
+  ],
+  "changelog-type": "github",
+  "extra-label": "automerge",
+  "release-type": "simple",
+  "include-v-in-tag": false,
+  "packages": {
+    "actionlint": {},
+    "add-bug-to-quality-board": {},
+    "argocd-delete-applications": {},
+    "argocd-sync-applications": {},
+    "assert-camunda-git-emails": {},
+    "build-docker-image": {},
+    "check-copilot-commits": {},
+    "common-tooling": {},
+    "configure-pull-request": {},
+    "download-center-upload": {},
+    "fossa/analyze": {},
+    "fossa/get-issues": {},
+    "fossa/info": {},
+    "fossa/pr-check": {},
+    "fossa/release": {},
+    "fossa/setup": {},
+    "fossa/wait-for-scan": {},
+    "generate-github-app-token-from-vault-secrets": {},
+    "is-cache-enabled": {},
+    "kubernetes-image-replace": {},
+    "preview-env/clean": {},
+    "preview-env/comment": {},
+    "preview-env/conflicts": {},
+    "preview-env/create": {},
+    "preview-env/destroy": {},
+    "previous-version": {},
+    "rerun-failed-run": {},
+    "rerun-failed-run/check-annotations-and-logs": {},
+    "sanitize-branch-name": {},
+    "setup-gh-cli": {},
+    "setup-yarn-cache": {},
+    "submit-aborted-gha-status": {},
+    "submit-build-status": {},
+    "submit-test-status": {},
+    "teams/infra/configure-maintenance-pull-request": {},
+    "teams/infra/pull-request/automerge": {},
+    "teams/infra/pull-request/release": {},
+    "teams/infra/pull-request/validate-title": {},
+    "workflow-run-stats": {},
+    "yq-yaml-processor": {}
+  }
+}

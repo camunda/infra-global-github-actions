@@ -1,0 +1,33 @@
+---
+name: Handle Release PRs
+
+on:
+  push:
+    branches:
+    - main
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Import Secrets
+      id: vault-secrets
+      uses: hashicorp/vault-action@v3.0.0
+      with:
+        url: ${{ secrets.VAULT_ADDR }}
+        method: approle
+        roleId: ${{ secrets.VAULT_ROLE_ID }}
+        secretId: ${{ secrets.VAULT_SECRET_ID}}
+        secrets: |
+          secret/data/products/infra/ci/infra-releases RELEASES_APP_ID;
+          secret/data/products/infra/ci/infra-releases RELEASES_APP_KEY;
+    - name: Generate a GitHub token
+      id: app-token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ steps.vault-secrets.outputs.RELEASES_APP_ID }}
+        private-key: ${{ steps.vault-secrets.outputs.RELEASES_APP_KEY }}
+    - name: Handle Release Creation
+      uses: camunda/infra-global-github-actions/teams/infra/pull-request/release@main
+      with:
+        github-token: ${{ steps.app-token.outputs.token }}
