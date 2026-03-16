@@ -28,9 +28,9 @@ repos:
     args: ["--strict"]
     language_version: lts
 
-- repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
-  rev: v9.21.0
+- repo: https://github.com/compilerla/conventional-pre-commit
+  rev: v4.4.0
   hooks:
-    - id: commitlint
+    - id: conventional-pre-commit
       stages: [commit-msg]
-      additional_dependencies: ["@commitlint/config-conventional"]
+      args: []
