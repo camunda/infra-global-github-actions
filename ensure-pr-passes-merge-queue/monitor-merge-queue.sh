@@ -14,6 +14,7 @@ EVICTION_COUNT=0
 PREVIOUS_QUEUE_STATE=""
 API_FAILURE_COUNT=0
 MAX_CONSECUTIVE_API_FAILURES=5 # 5 failures x 2 minutes = 10 minutes
+REPOSITORY="${REPO_OWNER}/${REPO_NAME}"
 
 echo "Timeout configured: ${TIMEOUT_MINUTES} minutes (${MAX_ATTEMPTS} attempts)"
 
@@ -101,7 +102,11 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
     else
       echo "Re-enabling auto-merge..."
       # Use the GitHub App token for auto-merge re-enable.
-      gh pr merge "$PR_NUMBER" --auto --squash
+      if ! gh pr merge "$PR_NUMBER" -R "$REPOSITORY" --auto --squash; then
+        echo "Failed to enable auto-merge for PR #${PR_NUMBER} in ${REPOSITORY}"
+        echo "Check that the GitHub App is installed on ${REPOSITORY} and has Pull requests: Write permission."
+        exit 1
+      fi
       echo "Auto-merge re-enabled - PR sent back to merge queue"
     fi
   fi
