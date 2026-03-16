@@ -5,6 +5,8 @@ on:
   schedule:
   - cron: '35 4 * * 1' # runs every Monday at 04:35 UTC
 
+permissions: {}
+
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
