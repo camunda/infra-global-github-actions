@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1 (2026-03-17)
+
+## What's Changed
+* docs(pull-request): add dogfooding example and fix broken release.yml link by @Copilot in https://github.com/camunda/infra-global-github-actions/pull/638
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/pull-request-1.0.0...pull-request-1.0.1
+
 ## 1.0.0 (2026-03-17)
 
 ## What's Changed
