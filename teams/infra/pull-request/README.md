@@ -43,7 +43,7 @@ To integrate the `Auto-Release` functionality you need the following basics:
   * General and package-specific configuration on how to create release tags
 * A release-please-manifest file which contains the latest released version number of each package
 * 2 workflow files
-  * `release.yml` - gets triggered on pushes to the mainline branch and calls `release-please` under the hood. You can just copy [the example]()
+  * `release.yml` - gets triggered on pushes to the mainline branch and calls `release-please` under the hood. You can just copy [the example](https://github.com/camunda/infra-global-github-actions/blob/main/.github/workflows/release.yml)
   * `automerge.yml` - ideally a cronjob (e.g. `weekly`) which leverages `pascalgn/automerge-action` to merge. You can just copy [the example](./automerge/README.md) from the readme into your workflows folder.
 
 Once everything got merged, you'll see a new release PR which you can merge directly or wait for the automerge workflow to do it.
@@ -51,6 +51,7 @@ Once everything got merged, you'll see a new release PR which you can merge dire
 ## Integration Examples
 * Simple release: https://github.com/camunda/infra-k8s-webhook/pull/86
 * Monorepo Example: https://github.com/camunda/camunda-docker-ci-postgresql/pull/29
+* Dogfooding (this repository): https://github.com/camunda/infra-global-github-actions/pull/631
 
 ## Pre-Commit Hook & PR Title Validation
 Since release-please depends on [conventional commits](https://www.conventionalcommits.org/en/v1.0.0/) to bump versions appropriately it's required to enforce the usage of these by pre-commit hooks. Just look at one of the above's examples to see how it's done.
