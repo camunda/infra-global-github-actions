@@ -1,0 +1,75 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "changelog-sections": [
+    {
+      "type": "feat",
+      "section": "Features"
+    },
+    {
+      "type": "fix",
+      "section": "Bugfixes"
+    },
+    {
+      "type": "docs",
+      "section": "Documentation"
+    },
+    {
+      "type": "chore",
+      "section": "Miscellaneous"
+    },
+    {
+      "type": "deps",
+      "section": "Dependency Upgrades"
+    },
+    {
+      "type": "ci",
+      "section": "CI/CD"
+    },
+    {
+      "type": "refactor",
+      "section": "Code Refactoring"
+    }
+  ],
+  "changelog-type": "github",
+  "extra-label": "automerge",
+  "release-type": "simple",
+  "bump-minor-pre-major": false,
+  "include-v-in-tag": false,
+  "include-component-in-tag": true,
+  "packages": {
+    "actionlint": {},
+    "add-bug-to-quality-board": {},
+    "argocd-delete-applications": {},
+    "argocd-sync-applications": {},
+    "assert-camunda-git-emails": {},
+    "build-docker-image": {},
+    "check-copilot-commits": {},
+    "common-tooling": {},
+    "configure-pull-request": {},
+    "download-center-upload": {},
+    "fossa": {},
+    "generate-github-app-token-from-vault-secrets": {},
+    "is-cache-enabled": {},
+    "kubernetes-image-replace": {},
+    "preview-env": {},
+    "previous-version": {},
+    "rerun-failed-run": {},
+    "rerun-failed-run/check-annotations-and-logs": {
+      "package-name": "check-annotations-and-logs"
+    },
+    "sanitize-branch-name": {},
+    "setup-gh-cli": {},
+    "setup-yarn-cache": {},
+    "submit-aborted-gha-status": {},
+    "submit-build-status": {},
+    "submit-test-status": {},
+    "teams/infra/configure-maintenance-pull-request": {
+      "package-name": "configure-maintenance-pull-request"
+    },
+    "teams/infra/pull-request": {
+      "package-name": "pull-request"
+    },
+    "workflow-run-stats": {},
+    "yq-yaml-processor": {}
+  }
+}
