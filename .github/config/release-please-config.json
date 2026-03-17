@@ -37,39 +37,89 @@
   "include-v-in-tag": false,
   "include-component-in-tag": true,
   "packages": {
-    "actionlint": {},
-    "add-bug-to-quality-board": {},
-    "argocd-delete-applications": {},
-    "argocd-sync-applications": {},
-    "assert-camunda-git-emails": {},
-    "build-docker-image": {},
-    "check-copilot-commits": {},
-    "common-tooling": {},
-    "configure-pull-request": {},
-    "download-center-upload": {},
-    "fossa": {},
-    "generate-github-app-token-from-vault-secrets": {},
-    "is-cache-enabled": {},
-    "kubernetes-image-replace": {},
-    "preview-env": {},
-    "previous-version": {},
-    "rerun-failed-run": {},
+    "actionlint": {
+      "package-name": "actionlint"
+    },
+    "add-bug-to-quality-board": {
+      "package-name": "add-bug-to-quality-board"
+    },
+    "argocd-delete-applications": {
+      "package-name": "argocd-delete-applications"
+    },
+    "argocd-sync-applications": {
+      "package-name": "argocd-sync-applications"
+    },
+    "assert-camunda-git-emails": {
+      "package-name": "assert-camunda-git-emails"
+    },
+    "build-docker-image": {
+      "package-name": "build-docker-image"
+    },
+    "check-copilot-commits": {
+      "package-name": "check-copilot-commits"
+    },
+    "common-tooling": {
+      "package-name": "common-tooling"
+    },
+    "configure-pull-request": {
+      "package-name": "configure-pull-request"
+    },
+    "download-center-upload": {
+      "package-name": "download-center-upload"
+    },
+    "fossa": {
+      "package-name": "fossa"
+    },
+    "generate-github-app-token-from-vault-secrets": {
+      "package-name": "generate-github-app-token-from-vault-secrets"
+    },
+    "is-cache-enabled": {
+      "package-name": "is-cache-enabled"
+    },
+    "kubernetes-image-replace": {
+      "package-name": "kubernetes-image-replace"
+    },
+    "preview-env": {
+      "package-name": "preview-env"
+    },
+    "previous-version": {
+      "package-name": "previous-version"
+    },
+    "rerun-failed-run": {
+      "package-name": "rerun-failed-run"
+    },
     "rerun-failed-run/check-annotations-and-logs": {
       "package-name": "check-annotations-and-logs"
     },
-    "sanitize-branch-name": {},
-    "setup-gh-cli": {},
-    "setup-yarn-cache": {},
-    "submit-aborted-gha-status": {},
-    "submit-build-status": {},
-    "submit-test-status": {},
+    "sanitize-branch-name": {
+      "package-name": "sanitize-branch-name"
+    },
+    "setup-gh-cli": {
+      "package-name": "setup-gh-cli"
+    },
+    "setup-yarn-cache": {
+      "package-name": "setup-yarn-cache"
+    },
+    "submit-aborted-gha-status": {
+      "package-name": "submit-aborted-gha-status"
+    },
+    "submit-build-status": {
+      "package-name": "submit-build-status"
+    },
+    "submit-test-status": {
+      "package-name": "submit-test-status"
+    },
     "teams/infra/configure-maintenance-pull-request": {
       "package-name": "configure-maintenance-pull-request"
     },
     "teams/infra/pull-request": {
       "package-name": "pull-request"
     },
-    "workflow-run-stats": {},
-    "yq-yaml-processor": {}
+    "workflow-run-stats": {
+      "package-name": "workflow-run-stats"
+    },
+    "yq-yaml-processor": {
+      "package-name": "yq-yaml-processor"
+    }
   }
 }
