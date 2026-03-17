@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+REPOSITORY="${REPO_OWNER}/${REPO_NAME}"
+
 REQUIRED_CHECKS=""
 
 # Get all rulesets (returns empty array [] if none exist).
