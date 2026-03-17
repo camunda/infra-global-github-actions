@@ -22,7 +22,7 @@ inputs:
   timeout-minutes:
     description: 'Maximum time to wait for the merge (in minutes)'
     required: false
-    default: '60'
+    default: '180'
   max-evictions:
     description: 'Maximum number of merge queue evictions before giving up'
     required: false

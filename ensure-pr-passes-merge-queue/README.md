@@ -19,7 +19,7 @@ This composite GitHub Action (GHA) is intended for Camunda engineers to monitor 
 | `app-token` | Yes | - | GitHub App installation token used for GraphQL queries and re-enabling auto-merge. |
 | `repository-owner` | Yes | - | Repository owner, for example `camunda`. |
 | `repository-name` | Yes | - | Repository name, for example `infra-core`. |
-| `timeout-minutes` | No | `60` | Maximum minutes to wait for merge completion. |
+| `timeout-minutes` | No | `180` | Maximum minutes to wait for merge completion. |
 | `max-evictions` | No | `3` | Maximum merge queue evictions before failing. |
 | `dry-run` | No | `false` | If `true`, does not re-enable auto-merge, only observes. |
 
@@ -52,7 +52,7 @@ jobs:
           app-token: ${{ secrets.MERGE_QUEUE_APP_TOKEN }}
           repository-owner: ${{ github.repository_owner }}
           repository-name: ${{ github.event.repository.name }}
-          timeout-minutes: "60"
+          timeout-minutes: "180"
           max-evictions: "3"
 
       - name: Print result
