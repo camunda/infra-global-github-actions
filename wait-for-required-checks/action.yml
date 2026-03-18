@@ -4,10 +4,10 @@ description: >
   Discovers required status checks from repository rulesets targeting
   the PR base branch, then polls until they all pass (or times out).
 inputs:
-  repository-owner:
+  repository_owner:
     description: "Repository owner (e.g. camunda)"
     required: true
-  repository-name:
+  repository_name:
     description: "Repository name (e.g. infra-core)"
     required: true
   base_branch:
@@ -35,8 +35,8 @@ runs:
       id: get_required_checks
       shell: bash
       env:
-        REPO_OWNER: ${{ inputs.repository-owner }}
-        REPO_NAME: ${{ inputs.repository-name }}
+        REPO_OWNER: ${{ inputs.repository_owner }}
+        REPO_NAME: ${{ inputs.repository_name }}
         BASE_BRANCH: ${{ inputs.base_branch }}
       run: |
         bash "$GITHUB_ACTION_PATH/get-required-checks.sh"
@@ -48,8 +48,8 @@ runs:
       env:
         SHA: ${{ inputs.head_sha }}
         CHECKS_PATTERN: ${{ steps.get_required_checks.outputs.checks_pattern }}
-        REPO_OWNER: ${{ inputs.repository-owner }}
-        REPO_NAME: ${{ inputs.repository-name }}
+        REPO_OWNER: ${{ inputs.repository_owner }}
+        REPO_NAME: ${{ inputs.repository_name }}
         TIMEOUT_MINUTES: ${{ inputs.timeout_minutes }}
         POLL_INTERVAL: ${{ inputs.poll_interval }}
       run: |

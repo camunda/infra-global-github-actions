@@ -21,6 +21,7 @@ This composite GitHub Action (GHA) is intended for Camunda engineers to monitor 
 | `repository-name` | Yes | - | Repository name, for example `infra-core`. |
 | `timeout-minutes` | No | `180` | Maximum minutes to wait for merge completion. |
 | `max-evictions` | No | `3` | Maximum merge queue evictions before failing. |
+| `merge-method` | No | `squash` | Merge method used when re-enabling auto-merge: `squash`, `merge`, `rebase`, or `default` (omit method flag). |
 | `dry-run` | No | `false` | If `true`, does not re-enable auto-merge, only observes. |
 
 ### Outputs
@@ -39,7 +40,7 @@ on:
 
 jobs:
   monitor:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     permissions:
       contents: read
       pull-requests: write
@@ -54,6 +55,7 @@ jobs:
           repository-name: ${{ github.event.repository.name }}
           timeout-minutes: "180"
           max-evictions: "3"
+          merge-method: "default"
 
       - name: Print result
         run: echo "Merge queue result: ${{ steps.monitor_mq.outputs.result }}"

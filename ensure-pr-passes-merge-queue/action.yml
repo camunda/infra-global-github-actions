@@ -27,6 +27,10 @@ inputs:
     description: 'Maximum number of merge queue evictions before giving up'
     required: false
     default: '3'
+  merge-method:
+    description: 'Merge method used when re-enabling auto-merge: squash, merge, rebase, or default (omit method flag)'
+    required: false
+    default: 'squash'
   dry-run:
     description: 'If true, only observe without re-enabling auto-merge on eviction'
     required: false
@@ -48,6 +52,7 @@ runs:
         PR_NUMBER: ${{ inputs.pr-number }}
         TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
         MAX_EVICTIONS: ${{ inputs.max-evictions }}
+        MERGE_METHOD: ${{ inputs.merge-method }}
         DRY_RUN: ${{ inputs.dry-run }}
         REPO_OWNER: ${{ inputs.repository-owner }}
         REPO_NAME: ${{ inputs.repository-name }}

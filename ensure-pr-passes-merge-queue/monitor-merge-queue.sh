@@ -5,21 +5,41 @@ set -euo pipefail
 if [ "$DRY_RUN" = "true" ]; then
   echo "[DRY RUN] Monitoring merge queue status (read-only) for PR #${PR_NUMBER}"
 else
-  echo "Monitoring merge queue status..."
+  echo "Monitoring merge queue status for PR #${PR_NUMBER}"
 fi
 
-MAX_ATTEMPTS=$((TIMEOUT_MINUTES / 2)) # Check every 2 minutes
+MAX_ATTEMPTS=$(((TIMEOUT_MINUTES + 1) / 2)) # Check every 2 minutes (ceiling division)
 ATTEMPT=0
 EVICTION_COUNT=0
 PREVIOUS_QUEUE_STATE=""
 API_FAILURE_COUNT=0
 MAX_CONSECUTIVE_API_FAILURES=5 # 5 failures x 2 minutes = 10 minutes
 REPOSITORY="${REPO_OWNER}/${REPO_NAME}"
+MERGE_ARGS=(--auto)
+
+case "$MERGE_METHOD" in
+  squash)
+    MERGE_ARGS+=(--squash)
+    ;;
+  merge)
+    MERGE_ARGS+=(--merge)
+    ;;
+  rebase)
+    MERGE_ARGS+=(--rebase)
+    ;;
+  default)
+    ;;
+  *)
+    echo "Invalid merge method: '$MERGE_METHOD'. Allowed values: squash, merge, rebase, default."
+    exit 1
+    ;;
+esac
 
 echo "Timeout configured: ${TIMEOUT_MINUTES} minutes (${MAX_ATTEMPTS} attempts)"
 
 while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
   # Query PR and merge queue status via GraphQL.
+  set +e
   # shellcheck disable=SC2016
   PR_DATA=$(gh api graphql -f query='
     query($owner: String!, $repo: String!, $number: Int!) {
@@ -34,7 +54,24 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
           }
         }
       }
-    }' -f owner="$REPO_OWNER" -f repo="$REPO_NAME" -F number="$PR_NUMBER")
+    }' -f owner="$REPO_OWNER" -f repo="$REPO_NAME" -F number="$PR_NUMBER" 2>&1)
+  GH_STATUS=$?
+  set -e
+
+  if [ $GH_STATUS -ne 0 ]; then
+    API_FAILURE_COUNT=$((API_FAILURE_COUNT + 1))
+    echo "GraphQL API call failed (${API_FAILURE_COUNT}/${MAX_CONSECUTIVE_API_FAILURES}): $PR_DATA"
+
+    if [ $API_FAILURE_COUNT -ge $MAX_CONSECUTIVE_API_FAILURES ]; then
+      echo "API calls failed ${MAX_CONSECUTIVE_API_FAILURES} times consecutively (10 minutes) - aborting"
+      echo "result=timeout" >> "$GITHUB_OUTPUT"
+      exit 1
+    fi
+
+    ATTEMPT=$((ATTEMPT + 1))
+    sleep 120
+    continue
+  fi
 
   # Validate API response and parse PR state.
   if ! PR_STATE=$(echo "$PR_DATA" | jq -e -r '.data.repository.pullRequest.state' 2>/dev/null); then
@@ -100,9 +137,9 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
     if [ "$DRY_RUN" = "true" ]; then
       echo "[DRY RUN] Would re-enable auto-merge after eviction"
     else
-      echo "Re-enabling auto-merge..."
+      echo "Re-enabling auto-merge (method: ${MERGE_METHOD})..."
       # Use the GitHub App token for auto-merge re-enable.
-      if ! gh pr merge "$PR_NUMBER" -R "$REPOSITORY" --auto --squash; then
+      if ! gh pr merge "$PR_NUMBER" -R "$REPOSITORY" "${MERGE_ARGS[@]}"; then
         echo "Failed to enable auto-merge for PR #${PR_NUMBER} in ${REPOSITORY}"
         echo "Check that the GitHub App is installed on ${REPOSITORY} and has Pull requests: Write permission."
         exit 1

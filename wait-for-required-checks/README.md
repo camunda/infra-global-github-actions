@@ -41,7 +41,7 @@ on:
 
 jobs:
   wait-required-checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     permissions:
       contents: read
       checks: read
