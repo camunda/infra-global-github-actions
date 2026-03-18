@@ -91,7 +91,7 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
     EVICTION_COUNT=$((EVICTION_COUNT + 1))
     echo "PR evicted from merge queue (attempt $EVICTION_COUNT/$MAX_EVICTIONS)"
 
-    if [ $EVICTION_COUNT -ge $MAX_EVICTIONS ]; then
+    if [ $EVICTION_COUNT -ge "$MAX_EVICTIONS" ]; then
       echo "PR evicted $MAX_EVICTIONS times - giving up"
       echo "result=evicted" >> "$GITHUB_OUTPUT"
       exit 1
