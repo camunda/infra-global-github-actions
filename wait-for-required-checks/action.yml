@@ -1,0 +1,56 @@
+---
+name: Wait for Required Checks
+description: >
+  Discovers required status checks from repository rulesets targeting
+  the PR base branch, then polls until they all pass (or times out).
+inputs:
+  repository_owner:
+    description: "Repository owner (e.g. camunda)"
+    required: true
+  repository_name:
+    description: "Repository name (e.g. infra-core)"
+    required: true
+  base_branch:
+    description: "PR base branch name (e.g. stage)"
+    required: true
+  head_sha:
+    description: "Head commit SHA to monitor"
+    required: true
+  timeout_minutes:
+    description: "Maximum minutes to wait for checks"
+    required: false
+    default: "50"
+  poll_interval:
+    description: "Seconds between polls"
+    required: false
+    default: "30"
+outputs:
+  result:
+    description: "'success' when all checks passed, 'skipped' when no checks found"
+    value: ${{ steps.wait_checks.outputs.result || 'skipped' }}
+runs:
+  using: composite
+  steps:
+    - name: Get required status checks from rulesets targeting base branch
+      id: get_required_checks
+      shell: bash
+      env:
+        REPO_OWNER: ${{ inputs.repository_owner }}
+        REPO_NAME: ${{ inputs.repository_name }}
+        BASE_BRANCH: ${{ inputs.base_branch }}
+      run: |
+        bash "$GITHUB_ACTION_PATH/get-required-checks.sh"
+
+    - name: Wait for required checks to pass
+      id: wait_checks
+      if: steps.get_required_checks.outputs.checks_pattern != ''
+      shell: bash
+      env:
+        SHA: ${{ inputs.head_sha }}
+        CHECKS_PATTERN: ${{ steps.get_required_checks.outputs.checks_pattern }}
+        REPO_OWNER: ${{ inputs.repository_owner }}
+        REPO_NAME: ${{ inputs.repository_name }}
+        TIMEOUT_MINUTES: ${{ inputs.timeout_minutes }}
+        POLL_INTERVAL: ${{ inputs.poll_interval }}
+      run: |
+        bash "$GITHUB_ACTION_PATH/wait-for-checks.sh"
