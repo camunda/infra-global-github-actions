@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.1 (2026-03-21)
+
+## What's Changed
+* docs(pull-request): add dogfooding example and fix broken release.yml link by @Copilot in https://github.com/camunda/infra-global-github-actions/pull/638
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/639
+* feat: add new wait-for-required-checks and monitor-merge-queue github actions by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/632
+* chore(deps): update dependency fossas/fossa-cli to v3.16.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/640
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.3.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/641
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.84.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/643
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.0...fossa-1.0.1
+
 ## 1.0.0 (2026-03-17)
 
 ## What's Changed
