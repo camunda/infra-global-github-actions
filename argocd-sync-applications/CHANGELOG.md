@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.2 (2026-03-28)
+
+## What's Changed
+* chore(deps): update hashicorp/vault-action action to v3.4.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/642
+* chore(deps): update actions/create-github-app-token action to v3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/645
+* chore(deps): update dependency fossas/fossa-cli to v3.16.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/646
+* chore(deps): update mikefarah/yq action to v4.52.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/647
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.3.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/648
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.96.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/649
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.98.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/651
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.99.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/652
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/argocd-sync-applications-1.0.1...argocd-sync-applications-1.0.2
+
 ## 1.0.1 (2026-03-21)
 
 ## What's Changed
