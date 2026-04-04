@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.0.1 (2026-04-04)
+
+## What's Changed
+* docs(pull-request): add dogfooding example and fix broken release.yml link by @Copilot in https://github.com/camunda/infra-global-github-actions/pull/638
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/639
+* feat: add new wait-for-required-checks and monitor-merge-queue github actions by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/632
+* chore(deps): update dependency fossas/fossa-cli to v3.16.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/640
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.3.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/641
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.84.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/643
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/644
+* chore(deps): update hashicorp/vault-action action to v3.4.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/642
+* chore(deps): update actions/create-github-app-token action to v3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/645
+* chore(deps): update dependency fossas/fossa-cli to v3.16.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/646
+* chore(deps): update mikefarah/yq action to v4.52.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/647
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.3.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/648
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.96.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/649
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.98.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/651
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.99.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/652
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/650
+* chore(deps): update dependency actionlint to v1.7.12 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/653
+* chore(deps): update dependency fossas/fossa-cli to v3.16.7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/654
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/655
+* chore(deps): update s4u/setup-maven-action action to v1.20.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/656
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/common-tooling-1.0.0...common-tooling-1.0.1
+
 ## 1.0.0 (2026-03-17)
 
 ## What's Changed

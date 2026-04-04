@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.3 (2026-04-04)
+
+## What's Changed
+* chore(deps): update dependency actionlint to v1.7.12 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/653
+* chore(deps): update dependency fossas/fossa-cli to v3.16.7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/654
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/655
+* chore(deps): update s4u/setup-maven-action action to v1.20.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/656
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.2...fossa-1.0.3
+
 ## 1.0.2 (2026-03-28)
 
 ## What's Changed
