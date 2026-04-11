@@ -20,7 +20,7 @@ runs:
   steps:
     - name: Add provided labels to issue
       if: ${{ inputs.labels != '' && github.event.action == 'opened' }}
-      uses: actions/github-script@v8
+      uses: actions/github-script@v9
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -54,7 +54,7 @@ runs:
 
     - name: Get project ID
       id: get-project-id
-      uses: actions/github-script@v8
+      uses: actions/github-script@v9
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -74,7 +74,7 @@ runs:
 
     - name: Get project fields
       id: get-project-fields
-      uses: actions/github-script@v8
+      uses: actions/github-script@v9
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -99,7 +99,7 @@ runs:
 
     - name: Get project item ID for issue
       id: get-item
-      uses: actions/github-script@v8
+      uses: actions/github-script@v9
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -149,7 +149,7 @@ runs:
 
     - name: Update Severity & Component fields
       if: steps.get-item.outputs.itemId != ''
-      uses: actions/github-script@v8
+      uses: actions/github-script@v9
       with:
         github-token: ${{ inputs.github-token }}
         script: |
