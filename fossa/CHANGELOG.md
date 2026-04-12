@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.4 (2026-04-12)
+
+## What's Changed
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.110.14 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/659
+* chore(deps): update dependency fossas/fossa-cli to v3.17.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/658
+* chore(deps): update actions/github-script action to v9 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/660
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.3...fossa-1.0.4
+
 ## 1.0.3 (2026-04-04)
 
 ## What's Changed
