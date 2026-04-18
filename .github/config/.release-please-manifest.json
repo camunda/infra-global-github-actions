@@ -2,18 +2,18 @@
   "actionlint": "1.0.0",
   "add-bug-to-quality-board": "1.0.1",
   "argocd-delete-applications": "1.0.0",
-  "argocd-sync-applications": "1.0.2",
+  "argocd-sync-applications": "1.0.3",
   "assert-camunda-git-emails": "1.0.0",
   "build-docker-image": "1.0.0",
   "check-copilot-commits": "1.0.0",
   "common-tooling": "1.0.1",
   "configure-pull-request": "1.0.0",
   "download-center-upload": "1.0.0",
-  "fossa": "1.0.4",
+  "fossa": "1.0.5",
   "generate-github-app-token-from-vault-secrets": "1.0.0",
   "is-cache-enabled": "1.0.0",
   "kubernetes-image-replace": "0.0.0",
-  "preview-env": "1.0.2",
+  "preview-env": "1.0.3",
   "previous-version": "1.0.0",
   "rerun-failed-run": "1.0.0",
   "rerun-failed-run/check-annotations-and-logs": "1.0.0",
@@ -26,5 +26,5 @@
   "teams/infra/configure-maintenance-pull-request": "1.0.0",
   "teams/infra/pull-request": "1.0.1",
   "workflow-run-stats": "1.0.0",
-  "yq-yaml-processor": "1.0.1"
+  "yq-yaml-processor": "1.0.2"
 }
