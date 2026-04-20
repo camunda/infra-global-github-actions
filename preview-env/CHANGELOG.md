@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.3 (2026-04-18)
+
+## What's Changed
+* chore(deps): update dependency actionlint to v1.7.12 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/653
+* chore(deps): update dependency fossas/fossa-cli to v3.16.7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/654
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/655
+* chore(deps): update s4u/setup-maven-action action to v1.20.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/656
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/657
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.110.14 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/659
+* chore(deps): update dependency fossas/fossa-cli to v3.17.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/658
+* chore(deps): update actions/github-script action to v9 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/660
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/661
+* chore(deps): update dependency fossas/fossa-cli to v3.17.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/662
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.3.7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/663
+* chore(deps): update mikefarah/yq action to v4.53.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/664
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.129.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/665
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/preview-env-1.0.2...preview-env-1.0.3
+
 ## 1.0.2 (2026-03-28)
 
 ## What's Changed
