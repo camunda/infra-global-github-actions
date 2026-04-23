@@ -84,7 +84,86 @@ runs:
       BUILD_HEAD_REF: "${{ github.head_ref && format('refs/heads/{0}', github.head_ref) || github.event.merge_group.head_ref }}"
       ACCESS_TOKEN: "${{ steps.auth.outputs.access_token }}"
     run: |
-      # Parse BigQuery table name (format: project_id:dataset.table)
+      # ── Resource monitor: stop vmstat and parse metrics if monitor-start ran ──
+      MONITOR_FIELDS=""
+      # TODO: avoid duplicate decleration
+      PID_FILE=/tmp/_monitor_vmstat.pid
+      LOG_FILE=/tmp/_monitor_vmstat.log
+
+      if [ -f "$PID_FILE" ]; then
+        VMSTAT_PID=$(cat "$PID_FILE")
+        kill "$VMSTAT_PID" 2>/dev/null || true
+        rm -f "$PID_FILE"
+        echo "Resource monitor stopped (PID=$VMSTAT_PID)"
+        cat "$LOG_FILE"
+
+        # Read total memory once from /proc/meminfo (in kB)
+        MEM_TOTAL_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+
+        # Parse vmstat log in one awk pass: skip 2 header lines, filter non-numeric rows.
+        # awk columns (1-based): free=$4, cache=$6, idle=$15
+        read -r AVG_CPU CPU_MAX P90_CPU P95_CPU AVG_MEM MEM_MAX P90_MEM P95_MEM COUNT < <(
+          awk -v mem_total_kb="$MEM_TOTAL_KB" '
+            function ceil(x) { return (x == int(x)) ? x : int(x) + 1 }
+            function sort_num(a, n,   i,j,tmp) {
+              for (i = 1; i <= n; i++) {
+                for (j = i + 1; j <= n; j++) {
+                  if (a[i] > a[j]) { tmp = a[i]; a[i] = a[j]; a[j] = tmp }
+                }
+              }
+            }
+            function pct(sorted, n, p,   idx) {
+              # Nearest-rank method: rank = ceil(p * n)
+              idx = ceil(p * n)
+              if (idx < 1) idx = 1
+              if (idx > n) idx = n
+              return sorted[idx]
+            }
+        
+            NR <= 2              { next }
+            $15 !~ /^[0-9]+$/    { next }
+            {
+              cpu_used = 100 - $15
+              mem_pct  = (mem_total_kb - $4 - $6) * 100 / mem_total_kb
+        
+              cpu_sum += cpu_used
+              mem_sum += mem_pct
+              count++
+        
+              cpu[count] = cpu_used
+              mem[count] = mem_pct
+        
+              if (count == 1 || cpu_used > cpu_max) cpu_max = cpu_used
+              if (count == 1 || mem_pct  > mem_max) mem_max = mem_pct
+            }
+            END {
+              if (count > 0) {
+                sort_num(cpu, count)
+                sort_num(mem, count)
+        
+                p90_cpu = pct(cpu, count, 0.90)
+                p95_cpu = pct(cpu, count, 0.95)
+                p90_mem = pct(mem, count, 0.90)
+                p95_mem = pct(mem, count, 0.95)
+        
+                printf "%.2f %d %.2f %.2f %.2f %.2f %.2f %.2f %d\n",
+                  cpu_sum/count, cpu_max, p90_cpu, p95_cpu,
+                  mem_sum/count, mem_max, p90_mem, p95_mem, count
+              }
+            }
+          ' "$LOG_FILE"
+        )
+
+        if [ -n "$COUNT" ] && [ "$COUNT" -gt 0 ]; then
+          echo "CPU: avg=${AVG_CPU}%, max=${CPU_MAX}%, p90=${P90_CPU}%, p95=${P95_CPU}%  |  Mem: avg=${AVG_MEM}%, max=${MEM_MAX}%, p90=${P90_MEM}%, p95=${P95_MEM}%  (${COUNT} samples)"
+          MONITOR_FIELDS=$(printf ', "avg_cpu_pct": %s, "max_cpu_pct": %s, "avg_mem_pct": %s, "max_mem_pct": %s' \
+            "$AVG_CPU" "$CPU_MAX" "$AVG_MEM" "$MEM_MAX")
+        else
+          echo "Resource monitor log had no data rows — metrics omitted"
+        fi
+      fi
+
+      # ── Parse BigQuery table name (format: project_id:dataset.table) ──
       TABLE_NAME="${{ inputs.big_query_table_name }}"
       PROJECT_ID="${TABLE_NAME%%:*}"
       DATASET_TABLE="${TABLE_NAME#*:}"
