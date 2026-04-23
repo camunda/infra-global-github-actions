@@ -98,29 +98,24 @@ runs:
         # Read total memory once from /proc/meminfo (in kB)
         MEM_TOTAL_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
 
-        # Parse vmstat log: skip the 2 header lines, then read data lines.
-        # Columns (0-based, whitespace-split): 3=free(KB), 5=cache(KB), 14=id(idle%)
-        CPU_SUM=0; CPU_MAX=0; MEM_SUM=0; MEM_MAX=0; COUNT=0
-        while IFS= read -r line; do
-          read -ra cols <<< "$line"
-          [ "${#cols[@]}" -lt 15 ] && continue
-          FREE_KB="${cols[3]}"; CACHE_KB="${cols[5]}"; IDLE="${cols[14]}"
-          # skip non-numeric lines (headers that sneak in on interval boundaries)
-          [[ "$IDLE" =~ ^[0-9]+$ ]] || continue
-          CPU_USED=$((100 - IDLE))
-          USED_KB=$(( MEM_TOTAL_KB - FREE_KB - CACHE_KB ))
-          MEM_PCT=$(echo "scale=2; $USED_KB * 100 / $MEM_TOTAL_KB" | bc)
-          CPU_SUM=$((CPU_SUM + CPU_USED))
-          MEM_SUM=$(echo "scale=2; $MEM_SUM + $MEM_PCT" | bc)
-          [ "$CPU_USED" -gt "$CPU_MAX" ] && CPU_MAX=$CPU_USED
-          MEM_MAX_CMP=$(echo "$MEM_PCT > $MEM_MAX" | bc)
-          [ "$MEM_MAX_CMP" -eq 1 ] && MEM_MAX=$MEM_PCT
-          COUNT=$((COUNT + 1))
-        done < <(tail -n +3 "$LOG_FILE")
+        # Parse vmstat log in one awk pass: skip 2 header lines, filter non-numeric rows.
+        # awk columns (1-based): free=$4, cache=$6, idle=$15
+        read -r AVG_CPU CPU_MAX AVG_MEM MEM_MAX COUNT < <(
+          awk -v mem_total_kb="$MEM_TOTAL_KB" '
+            NR <= 2       { next }
+            $15 !~ /^[0-9]+$/ { next }
+            {
+              cpu_used = 100 - $15
+              mem_pct  = (mem_total_kb - $4 - $6) * 100 / mem_total_kb
+              cpu_sum += cpu_used; mem_sum += mem_pct; count++
+              if (cpu_used > cpu_max) cpu_max = cpu_used
+              if (mem_pct  > mem_max) mem_max = mem_pct
+            }
+            END { if (count > 0) printf "%.2f %d %.2f %.2f %d\n", cpu_sum/count, cpu_max, mem_sum/count, mem_max, count }
+          ' "$LOG_FILE"
+        )
 
-        if [ "$COUNT" -gt 0 ]; then
-          AVG_CPU=$(echo "scale=2; $CPU_SUM / $COUNT" | bc)
-          AVG_MEM=$(echo "scale=2; $MEM_SUM / $COUNT" | bc)
+        if [ -n "$COUNT" ] && [ "$COUNT" -gt 0 ]; then
           echo "CPU: avg=${AVG_CPU}%, max=${CPU_MAX}%  |  Mem: avg=${AVG_MEM}%, max=${MEM_MAX}%  (${COUNT} samples)"
           MONITOR_FIELDS=$(printf ', "avg_cpu_pct": %s, "max_cpu_pct": %s, "avg_mem_pct": %s, "max_mem_pct": %s' \
             "$AVG_CPU" "$CPU_MAX" "$AVG_MEM" "$MEM_MAX")
