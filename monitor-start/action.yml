@@ -9,7 +9,7 @@ runs:
   - name: Start resource monitor
     shell: bash
     run: |
-      INTERVAL=10
+      INTERVAL=5
       LOG_FILE=/tmp/_monitor_vmstat.log
       PID_FILE=/tmp/_monitor_vmstat.pid
       START_FILE=/tmp/_monitor_vmstat_start
