@@ -1,0 +1,12 @@
+---
+name: Start Build Monitor
+
+description: Starts a background CPU/memory monitor for the current job. Used in conjunction with submit-build-status, which auto-detects and includes the metrics when this action ran before it.
+
+runs:
+  using: composite
+  steps:
+  - name: Start resource monitor
+    shell: bash
+    run: |
+      bash "$GITHUB_ACTION_PATH/start-build-monitor.sh"
