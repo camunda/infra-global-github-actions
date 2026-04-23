@@ -77,6 +77,12 @@ runs:
       credentials_json: '${{ inputs.gcp_credentials_json }}'
       token_format: 'access_token'
 
+  - name: Collect resource usage metrics
+    id: monitor
+    shell: bash
+    run: |
+      bash "$GITHUB_ACTION_PATH/stop-and-collect-build-monitor.sh" "$GITHUB_OUTPUT"
+
   - name: Submit build status to CI Analytics
     shell: bash
     env:
@@ -84,7 +90,10 @@ runs:
       BUILD_HEAD_REF: "${{ github.head_ref && format('refs/heads/{0}', github.head_ref) || github.event.merge_group.head_ref }}"
       ACCESS_TOKEN: "${{ steps.auth.outputs.access_token }}"
     run: |
-      # Parse BigQuery table name (format: project_id:dataset.table)
+      # ── Build monitor: get resource usage metrics (might be empty) ──
+      MONITOR_FIELDS="${{ steps.monitor.outputs.monitor_fields }}"
+
+      # ── Parse BigQuery table name (format: project_id:dataset.table) ──
       TABLE_NAME="${{ inputs.big_query_table_name }}"
       PROJECT_ID="${TABLE_NAME%%:*}"
       DATASET_TABLE="${TABLE_NAME#*:}"
@@ -110,6 +119,7 @@ runs:
         ${{ (inputs.build_duration_millis == '') && ' ' || format(', "build_duration_milliseconds": "{0}"', inputs.build_duration_millis) }}
         ${{ (inputs.user_reason == '') && ' ' || format(', "user_reason": "{0}"', inputs.user_reason) }}
         ${{ (inputs.user_description == '') && ' ' || format(', "user_description": "{0}"', inputs.user_description) }}
+        $MONITOR_FIELDS
       }
       EOF
       )
