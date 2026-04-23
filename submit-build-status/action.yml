@@ -84,7 +84,52 @@ runs:
       BUILD_HEAD_REF: "${{ github.head_ref && format('refs/heads/{0}', github.head_ref) || github.event.merge_group.head_ref }}"
       ACCESS_TOKEN: "${{ steps.auth.outputs.access_token }}"
     run: |
-      # Parse BigQuery table name (format: project_id:dataset.table)
+      # ── Resource monitor: stop vmstat and parse metrics if monitor-start ran ──
+      MONITOR_FIELDS=""
+      PID_FILE=/tmp/_monitor_vmstat.pid
+      LOG_FILE=/tmp/_monitor_vmstat.log
+
+      if [ -f "$PID_FILE" ]; then
+        VMSTAT_PID=$(cat "$PID_FILE")
+        kill "$VMSTAT_PID" 2>/dev/null || true
+        rm -f "$PID_FILE"
+        echo "Resource monitor stopped (PID=$VMSTAT_PID)"
+
+        # Read total memory once from /proc/meminfo (in kB)
+        MEM_TOTAL_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+
+        # Parse vmstat log: skip the 2 header lines, then read data lines.
+        # Columns (0-based, whitespace-split): 3=free(KB), 5=cache(KB), 14=id(idle%)
+        CPU_SUM=0; CPU_MAX=0; MEM_SUM=0; MEM_MAX=0; COUNT=0
+        while IFS= read -r line; do
+          read -ra cols <<< "$line"
+          [ "${#cols[@]}" -lt 15 ] && continue
+          FREE_KB="${cols[3]}"; CACHE_KB="${cols[5]}"; IDLE="${cols[14]}"
+          # skip non-numeric lines (headers that sneak in on interval boundaries)
+          [[ "$IDLE" =~ ^[0-9]+$ ]] || continue
+          CPU_USED=$((100 - IDLE))
+          USED_KB=$(( MEM_TOTAL_KB - FREE_KB - CACHE_KB ))
+          MEM_PCT=$(echo "scale=2; $USED_KB * 100 / $MEM_TOTAL_KB" | bc)
+          CPU_SUM=$((CPU_SUM + CPU_USED))
+          MEM_SUM=$(echo "scale=2; $MEM_SUM + $MEM_PCT" | bc)
+          [ "$CPU_USED" -gt "$CPU_MAX" ] && CPU_MAX=$CPU_USED
+          MEM_MAX_CMP=$(echo "$MEM_PCT > $MEM_MAX" | bc)
+          [ "$MEM_MAX_CMP" -eq 1 ] && MEM_MAX=$MEM_PCT
+          COUNT=$((COUNT + 1))
+        done < <(tail -n +3 "$LOG_FILE")
+
+        if [ "$COUNT" -gt 0 ]; then
+          AVG_CPU=$(echo "scale=2; $CPU_SUM / $COUNT" | bc)
+          AVG_MEM=$(echo "scale=2; $MEM_SUM / $COUNT" | bc)
+          echo "CPU: avg=${AVG_CPU}%, max=${CPU_MAX}%  |  Mem: avg=${AVG_MEM}%, max=${MEM_MAX}%  (${COUNT} samples)"
+          MONITOR_FIELDS=$(printf ', "avg_cpu_pct": %s, "max_cpu_pct": %s, "avg_mem_pct": %s, "max_mem_pct": %s' \
+            "$AVG_CPU" "$CPU_MAX" "$AVG_MEM" "$MEM_MAX")
+        else
+          echo "Resource monitor log had no data rows — metrics omitted"
+        fi
+      fi
+
+      # ── Parse BigQuery table name (format: project_id:dataset.table) ──
       TABLE_NAME="${{ inputs.big_query_table_name }}"
       PROJECT_ID="${TABLE_NAME%%:*}"
       DATASET_TABLE="${TABLE_NAME#*:}"
