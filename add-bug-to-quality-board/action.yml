@@ -1,5 +1,5 @@
 name: "Add Issue to Quality Board"
-description: "Assigns new issues labeled as bugs to the Quality Board project and updates Component & Severity fields."
+description: "Assigns new issues labeled as bugs to the Quality Board project and updates the Component field."
 author: "Camunda QA Engineering Team"
 
 inputs:
@@ -147,7 +147,7 @@ runs:
           console.log("Project item ID:", itemId || "not found");
           core.setOutput("itemId", itemId || "");
 
-    - name: Update Severity & Component fields
+    - name: Update Component field
       if: steps.get-item.outputs.itemId != ''
       uses: actions/github-script@v9
       with:
@@ -179,12 +179,15 @@ runs:
             ...(componentInput ? [{ name: componentInput }] : [])
           ];
 
-          const severityLabel = effectiveLabels.find(l => l.name?.startsWith("severity/"));
           const componentLabel = effectiveLabels.find(l => l.name?.startsWith("component/"));
-          const severity = severityLabel ? severityLabel.name.split("/")[1] : "";
           const component = componentLabel ? componentLabel.name.split("/")[1] : "";
+          if (!component) return;
 
-          const updates = { "Severity": severity, "Component": component };
+          const field = fields.find(f => f.name === "Component");
+          if (!field) return;
+          const option = field.options?.find(o => o.name.toLowerCase() === component.toLowerCase());
+          if (!option) return;
+
           const mutation = `
             mutation($projectId: ID!, $itemId: ID!, $fieldId: ID!, $optionId: String!) {
               updateProjectV2ItemFieldValue(input: {
@@ -196,12 +199,5 @@ runs:
             }
           `;
 
-          for (const [fieldName, optionValue] of Object.entries(updates)) {
-            if (!optionValue) continue;
-            const field = fields.find(f => f.name === fieldName);
-            if (!field) continue;
-            const option = field.options?.find(o => o.name.toLowerCase() === optionValue.toLowerCase());
-            if (!option) continue;
-            console.log(`Updating field "${fieldName}" with value "${optionValue}"`);
-            await github.graphql(mutation, { projectId, itemId, fieldId: field.id, optionId: option.id });
-          }
+          console.log(`Updating field "Component" with value "${component}"`);
+          await github.graphql(mutation, { projectId, itemId, fieldId: field.id, optionId: option.id });
