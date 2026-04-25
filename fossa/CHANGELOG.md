@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.6 (2026-04-25)
+
+## What's Changed
+* feat(assert-camunda-git-emails): improve failure output with local debug instructions by @Copilot in https://github.com/camunda/infra-global-github-actions/pull/668
+* chore(deps): update dependency fossas/fossa-cli to v3.17.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/673
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.3.8 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/674
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.141.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/676
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.5...fossa-1.0.6
+
 ## 1.0.5 (2026-04-18)
 
 ## What's Changed
