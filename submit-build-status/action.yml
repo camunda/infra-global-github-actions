@@ -119,20 +119,20 @@ runs:
               if (idx > n) idx = n
               return sorted[idx]
             }
-        
+
             NR <= 2              { next }
             $15 !~ /^[0-9]+$/    { next }
             {
               cpu_used = 100 - $15
               mem_pct  = (mem_total_kb - $4 - $6) * 100 / mem_total_kb
-        
+
               cpu_sum += cpu_used
               mem_sum += mem_pct
               count++
-        
+
               cpu[count] = cpu_used
               mem[count] = mem_pct
-        
+
               if (count == 1 || cpu_used > cpu_max) cpu_max = cpu_used
               if (count == 1 || mem_pct  > mem_max) mem_max = mem_pct
             }
@@ -140,12 +140,12 @@ runs:
               if (count > 0) {
                 sort_num(cpu, count)
                 sort_num(mem, count)
-        
+
                 p90_cpu = pct(cpu, count, 0.90)
                 p95_cpu = pct(cpu, count, 0.95)
                 p90_mem = pct(mem, count, 0.90)
                 p95_mem = pct(mem, count, 0.95)
-        
+
                 printf "%.2f %d %.2f %.2f %.2f %.2f %.2f %.2f %d\n",
                   cpu_sum/count, cpu_max, p90_cpu, p95_cpu,
                   mem_sum/count, mem_max, p90_mem, p95_mem, count
@@ -155,7 +155,8 @@ runs:
         )
 
         if [ -n "$COUNT" ] && [ "$COUNT" -gt 0 ]; then
-          echo "CPU: avg=${AVG_CPU}%, max=${CPU_MAX}%, p90=${P90_CPU}%, p95=${P95_CPU}%  |  Mem: avg=${AVG_MEM}%, max=${MEM_MAX}%, p90=${P90_MEM}%, p95=${P95_MEM}%  (${COUNT} samples)"
+          echo "Total memory: $MEM_TOTAL_KB KiB"
+          echo "CPU: avg=${AVG_CPU}%, p90=${P90_CPU}%, p95=${P95_CPU}%, max=${CPU_MAX}%  |  Mem: avg=${AVG_MEM}%, p90=${P90_MEM}%, p95=${P95_MEM}%, max=${MEM_MAX}%  (${COUNT} samples)"
           MONITOR_FIELDS=$(printf ', "avg_cpu_pct": %s, "max_cpu_pct": %s, "avg_mem_pct": %s, "max_mem_pct": %s' \
             "$AVG_CPU" "$CPU_MAX" "$AVG_MEM" "$MEM_MAX")
         else
