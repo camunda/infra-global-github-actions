@@ -97,13 +97,43 @@ runs:
         echo "Resource monitor stopped (PID=$VMSTAT_PID)"
         cat "$LOG_FILE"
 
-        # Read total memory once from /proc/meminfo (in kB)
-        MEM_TOTAL_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+        # Read total memory (in kB): prefer cgroup limit (correct inside K8s/container runners),
+        # fall back to /proc/meminfo for bare VMs. Checks cgroup v2 first, then v1.
+        CGROUP_LIMIT_BYTES=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || echo "max")
+        if [ "$CGROUP_LIMIT_BYTES" != "max" ] && [ "$CGROUP_LIMIT_BYTES" -gt 0 ] 2>/dev/null; then
+          MEM_TOTAL_KB=$(( CGROUP_LIMIT_BYTES / 1024 ))
+          echo "Memory total: ${MEM_TOTAL_KB}KB (from cgroup limit)"
+        else
+          MEM_TOTAL_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+          echo "Memory total: ${MEM_TOTAL_KB}KB (from /proc/meminfo)"
+        fi
+
+        # CPU normalization: vmstat reports CPU as % of all host cores; inside a container
+        # with a CPU limit this under-reports utilization — scale up to % of the pod's allocation.
+        # cgroup v2: cpu.max contains "quota period" or "max period"
+        # cgroup v1: cpu.cfs_quota_us / cpu.cfs_period_us  (-1 = unlimited)
+        HOST_CORES=$(nproc)
+        CPU_NORM_FACTOR=1
+        CGROUP_CPU_QUOTA=""; CGROUP_CPU_PERIOD=""
+        if [ -f /sys/fs/cgroup/cpu.max ]; then
+          read -r CGROUP_CPU_QUOTA CGROUP_CPU_PERIOD < /sys/fs/cgroup/cpu.max
+        elif [ -f /sys/fs/cgroup/cpu/cpu.cfs_quota_us ]; then
+          CGROUP_CPU_QUOTA=$(cat /sys/fs/cgroup/cpu/cpu.cfs_quota_us)
+          CGROUP_CPU_PERIOD=$(cat /sys/fs/cgroup/cpu/cpu.cfs_period_us)
+        fi
+        if [ -n "$CGROUP_CPU_QUOTA" ] && [ "$CGROUP_CPU_QUOTA" != "max" ] && [ "$CGROUP_CPU_QUOTA" != "-1" ] \
+            && [ "${CGROUP_CPU_PERIOD:-0}" -gt 0 ] 2>/dev/null; then
+          CPU_NORM_FACTOR=$(awk "BEGIN {printf \"%.6f\", $HOST_CORES * $CGROUP_CPU_PERIOD / $CGROUP_CPU_QUOTA}")
+          CONTAINER_CPU_CORES=$(awk "BEGIN {printf \"%.2f\", $CGROUP_CPU_QUOTA / $CGROUP_CPU_PERIOD}")
+          echo "CPU: ${HOST_CORES} host cores, ${CONTAINER_CPU_CORES} container cores (cgroup), norm_factor=${CPU_NORM_FACTOR}"
+        else
+          echo "CPU: ${HOST_CORES} host cores, no cgroup CPU limit — no normalization"
+        fi
 
         # Parse vmstat log in one awk pass: skip 2 header lines, filter non-numeric rows.
         # awk columns (1-based): free=$4, cache=$6, idle=$15
         read -r AVG_CPU CPU_MAX P90_CPU P95_CPU AVG_MEM MEM_MAX P90_MEM P95_MEM COUNT < <(
-          awk -v mem_total_kb="$MEM_TOTAL_KB" '
+          awk -v mem_total_kb="$MEM_TOTAL_KB" -v cpu_norm="$CPU_NORM_FACTOR" '
             function ceil(x) { return (x == int(x)) ? x : int(x) + 1 }
             function sort_num(a, n,   i,j,tmp) {
               for (i = 1; i <= n; i++) {
@@ -123,7 +153,8 @@ runs:
             NR <= 2              { next }
             $15 !~ /^[0-9]+$/    { next }
             {
-              cpu_used = 100 - $15
+              cpu_used = (100 - $15) * cpu_norm
+              if (cpu_used > 100) cpu_used = 100
               mem_pct  = (mem_total_kb - $4 - $6) * 100 / mem_total_kb
 
               cpu_sum += cpu_used
