@@ -1,0 +1,25 @@
+---
+name: Monitor Start
+
+description: Starts a background CPU/memory monitor for the current job. Used in conjunction with submit-build-status, which auto-detects and includes the metrics when this action ran before it.
+
+runs:
+  using: composite
+  steps:
+  - name: Start resource monitor
+    shell: bash
+    run: |
+      INTERVAL=5
+      LOG_FILE=/tmp/_monitor_vmstat.log
+      PID_FILE=/tmp/_monitor_vmstat.pid
+      START_FILE=/tmp/_monitor_vmstat_start
+
+      # Record start time in seconds since epoch
+      date +%s > "$START_FILE"
+
+      # Start vmstat in background, skip the two header lines on first iteration
+      # -n: only print header once; output goes to log file
+      vmstat -n "$INTERVAL" > "$LOG_FILE" 2>&1 &
+      echo $! > "$PID_FILE"
+
+      echo "Resource monitor started (PID=$(cat $PID_FILE), interval=${INTERVAL}s, log=$LOG_FILE)"
