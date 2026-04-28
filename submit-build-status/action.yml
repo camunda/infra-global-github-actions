@@ -97,15 +97,21 @@ runs:
         echo "Resource monitor stopped (PID=$VMSTAT_PID)"
         cat "$LOG_FILE"
 
-        # Read total memory (in kB): prefer cgroup limit (correct inside K8s/container runners),
-        # fall back to /proc/meminfo for bare VMs. Checks cgroup v2 first, then v1.
+        # vmstat's free/cache columns are always host-scoped, so use /proc/meminfo MemTotal
+        # as the denominator to keep the arithmetic self-consistent.
+        # If a cgroup memory limit exists (K8s runners), apply a scale factor afterwards:
+        #   mem_pct = (host_used_kb / host_total_kb) * (host_total_kb / cgroup_limit_kb)
+        #           = host_used_kb * 100 / cgroup_limit_kb
+        # This normalizes to % of the container's memory budget.
+        MEM_TOTAL_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
+        MEM_SCALE_FACTOR=1
         CGROUP_LIMIT_BYTES=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || cat /sys/fs/cgroup/memory/memory.limit_in_bytes 2>/dev/null || echo "max")
         if [ "$CGROUP_LIMIT_BYTES" != "max" ] && [ "$CGROUP_LIMIT_BYTES" -gt 0 ] 2>/dev/null; then
-          MEM_TOTAL_KB=$(( CGROUP_LIMIT_BYTES / 1024 ))
-          echo "Memory total: ${MEM_TOTAL_KB}KB (from cgroup limit)"
+          CGROUP_LIMIT_KB=$(( CGROUP_LIMIT_BYTES / 1024 ))
+          MEM_SCALE_FACTOR=$(awk "BEGIN {printf \"%.6f\", $MEM_TOTAL_KB / $CGROUP_LIMIT_KB}")
+          echo "Memory: ${MEM_TOTAL_KB}KB host total, ${CGROUP_LIMIT_KB}KB cgroup limit, mem_scale=${MEM_SCALE_FACTOR}"
         else
-          MEM_TOTAL_KB=$(awk '/^MemTotal:/ {print $2}' /proc/meminfo)
-          echo "Memory total: ${MEM_TOTAL_KB}KB (from /proc/meminfo)"
+          echo "Memory: ${MEM_TOTAL_KB}KB (no cgroup limit)"
         fi
 
         # CPU normalization: vmstat reports CPU as % of all host cores; inside a container
@@ -133,7 +139,7 @@ runs:
         # Parse vmstat log in one awk pass: skip 2 header lines, filter non-numeric rows.
         # awk columns (1-based): free=$4, cache=$6, idle=$15
         read -r AVG_CPU CPU_MAX P90_CPU P95_CPU AVG_MEM MEM_MAX P90_MEM P95_MEM COUNT < <(
-          awk -v mem_total_kb="$MEM_TOTAL_KB" -v cpu_norm="$CPU_NORM_FACTOR" '
+          awk -v mem_total_kb="$MEM_TOTAL_KB" -v mem_scale="$MEM_SCALE_FACTOR" -v cpu_norm="$CPU_NORM_FACTOR" '
             function ceil(x) { return (x == int(x)) ? x : int(x) + 1 }
             function sort_num(a, n,   i,j,tmp) {
               for (i = 1; i <= n; i++) {
@@ -155,7 +161,7 @@ runs:
             {
               cpu_used = (100 - $15) * cpu_norm
               if (cpu_used > 100) cpu_used = 100
-              mem_pct  = (mem_total_kb - $4 - $6) * 100 / mem_total_kb
+              mem_pct  = (mem_total_kb - $4 - $6) * 100 / mem_total_kb * mem_scale
 
               cpu_sum += cpu_used
               mem_sum += mem_pct
