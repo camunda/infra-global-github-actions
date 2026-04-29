@@ -37,7 +37,7 @@ runs:
         echo "config-filename=${{ inputs.config-filename }}" >> $GITHUB_ENV
       fi
   - name: Manage Release
-    uses: googleapis/release-please-action@v4
+    uses: googleapis/release-please-action@v5
     with:
       config-file: ${{ env.config-filename }}
       manifest-file: ${{ inputs.manifest-filename }}
