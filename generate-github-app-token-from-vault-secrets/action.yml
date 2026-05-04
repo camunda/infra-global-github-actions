@@ -124,7 +124,7 @@ runs:
     id: github-token
     uses: actions/create-github-app-token@v3
     with:
-      app-id: ${{ steps.app-id.outputs.id }}
+      client-id: ${{ steps.app-id.outputs.id }}
       private-key: ${{ steps.app-private-key.outputs.private-key }}
       skip-token-revoke: ${{ inputs.skip-token-revoke }}
       owner: ${{ inputs.owner }}
