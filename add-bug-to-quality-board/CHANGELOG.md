@@ -1,5 +1,26 @@
 # Changelog
 
+## 1.0.2 (2026-05-04)
+
+## What's Changed
+* chore(deps): update dependency fossas/fossa-cli to v3.17.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/662
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.3.7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/663
+* chore(deps): update mikefarah/yq action to v4.53.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/664
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.129.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/665
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/666
+* feat(assert-camunda-git-emails): improve failure output with local debug instructions by @Copilot in https://github.com/camunda/infra-global-github-actions/pull/668
+* chore(deps): update dependency fossas/fossa-cli to v3.17.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/673
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.3.8 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/674
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.141.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/676
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/669
+* chore(deps): update dependency pre-commit to v4.6.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/675
+* chore(deps): update googleapis/release-please-action action to v5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/677
+* chore(add-bug-to-quality-board): remove severity field mapping by @mschoe in https://github.com/camunda/infra-global-github-actions/pull/672
+* fix: replace deprecated app-id with client-id in create-github-app-token by @maxdanilov in https://github.com/camunda/infra-global-github-actions/pull/679
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/add-bug-to-quality-board-1.0.1...add-bug-to-quality-board-1.0.2
+
 ## 1.0.1 (2026-04-12)
 
 ## What's Changed
