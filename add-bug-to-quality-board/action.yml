@@ -47,7 +47,7 @@ runs:
           console.log("Added labels:", parsed);
 
     - name: Add issue to Quality Board project
-      uses: actions/add-to-project@v1.0.2
+      uses: actions/add-to-project@v2
       with:
         project-url: https://github.com/orgs/${{ github.repository_owner }}/projects/${{ inputs.project-number }}
         github-token: ${{ inputs.github-token }}
