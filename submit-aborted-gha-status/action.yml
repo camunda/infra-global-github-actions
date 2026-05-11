@@ -90,11 +90,17 @@ runs:
       EOF
       )
 
-          curl -fsS -X POST \
+          RESPONSE=$(curl -fsS -X POST \
             "https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT_ID}/datasets/${DATASET}/tables/${TABLE}/insertAll" \
             -H "Authorization: Bearer ${ACCESS_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
+            -d "$PAYLOAD")
+
+          if echo "$RESPONSE" | jq -e '.insertErrors? | length > 0' >/dev/null; then
+            echo "BigQuery insertAll rejected one or more rows:" >&2
+            echo "$RESPONSE" | jq '.insertErrors' >&2
+            exit 1
+          fi
         fi
       done
 
