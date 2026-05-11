@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.3 (2026-05-11)
+
+## What's Changed
+* chore(deps): update dependency fossas/fossa-cli to v3.17.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/681
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.150.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/682
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/683
+* chore(deps): update actions/add-to-project action to v2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/685
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/684
+* fix: update actionlint runner labels from N1 to N2 pool names by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/687
+* chore(submit-aborted-gha-status): massive speedup due to using REST API instead of gcloud CLI by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/680
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/add-bug-to-quality-board-1.0.2...add-bug-to-quality-board-1.0.3
+
 ## 1.0.2 (2026-05-04)
 
 ## What's Changed
