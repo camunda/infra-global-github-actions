@@ -52,7 +52,6 @@ self-hosted-runner:
     - n2-standard-16-netssd-preempt
     - n2-standard-32-netssd-preempt
     - n2-standard-8-netssd-preempt
-    - n2-standard-8-netssd-preempt-quick
 
 # Configuration variables in array of strings defined in your repository or
 # organization. `null` means disabling configuration variables check.
