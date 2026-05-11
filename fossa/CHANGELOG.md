@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.7 (2026-05-09)
+
+## What's Changed
+* chore(deps): update dependency pre-commit to v4.6.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/675
+* chore(deps): update googleapis/release-please-action action to v5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/677
+* chore(add-bug-to-quality-board): remove severity field mapping by @mschoe in https://github.com/camunda/infra-global-github-actions/pull/672
+* fix: replace deprecated app-id with client-id in create-github-app-token by @maxdanilov in https://github.com/camunda/infra-global-github-actions/pull/679
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/678
+* chore(deps): update dependency fossas/fossa-cli to v3.17.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/681
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.150.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/682
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.6...fossa-1.0.7
+
 ## 1.0.6 (2026-04-25)
 
 ## What's Changed

@@ -9,7 +9,7 @@
   "common-tooling": "1.0.1",
   "configure-pull-request": "1.0.0",
   "download-center-upload": "1.0.0",
-  "fossa": "1.0.6",
+  "fossa": "1.0.7",
   "generate-github-app-token-from-vault-secrets": "1.0.1",
   "is-cache-enabled": "1.0.0",
   "kubernetes-image-replace": "0.0.0",
