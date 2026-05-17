@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.8 (2026-05-17)
+
+## What's Changed
+* chore(deps): update actions/add-to-project action to v2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/685
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/684
+* fix: update actionlint runner labels from N1 to N2 pool names by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/687
+* chore(submit-aborted-gha-status): massive speedup due to using REST API instead of gcloud CLI by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/680
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/686
+* chore(deps): update dependency fossas/fossa-cli to v3.17.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/688
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/689
+* chore(deps): update hashicorp/vault-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/690
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.7...fossa-1.0.8
+
 ## 1.0.7 (2026-05-09)
 
 ## What's Changed

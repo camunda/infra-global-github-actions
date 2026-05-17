@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.2 (2026-05-17)
+
+## What's Changed
+* chore(deps): update dependency fossas/fossa-cli to v3.17.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/681
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.150.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/682
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/683
+* chore(deps): update actions/add-to-project action to v2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/685
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/684
+* fix: update actionlint runner labels from N1 to N2 pool names by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/687
+* chore(submit-aborted-gha-status): massive speedup due to using REST API instead of gcloud CLI by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/680
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/686
+* chore(deps): update dependency fossas/fossa-cli to v3.17.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/688
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/689
+* chore(deps): update hashicorp/vault-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/690
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/generate-github-app-token-from-vault-secrets-1.0.1...generate-github-app-token-from-vault-secrets-1.0.2
+
 ## 1.0.1 (2026-05-04)
 
 ## What's Changed
