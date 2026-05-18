@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.6 (2026-05-17)
+
+## What's Changed
+* chore(deps): update dependency fossas/fossa-cli to v3.17.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/688
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/689
+* chore(deps): update hashicorp/vault-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/690
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/argocd-sync-applications-1.0.5...argocd-sync-applications-1.0.6
+
 ## 1.0.5 (2026-05-11)
 
 ## What's Changed
