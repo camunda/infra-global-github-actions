@@ -89,9 +89,18 @@ runs:
       BUILD_BASE_REF: "${{ github.base_ref && format('refs/heads/{0}', github.base_ref) || github.event.merge_group.base_ref }}"
       BUILD_HEAD_REF: "${{ github.head_ref && format('refs/heads/{0}', github.head_ref) || github.event.merge_group.head_ref }}"
       ACCESS_TOKEN: "${{ steps.auth.outputs.access_token }}"
+      RUNNER_INFO_RUNS_ON_FILE: "/home/runner/.camunda-arc-runner-info/runs-on"
     run: |
       # ── Build monitor: get resource usage metrics (might be empty) ──
       MONITOR_FIELDS="${{ steps.monitor.outputs.monitor_fields }}"
+
+      # ── Read runs-on label info from self-hosted runner metadata (might be empty) ──
+      RUNNER_TYPE_FIELD=""
+      if [ -f "$RUNNER_INFO_RUNS_ON_FILE" ]; then
+        # The runs-on label from GHA jobs represents the runner type for self-hosted runners.
+        RUNS_ON=$(tr -cd '[:alnum:]_. -' < "$RUNNER_INFO_RUNS_ON_FILE")
+        RUNNER_TYPE_FIELD=$(printf ', "runner_type": "%s"' "$RUNS_ON")
+      fi
 
       # ── Parse BigQuery table name (format: project_id:dataset.table) ──
       TABLE_NAME="${{ inputs.big_query_table_name }}"
@@ -120,6 +129,7 @@ runs:
         ${{ (inputs.user_reason == '') && ' ' || format(', "user_reason": "{0}"', inputs.user_reason) }}
         ${{ (inputs.user_description == '') && ' ' || format(', "user_description": "{0}"', inputs.user_description) }}
         $MONITOR_FIELDS
+        $RUNNER_TYPE_FIELD
       }
       EOF
       )
