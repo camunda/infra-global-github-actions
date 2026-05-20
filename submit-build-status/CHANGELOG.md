@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 (2026-05-20)
+
+## What's Changed
+* feat: add self-hosted runner type info in CI analytics by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/693
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/submit-build-status-1.1.0...submit-build-status-1.2.0
+
 ## 1.1.0 (2026-05-18)
 
 ## What's Changed

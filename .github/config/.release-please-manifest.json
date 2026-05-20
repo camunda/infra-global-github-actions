@@ -21,7 +21,7 @@
   "setup-gh-cli": "1.0.0",
   "setup-yarn-cache": "1.0.0",
   "submit-aborted-gha-status": "1.0.1",
-  "submit-build-status": "1.1.0",
+  "submit-build-status": "1.2.0",
   "submit-test-status": "1.0.0",
   "teams/infra/configure-maintenance-pull-request": "1.0.0",
   "teams/infra/pull-request": "1.0.2",
