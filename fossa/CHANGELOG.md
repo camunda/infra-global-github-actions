@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.9 (2026-05-23)
+
+## What's Changed
+* feat: add CPU and memory utilization measurement in CI analytics by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/670
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/692
+* feat: add self-hosted runner type info in CI analytics by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/693
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/694
+* chore(deps): update dependency fossas/fossa-cli to v3.17.8 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/695
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.8...fossa-1.0.9
+
 ## 1.0.8 (2026-05-17)
 
 ## What's Changed
