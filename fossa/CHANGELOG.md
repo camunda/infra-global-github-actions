@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.10 (2026-05-30)
+
+## What's Changed
+* chore(deps): update dependency fossas/fossa-cli to v3.17.10 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/697
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/698
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.204.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/699
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.205.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/701
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.9...fossa-1.0.10
+
 ## 1.0.9 (2026-05-23)
 
 ## What's Changed
