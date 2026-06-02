@@ -20,16 +20,33 @@ inputs:
     required: true
     type: string
   vault-auth-method:
-    description: The method to use to authenticate with Vault
+    description: The method to use to authenticate with Vault (`approle` or `jwt`)
     required: true
     type: string
   vault-auth-role-id:
-    description: The Role Id for (Vault) App Role authentication
-    required: true
+    description: The Role Id for (Vault) App Role authentication (required when `vault-auth-method` is `approle`)
+    required: false
+    default: ""
     type: string
   vault-auth-secret-id:
-    description: The Secret Id for (Vault) App Role authentication
-    required: true
+    description: The Secret Id for (Vault) App Role authentication (required when `vault-auth-method` is `approle`)
+    required: false
+    default: ""
+    type: string
+  vault-auth-jwt-path:
+    description: The auth backend path for (Vault) JWT authentication (required when `vault-auth-method` is `jwt`)
+    required: false
+    default: ""
+    type: string
+  vault-auth-jwt-role:
+    description: The role for (Vault) JWT authentication (required when `vault-auth-method` is `jwt`)
+    required: false
+    default: ""
+    type: string
+  vault-auth-jwt-audience:
+    description: The GitHub OIDC audience for (Vault) JWT authentication (required when `vault-auth-method` is `jwt`)
+    required: false
+    default: ""
     type: string
   vault-url:
     description: The URL for the Vault endpoint
@@ -65,6 +82,47 @@ outputs:
 runs:
   using: composite
   steps:
+  - name: Validate Vault authentication inputs
+    shell: bash
+    env:
+      VAULT_AUTH_METHOD: ${{ inputs.vault-auth-method }}
+      VAULT_AUTH_ROLE_ID: ${{ inputs.vault-auth-role-id }}
+      VAULT_AUTH_SECRET_ID: ${{ inputs.vault-auth-secret-id }}
+      VAULT_AUTH_JWT_PATH: ${{ inputs.vault-auth-jwt-path }}
+      VAULT_AUTH_JWT_ROLE: ${{ inputs.vault-auth-jwt-role }}
+      VAULT_AUTH_JWT_AUDIENCE: ${{ inputs.vault-auth-jwt-audience }}
+    run: |
+      missing=()
+      conflicting=()
+      case "${VAULT_AUTH_METHOD}" in
+        approle)
+          [[ -z "${VAULT_AUTH_ROLE_ID}" ]] && missing+=("vault-auth-role-id")
+          [[ -z "${VAULT_AUTH_SECRET_ID}" ]] && missing+=("vault-auth-secret-id")
+          [[ -n "${VAULT_AUTH_JWT_PATH}" ]] && conflicting+=("vault-auth-jwt-path")
+          [[ -n "${VAULT_AUTH_JWT_ROLE}" ]] && conflicting+=("vault-auth-jwt-role")
+          [[ -n "${VAULT_AUTH_JWT_AUDIENCE}" ]] && conflicting+=("vault-auth-jwt-audience")
+          ;;
+        jwt)
+          [[ -z "${VAULT_AUTH_JWT_PATH}" ]] && missing+=("vault-auth-jwt-path")
+          [[ -z "${VAULT_AUTH_JWT_ROLE}" ]] && missing+=("vault-auth-jwt-role")
+          [[ -z "${VAULT_AUTH_JWT_AUDIENCE}" ]] && missing+=("vault-auth-jwt-audience")
+          [[ -n "${VAULT_AUTH_ROLE_ID}" ]] && conflicting+=("vault-auth-role-id")
+          [[ -n "${VAULT_AUTH_SECRET_ID}" ]] && conflicting+=("vault-auth-secret-id")
+          ;;
+        *)
+          echo "::error::Unsupported vault-auth-method '${VAULT_AUTH_METHOD}' (expected 'approle' or 'jwt')"
+          exit 1
+          ;;
+      esac
+      if [[ ${#missing[@]} -gt 0 ]]; then
+        echo "::error::Missing required input(s) for vault-auth-method='${VAULT_AUTH_METHOD}': ${missing[*]}"
+        exit 1
+      fi
+      if [[ ${#conflicting[@]} -gt 0 ]]; then
+        echo "::error::Conflicting input(s) for vault-auth-method='${VAULT_AUTH_METHOD}': ${conflicting[*]} must not be set (provide only the inputs for the selected auth method)"
+        exit 1
+      fi
+
   - name: Import the GitHub App ID from vault
     id: app-id
     uses: hashicorp/vault-action@v4.0.0
@@ -73,6 +131,9 @@ runs:
       method: ${{ inputs.vault-auth-method }}
       roleId: ${{ inputs.vault-auth-role-id }}
       secretId: ${{ inputs.vault-auth-secret-id }}
+      path: ${{ inputs.vault-auth-jwt-path }}
+      role: ${{ inputs.vault-auth-jwt-role }}
+      jwtGithubAudience: ${{ inputs.vault-auth-jwt-audience }}
       exportEnv: false
       secrets: >
         ${{
@@ -91,6 +152,9 @@ runs:
       method: ${{ inputs.vault-auth-method }}
       roleId: ${{ inputs.vault-auth-role-id }}
       secretId: ${{ inputs.vault-auth-secret-id }}
+      path: ${{ inputs.vault-auth-jwt-path }}
+      role: ${{ inputs.vault-auth-jwt-role }}
+      jwtGithubAudience: ${{ inputs.vault-auth-jwt-audience }}
       exportEnv: false
       secrets: >
         ${{

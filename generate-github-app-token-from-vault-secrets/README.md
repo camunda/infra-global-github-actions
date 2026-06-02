@@ -13,15 +13,20 @@ This composite GHA can be used in any repository.
 | github-app-id-vault-path            | The path of the Vault secret storing the ID of the GitHub App           |
 | github-app-private-key-vault-key    | The key of the Vault secret storing the private key of the GitHub App   |
 | github-app-private-key-vault-path   | The path of the Vault secret storing the private key of the GitHub App  |
-| vault-auth-method                   | The method to use to authenticate with Vault (*)                        |
-| vault-auth-role-id                  | The Role Id for (Vault) App Role authentication                         |
-| vault-auth-secret-id                | The Secret Id for (Vault) App Role authentication                       |
+| vault-auth-method                   | The method to use to authenticate with Vault: `approle` or `jwt` (*)    |
+| vault-auth-role-id                  | The Role Id for (Vault) App Role authentication (required when `vault-auth-method=approle`) |
+| vault-auth-secret-id                | The Secret Id for (Vault) App Role authentication (required when `vault-auth-method=approle`) |
+| vault-auth-jwt-path                 | The auth backend path for (Vault) JWT authentication (required when `vault-auth-method=jwt`) |
+| vault-auth-jwt-role                 | The role for (Vault) JWT authentication (required when `vault-auth-method=jwt`) |
+| vault-auth-jwt-audience             | The GitHub OIDC audience for (Vault) JWT authentication (required when `vault-auth-method=jwt`) |
 | vault-url                           | The URL for the Vault endpoint                                          |
 | skip-token-revoke                   | If truthy, the token will not be revoked when the current job is complete (optional) |
 | owner                               | The owner of the GitHub App installation (defaults to current repository owner, optional). |
 | repositories                        | Comma or newline-separated list of repositories for which the GitHub app token will be valid for(defaults to current repository if owner is unset, optional). If you want to generate a token that has access to all repositories of the owner, set this to `!all` and explicitely set an `owner`. |
 
-> (*) The above Vault properties only support App Role authentication (`vault-auth-method=approle`) for now. New inputs may be added in the future to support other authentication methods.
+> (*) Supports both App Role (`vault-auth-method=approle`) and GitHub OIDC/JWT
+> (`vault-auth-method=jwt`) authentication. When using `jwt`, the calling job
+> must grant `id-token: write` permission so GitHub can mint the OIDC token.
 
 ### Outputs
 | Output name      | Description                       |
@@ -53,6 +58,33 @@ jobs:
         skip-token-revoke: false  # Optional, defaults to false if omitted
         owner: ${{ github.repository_owner }}  # Optional, defaults to current repository owner
         repositories: ${{ github.repository }}  # Optional, defaults to current repository
+```
+
+#### Using GitHub OIDC/JWT authentication
+
+```yaml
+---
+name: example
+on:
+  pull_request:
+jobs:
+  configure-pr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # mint GitHub OIDC token for Vault JWT auth
+    steps:
+    - uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@main
+      with:
+        github-app-id-vault-key: THE_KEY_NAME_OF_THE_VAULT_SECRET_STORING_THE_APP_ID
+        github-app-id-vault-path: the/path/of/the/vault/secret/storing/the/app/id
+        github-app-private-key-vault-key: THE_KEY_NAME_OF_THE_VAULT_SECRET_STORING_THE_APP_PRIVATE_KEY
+        github-app-private-key-vault-path: the/path/of/the/vault/secret/storing/the/app/private/key
+        vault-auth-method: jwt
+        vault-auth-jwt-path: ${{ secrets.VAULT_JWT_PATH }}
+        vault-auth-jwt-role: ${{ secrets.VAULT_JWT_ROLE }}
+        vault-auth-jwt-audience: ${{ secrets.VAULT_JWT_AUDIENCE }}
+        vault-url: ${{ secrets.VAULT_ADDR }}
 ```
 
 ### Token Generation

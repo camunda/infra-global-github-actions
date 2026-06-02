@@ -16,8 +16,12 @@ Retriggers failed GitHub Actions workflows, with optional error message filterin
 | `run-id` | Yes | - | Workflow run ID to retry |
 | `repository` | Yes | - | Repository in `owner/repo` format |
 | `vault-addr` | Yes | - | Vault URL |
-| `vault-role-id` | Yes | - | Vault role ID |
-| `vault-secret-id` | Yes | - | Vault secret ID |
+| `vault-auth-method` | No | `approle` | Vault auth method: `approle` or `jwt` |
+| `vault-role-id` | No | `''` | Vault role ID (required when `vault-auth-method=approle`) |
+| `vault-secret-id` | No | `''` | Vault secret ID (required when `vault-auth-method=approle`) |
+| `vault-jwt-path` | No | `''` | Vault JWT auth backend path (required when `vault-auth-method=jwt`) |
+| `vault-jwt-role` | No | `''` | Vault JWT role (required when `vault-auth-method=jwt`) |
+| `vault-jwt-audience` | No | `''` | GitHub OIDC audience (required when `vault-auth-method=jwt`) |
 | `error-messages` | No | `''` | Error messages to check for (one per line). Empty = retry immediately |
 | `notify-back-on-error` | No | `false` | Notify when errors don't match |
 | `rerun-whole-workflow` | No | `false` | Retry entire workflow vs failed jobs only |
@@ -47,6 +51,22 @@ Retriggers failed GitHub Actions workflows, with optional error message filterin
     vault-addr: ${{ secrets.VAULT_ADDR }}
     vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
     vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+```
+
+### Using GitHub OIDC/JWT authentication
+
+The calling job must grant `id-token: write` so GitHub can mint the OIDC token.
+
+```yaml
+- uses: camunda/infra-global-github-actions/rerun-failed-run@main
+  with:
+    run-id: ${{ github.run_id }}
+    repository: ${{ github.repository }}
+    vault-addr: ${{ secrets.VAULT_ADDR }}
+    vault-auth-method: jwt
+    vault-jwt-path: ${{ secrets.VAULT_JWT_PATH }}
+    vault-jwt-role: ${{ secrets.VAULT_JWT_ROLE }}
+    vault-jwt-audience: ${{ secrets.VAULT_JWT_AUDIENCE }}
 ```
 
 ## How It Works
