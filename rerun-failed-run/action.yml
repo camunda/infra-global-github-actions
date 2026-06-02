@@ -23,12 +23,30 @@ inputs:
   vault-addr:
     description: The Vault URL for fetching secrets
     required: true
+  vault-auth-method:
+    description: The method to use to authenticate with Vault (`approle` or `jwt`)
+    required: false
+    default: approle
   vault-role-id:
-    description: The Vault role ID for fetching secrets
-    required: true
+    description: The Vault role ID for fetching secrets (required when `vault-auth-method` is `approle`)
+    required: false
+    default: ""
   vault-secret-id:
-    description: The Vault secret ID for fetching secrets
-    required: true
+    description: The Vault secret ID for fetching secrets (required when `vault-auth-method` is `approle`)
+    required: false
+    default: ""
+  vault-jwt-path:
+    description: The auth backend path for (Vault) JWT authentication (required when `vault-auth-method` is `jwt`)
+    required: false
+    default: ""
+  vault-jwt-role:
+    description: The role for (Vault) JWT authentication (required when `vault-auth-method` is `jwt`)
+    required: false
+    default: ""
+  vault-jwt-audience:
+    description: The GitHub OIDC audience for (Vault) JWT authentication (required when `vault-auth-method` is `jwt`)
+    required: false
+    default: ""
   notify-back-on-error:
     description: |
       When the error message does not match the expected one,
@@ -47,14 +65,58 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Validate Vault authentication inputs
+      shell: bash
+      env:
+        VAULT_AUTH_METHOD: ${{ inputs.vault-auth-method }}
+        VAULT_ROLE_ID: ${{ inputs.vault-role-id }}
+        VAULT_SECRET_ID: ${{ inputs.vault-secret-id }}
+        VAULT_JWT_PATH: ${{ inputs.vault-jwt-path }}
+        VAULT_JWT_ROLE: ${{ inputs.vault-jwt-role }}
+        VAULT_JWT_AUDIENCE: ${{ inputs.vault-jwt-audience }}
+      run: |
+        missing=()
+        conflicting=()
+        case "${VAULT_AUTH_METHOD}" in
+          approle)
+            [[ -z "${VAULT_ROLE_ID}" ]] && missing+=("vault-role-id")
+            [[ -z "${VAULT_SECRET_ID}" ]] && missing+=("vault-secret-id")
+            [[ -n "${VAULT_JWT_PATH}" ]] && conflicting+=("vault-jwt-path")
+            [[ -n "${VAULT_JWT_ROLE}" ]] && conflicting+=("vault-jwt-role")
+            [[ -n "${VAULT_JWT_AUDIENCE}" ]] && conflicting+=("vault-jwt-audience")
+            ;;
+          jwt)
+            [[ -z "${VAULT_JWT_PATH}" ]] && missing+=("vault-jwt-path")
+            [[ -z "${VAULT_JWT_ROLE}" ]] && missing+=("vault-jwt-role")
+            [[ -z "${VAULT_JWT_AUDIENCE}" ]] && missing+=("vault-jwt-audience")
+            [[ -n "${VAULT_ROLE_ID}" ]] && conflicting+=("vault-role-id")
+            [[ -n "${VAULT_SECRET_ID}" ]] && conflicting+=("vault-secret-id")
+            ;;
+          *)
+            echo "::error::Unsupported vault-auth-method '${VAULT_AUTH_METHOD}' (expected 'approle' or 'jwt')"
+            exit 1
+            ;;
+        esac
+        if [[ ${#missing[@]} -gt 0 ]]; then
+          echo "::error::Missing required input(s) for vault-auth-method='${VAULT_AUTH_METHOD}': ${missing[*]}"
+          exit 1
+        fi
+        if [[ ${#conflicting[@]} -gt 0 ]]; then
+          echo "::error::Conflicting input(s) for vault-auth-method='${VAULT_AUTH_METHOD}': ${conflicting[*]} must not be set (provide only the inputs for the selected auth method)"
+          exit 1
+        fi
+
     - name: Import Secrets
       id: vault-secrets
       uses: hashicorp/vault-action@v4.0.0
       with:
         url: ${{ inputs.vault-addr }}
-        method: approle
+        method: ${{ inputs.vault-auth-method }}
         roleId: ${{ inputs.vault-role-id }}
         secretId: ${{ inputs.vault-secret-id }}
+        path: ${{ inputs.vault-jwt-path }}
+        role: ${{ inputs.vault-jwt-role }}
+        jwtGithubAudience: ${{ inputs.vault-jwt-audience }}
         secrets: |
           secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_ID;
           secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY;
