@@ -30,3 +30,7 @@ config-variables: null
 paths:
 #  .github/workflows/**/*.yml:
 #    ignore: []
+  # Exclude generated agentic workflow lock files from linting
+  .github/workflows/*.lock.yml:
+    ignore:
+      - ".*"
