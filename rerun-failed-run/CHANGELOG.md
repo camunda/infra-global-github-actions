@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.1.0 (2026-06-03)
+
+## What's Changed
+* feat: add CPU and memory utilization measurement in CI analytics by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/670
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/692
+* feat: add self-hosted runner type info in CI analytics by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/693
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/694
+* chore(deps): update dependency fossas/fossa-cli to v3.17.8 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/695
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/696
+* chore(deps): update dependency fossas/fossa-cli to v3.17.10 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/697
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/698
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.204.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/699
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.205.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/701
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/700
+* feat(vault): add OIDC/JWT auth support to vault composites by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/702
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/rerun-failed-run-1.0.1...rerun-failed-run-1.1.0
+
 ## 1.0.1 (2026-05-17)
 
 ## What's Changed
