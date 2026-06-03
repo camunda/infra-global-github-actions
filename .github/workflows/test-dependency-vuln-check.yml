@@ -1,0 +1,22 @@
+---
+name: Test Dependency Vuln Check
+
+on:
+  pull_request:
+    paths:
+    - 'dependency-vuln-check/**'
+
+jobs:
+  test-dependency-vuln-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    - name: Install pytest
+      run: pip install pytest
+    - name: Run unit tests
+      working-directory: dependency-vuln-check
+      run: python -m pytest -q
