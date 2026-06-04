@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.0.2 (2026-06-04)
+
+## What's Changed
+* chore(deps): update dependency fossas/fossa-cli to v3.17.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/688
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/689
+* chore(deps): update hashicorp/vault-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/690
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/691
+* feat: add CPU and memory utilization measurement in CI analytics by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/670
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/692
+* feat: add self-hosted runner type info in CI analytics by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/693
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/694
+* chore(deps): update dependency fossas/fossa-cli to v3.17.8 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/695
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/696
+* chore(deps): update dependency fossas/fossa-cli to v3.17.10 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/697
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/698
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.204.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/699
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.205.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/701
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/700
+* feat(vault): add OIDC/JWT auth support to vault composites by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/702
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/705
+* chore: ignore generated agentic workflows from actionlint by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/703
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/actionlint-1.0.1...actionlint-1.0.2
+
 ## 1.0.1 (2026-05-11)
 
 ## What's Changed

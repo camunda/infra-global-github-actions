@@ -1,5 +1,5 @@
 {
-  "actionlint": "1.0.1",
+  "actionlint": "1.0.2",
   "add-bug-to-quality-board": "1.0.3",
   "argocd-delete-applications": "1.0.0",
   "argocd-sync-applications": "1.0.7",
