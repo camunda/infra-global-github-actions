@@ -16,7 +16,7 @@ For every dependency whose `change_type` is `added` and whose `scope` is gated
 | Fix available, severity ≥ `fail-on-fixable-severity` (default `low` → any) | ✅ Yes |
 | No fix, severity ≥ `fail-on-severity` (default `high`) | ✅ Yes |
 | Severity below the applicable threshold | ❌ No |
-| Dependency scope not in `fail-on-scopes` (default: development) | ❌ No (non-blocking notice) |
+| Dependency scope not in `fail-on-scopes` (default gated scope: `runtime`, so `development` is excluded) | ❌ No (non-blocking notice) |
 | GHSA listed in the config `allow-ghsas` | ❌ No (non-blocking warning) |
 | `removed` or `unchanged` dependency | ❌ No |
 

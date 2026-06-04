@@ -282,8 +282,12 @@ def main() -> None:
     fail_fixable_rank = severity_rank(os.environ.get("FAIL_ON_FIXABLE_SEVERITY", "low").strip().lower())
     gated_scopes = parse_scopes(os.environ.get("FAIL_ON_SCOPES", "runtime"))
 
-    with open(config_file) as f:
-        allowed_ghsas = set(g.upper() for g in ((json.load(f) or {}).get("allow-ghsas") or []))
+    try:
+        with open(config_file) as f:
+            allowed_ghsas = set(g.upper() for g in ((json.load(f) or {}).get("allow-ghsas") or []))
+    except FileNotFoundError:
+        print(f"::notice::Config file {config_file} not found — proceeding with empty allow-ghsas list")
+        allowed_ghsas = set()
 
     try:
         diff = _api_get(
