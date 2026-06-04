@@ -88,6 +88,41 @@ Matching is case-insensitive. Each entry should carry a tracking issue / comment
 explaining why it is accepted and a review-by date. Protect this file with
 CODEOWNERS in the consuming repository so exceptions require security review.
 
+### Where the config file lives
+
+The config file belongs in the **repository being gated** (the one running the
+workflow) — **not** in this action's repository.
+
+- The path is resolved relative to the workflow's checkout, so the file must be
+  committed to the consuming repo and checked out (via `actions/checkout`) before
+  this action runs.
+- Default location: **`.github/dependency-review-config.json`** at the root of the
+  consuming repo. Use the default unless you have a reason to move it.
+- To use a different path, set the `config-file` input (relative to the repo root):
+
+  ```yaml
+  - uses: camunda/infra-global-github-actions/dependency-vuln-check@main
+    with:
+      base-sha: ${{ github.event.pull_request.base.sha }}
+      head-sha: ${{ github.event.pull_request.head.sha }}
+      config-file: path/to/your-config.json
+  ```
+
+- If the file is absent, the action does **not** fail — it logs a `::notice::` and
+  proceeds with an empty allow-list (every vulnerability is gated normally). Commit
+  the file only when you actually need to suppress an advisory.
+
+Example layout in a consuming repo:
+
+```
+your-repo/
+├── .github/
+│   ├── dependency-review-config.json   ← exceptions live here (default path)
+│   └── workflows/
+│       └── ci.yml                      ← calls the action
+└── ...
+```
+
 ## Outputs / behavior
 
 - Posts (or updates in place) a single PR comment marked `<!-- dependency-vuln-check -->`,
