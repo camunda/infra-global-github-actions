@@ -26,5 +26,5 @@
   "teams/infra/configure-maintenance-pull-request": "1.0.0",
   "teams/infra/pull-request": "1.0.2",
   "workflow-run-stats": "1.0.0",
-  "yq-yaml-processor": "1.0.2"
+  "yq-yaml-processor": "1.0.3"
 }
