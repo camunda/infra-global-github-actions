@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.0.3 (2026-06-06)
+
+## What's Changed
+* feat(assert-camunda-git-emails): improve failure output with local debug instructions by @Copilot in https://github.com/camunda/infra-global-github-actions/pull/668
+* chore(deps): update dependency fossas/fossa-cli to v3.17.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/673
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.3.8 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/674
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.141.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/676
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/669
+* chore(deps): update dependency pre-commit to v4.6.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/675
+* chore(deps): update googleapis/release-please-action action to v5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/677
+* chore(add-bug-to-quality-board): remove severity field mapping by @mschoe in https://github.com/camunda/infra-global-github-actions/pull/672
+* fix: replace deprecated app-id with client-id in create-github-app-token by @maxdanilov in https://github.com/camunda/infra-global-github-actions/pull/679
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/678
+* chore(deps): update dependency fossas/fossa-cli to v3.17.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/681
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.150.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/682
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/683
+* chore(deps): update actions/add-to-project action to v2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/685
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/684
+* fix: update actionlint runner labels from N1 to N2 pool names by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/687
+* chore(submit-aborted-gha-status): massive speedup due to using REST API instead of gcloud CLI by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/680
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/686
+* chore(deps): update dependency fossas/fossa-cli to v3.17.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/688
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/689
+* chore(deps): update hashicorp/vault-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/690
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/691
+* feat: add CPU and memory utilization measurement in CI analytics by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/670
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/692
+* feat: add self-hosted runner type info in CI analytics by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/693
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/694
+* chore(deps): update dependency fossas/fossa-cli to v3.17.8 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/695
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/696
+* chore(deps): update dependency fossas/fossa-cli to v3.17.10 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/697
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/698
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.204.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/699
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.205.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/701
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/700
+* feat(vault): add OIDC/JWT auth support to vault composites by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/702
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/705
+* chore: ignore generated agentic workflows from actionlint by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/703
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/706
+* chore(deps): update pre-commit hooks to v43.214.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/707
+* chore(deps): update mikefarah/yq action to v4.53.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/708
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/yq-yaml-processor-1.0.2...yq-yaml-processor-1.0.3
+
 ## 1.0.2 (2026-04-18)
 
 ## What's Changed
