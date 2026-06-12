@@ -1,0 +1,79 @@
+---
+name: Renovate PR maintainer
+description: >
+  Keeps open Renovate PRs fresh and unstuck on repositories that use
+  `rebaseWhen: "conflicted"`, without the per-push rebase storm of the default
+  Renovate behavior. On a schedule it inspects in-scope Renovate PRs and either
+  requests a one-off Renovate rebase (via the rebase label) for stale PRs, or
+  re-runs failed jobs (within a budget) for PRs whose required checks are red.
+
+inputs:
+  github-token:
+    description: >
+      Token used for all API calls. Needs `issues: write` (apply the rebase
+      label via the Issues Labels API), `actions: write` (re-run failed jobs),
+      `pull-requests: read`, `checks: read` and `contents: read` (read PR/commit/
+      compare state).
+    required: true
+  repository:
+    description: "Target repository (owner/name)."
+    required: false
+    default: ${{ github.repository }}
+  exclude-labels:
+    description: >
+      Comma-separated labels that take a PR out of scope. `keep-updated` is
+      excluded because Renovate already keeps those continuously rebased.
+    required: false
+    default: "keep-updated,stop-updating"
+  behind-threshold:
+    description: "Rebase when the PR is at least this many commits behind base (B)."
+    required: false
+    default: "60"
+  stale-hours:
+    description: "Rebase when the PR head is at least this many hours old (C)."
+    required: false
+    default: "24"
+  rerun-budget:
+    description: "Max workflow-run attempts per head SHA before reruns stop (N)."
+    required: false
+    default: "1"
+  batch-size:
+    description: "Max number of PRs acted on per run (blast-radius cap)."
+    required: false
+    default: "10"
+  base-branch:
+    description: "Optional exact base-branch filter; empty means all base branches."
+    required: false
+    default: ""
+  dry-run:
+    description: "When true, classify and log only; never modify any PR."
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Classify in-scope Renovate PRs (read-only)
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPOSITORY: ${{ inputs.repository }}
+        RENOVATE_AUTHOR: "renovate[bot]"
+        EXCLUDE_LABELS: ${{ inputs.exclude-labels }}
+        BEHIND_THRESHOLD: ${{ inputs.behind-threshold }}
+        STALE_HOURS: ${{ inputs.stale-hours }}
+        RERUN_BUDGET: ${{ inputs.rerun-budget }}
+        BASE_BRANCH: ${{ inputs.base-branch }}
+        PLAN_FILE: ${{ runner.temp }}/renovate-pr-maintainer-plan.json
+      run: bash "$GITHUB_ACTION_PATH/classify.sh"
+
+    - name: Apply maintenance plan
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        REPOSITORY: ${{ inputs.repository }}
+        BATCH_SIZE: ${{ inputs.batch-size }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        REBASE_LABEL: "rebase"
+        PLAN_FILE: ${{ runner.temp }}/renovate-pr-maintainer-plan.json
+      run: bash "$GITHUB_ACTION_PATH/apply.sh"
