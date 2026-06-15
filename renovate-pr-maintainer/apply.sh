@@ -10,6 +10,8 @@
 #           We never push commits ourselves.
 # - rerun:  re-run failed jobs of the failing workflow run(s) in place
 #           (increments run_attempt; no new SHA).
+# - none/skip/pending: no-op (pending = a rebase is already queued on the PR and
+#           awaiting Renovate, so the maintainer deliberately does nothing).
 set -euo pipefail
 
 : "${REPOSITORY:?REPOSITORY is required (owner/name)}"
@@ -35,7 +37,7 @@ while read -r item; do
   num=$(echo "$item" | jq -r '.number')
 
   case "$action" in
-    none|skip) continue ;;
+    none|skip|pending) continue ;;
   esac
 
   if [ "$applied" -ge "$BATCH_SIZE" ]; then
