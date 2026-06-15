@@ -6,6 +6,10 @@
 # JSON plan to $PLAN_FILE which apply.sh consumes.
 #
 # Decision model (see camunda/team-infrastructure#1053):
+#   - branch edited by a non-Renovate author        -> skip (Renovate's "Edited/Blocked"
+#                                                       state; rebasing would discard the
+#                                                       human's commits), checked first
+#                                                       for every actionable state below
 #   - dirty (merge conflict)                  -> skip   (Renovate rebases conflicts itself)
 #   - behind (blocked by "require up to date") -> rebase (apply the rebase label)
 #   - blocked/unstable (required checks red)   -> rebase if stale (rerunning stale code
@@ -27,6 +31,10 @@ BEHIND_THRESHOLD="${BEHIND_THRESHOLD:-60}"
 STALE_HOURS="${STALE_HOURS:-24}"
 RERUN_BUDGET="${RERUN_BUDGET:-1}"
 BASE_BRANCH="${BASE_BRANCH:-}"
+# GitHub stamps this login as the committer on Renovate's API-created (signed)
+# commits, so it is treated as Renovate-owned, not a human edit. Any other
+# non-Renovate author/committer on the head commit marks the branch as edited.
+GITHUB_SIGNING_COMMITTER="${GITHUB_SIGNING_COMMITTER:-web-flow}"
 # Polling for GitHub's asynchronously-computed mergeable_state. Every push to
 # the base branch resets it to "unknown", so a single retry is often not enough
 # on busy repos; poll a few times with backoff before giving up.
@@ -176,22 +184,49 @@ while IFS= read -r warm_base; do
   required_checks_for_base "$warm_base" >/dev/null
 done < <(echo "$candidates" | jq -r '.[].base' | sort -u)
 
-# Compute staleness for one PR: sets behind_by, age_hours, stale (globals).
-# Cost: 1 compare + 1 commit GET. Called only for states whose decision can
-# depend on staleness (blocked/unstable/clean/has_hooks).
-compute_staleness() {
-  local base="$1" head_sha="$2" base_enc head_date head_epoch
-  # URL-encode '/' in the base ref so base branches like `stable/8.7` don't break the path.
-  base_enc="${base//\//%2F}"
-  behind_by=$(gh_api "repos/${REPOSITORY}/compare/${base_enc}...${head_sha}" --jq '.behind_by' 2>/dev/null || echo 0)
-  [ -z "$behind_by" ] && behind_by=0
-  head_date=$(gh_api "repos/${REPOSITORY}/commits/${head_sha}" --jq '.commit.committer.date' 2>/dev/null || echo "")
+# Fetch the head commit once and derive age + edit ownership: sets age_hours and
+# head_modified (globals), memoized per PR via head_meta_done. Renovate refuses
+# to auto-rebase a branch it did not author ("Edited/Blocked"); we mirror that by
+# flagging head_modified when the head commit's author or committer is anyone
+# other than Renovate (GITHUB_SIGNING_COMMITTER is Renovate's signed-commit
+# committer and does not count). Login mapping is best-effort: an unmapped author
+# (null login) is treated as Renovate-owned to avoid skipping legitimate PRs.
+# Cost: 1 commit GET (shared with compute_staleness).
+fetch_head_meta() {
+  local head_sha="$1" head_json author committer head_date head_epoch
+  [ "$head_meta_done" = "true" ] && return 0
+  head_meta_done=true
+  head_json=$(gh_api "repos/${REPOSITORY}/commits/${head_sha}" 2>/dev/null || echo "")
+  if [ -z "$head_json" ]; then
+    age_hours=0
+    return 0
+  fi
+  author=$(echo "$head_json" | jq -r '.author.login // ""')
+  committer=$(echo "$head_json" | jq -r '.committer.login // ""')
+  if { [ -n "$author" ] && [ "$author" != "$RENOVATE_AUTHOR" ]; } ||
+     { [ -n "$committer" ] && [ "$committer" != "$RENOVATE_AUTHOR" ] && [ "$committer" != "$GITHUB_SIGNING_COMMITTER" ]; }; then
+    head_modified=true
+  fi
+  head_date=$(echo "$head_json" | jq -r '.commit.committer.date // ""')
   if [ -n "$head_date" ]; then
     head_epoch=$(date -u -d "$head_date" +%s 2>/dev/null || echo "$NOW_EPOCH")
   else
     head_epoch=$NOW_EPOCH
   fi
   age_hours=$(( (NOW_EPOCH - head_epoch) / 3600 ))
+}
+
+# Compute staleness for one PR: sets behind_by, age_hours, stale, head_modified
+# (globals). Cost: 1 compare + 1 commit GET (the latter via fetch_head_meta).
+# Called only for states whose decision can depend on staleness
+# (blocked/unstable/clean/has_hooks).
+compute_staleness() {
+  local base="$1" head_sha="$2" base_enc
+  # URL-encode '/' in the base ref so base branches like `stable/8.7` don't break the path.
+  base_enc="${base//\//%2F}"
+  behind_by=$(gh_api "repos/${REPOSITORY}/compare/${base_enc}...${head_sha}" --jq '.behind_by' 2>/dev/null || echo 0)
+  [ -z "$behind_by" ] && behind_by=0
+  fetch_head_meta "$head_sha"
   if [ "$behind_by" -ge "$BEHIND_THRESHOLD" ] || [ "$age_hours" -ge "$STALE_HOURS" ]; then
     stale=true
   fi
@@ -248,23 +283,35 @@ classify_one_pr() {
   #   - rerun eligibility (check-runs + actions/runs, the costliest pair) only
   #     matters for blocked/unstable that are NOT stale, so it is skipped
   #     entirely once a blocked/unstable PR is found stale.
-  # dirty/behind/unknown have a fixed action and fetch nothing further.
+  #   - head ownership (head_modified) gates every action that would push a new
+  #     SHA; it rides along on the commit GET that staleness already does, and
+  #     is fetched standalone for `behind` (otherwise a no-fetch state).
+  # dirty/unknown have a fixed action and fetch nothing further.
   # apply.sh consumes only number/action/run_ids, so the defaulted diagnostic
   # fields (behind_by/age_hours) on fixed-action states are cosmetic, not load-bearing.
   local behind_by=0 age_hours=0 required_count=0 eligible_ids="[]" eligible_count=0 stale=false
+  local head_modified=false head_meta_done=false
   local action="none" reason=""
   case "$ms" in
     dirty)
       action="skip"; reason="merge conflict; Renovate owns the rebase" ;;
     behind)
-      action="rebase"; reason="behind base (require-up-to-date blocks merge)" ;;
+      # A rebase here would push a fresh SHA, so honor an edited branch first.
+      fetch_head_meta "$head_sha"
+      if [ "$head_modified" = "true" ]; then
+        action="skip"; reason="branch edited by non-Renovate author; leave for human (rebase would discard manual commits)"
+      else
+        action="rebase"; reason="behind base (require-up-to-date blocks merge)"
+      fi ;;
     blocked|unstable)
       # Staleness wins over rerun: a stale PR must rebase to merge anyway, so
       # rerunning its (stale) SHA burns a full CI matrix for nothing. Only when
       # fresh do we pay for rerun eligibility and prefer the cheap failed-job
-      # rerun over a full rebase.
+      # rerun over a full rebase. compute_staleness also sets head_modified.
       compute_staleness "$base" "$head_sha"
-      if [ "$stale" = "true" ]; then
+      if [ "$head_modified" = "true" ]; then
+        action="skip"; reason="branch edited by non-Renovate author; leave for human (Renovate won't auto-rebase it)"
+      elif [ "$stale" = "true" ]; then
         action="rebase"; reason="checks failing + stale -> rebase (fresh SHA; skip rerun on stale code)"
       else
         compute_rerun_eligibility "$base" "$head_sha"
@@ -276,7 +323,9 @@ classify_one_pr() {
       fi ;;
     clean|has_hooks)
       compute_staleness "$base" "$head_sha"
-      if [ "$stale" = "true" ]; then
+      if [ "$head_modified" = "true" ]; then
+        action="skip"; reason="branch edited by non-Renovate author; leave for human (Renovate won't auto-rebase it)"
+      elif [ "$stale" = "true" ]; then
         action="rebase"; reason="stale (behind_by>=${BEHIND_THRESHOLD} or age>=${STALE_HOURS}h)"
       else
         action="none"; reason="fresh & green"
