@@ -30,6 +30,17 @@ BASE_BRANCH="${BASE_BRANCH:-}"
 # on busy repos; poll a few times with backoff before giving up.
 MERGEABLE_MAX_POLLS="${MERGEABLE_MAX_POLLS:-5}"
 MERGEABLE_POLL_DELAY="${MERGEABLE_POLL_DELAY:-3}"
+# Per-PR classification is independent across PRs, so we fan out with a bounded
+# worker pool. Workers are bash forks that inherit the pre-warmed REQUIRED_CACHE
+# (read-only), so concurrency adds no extra ruleset discovery. Tunable; set to 1
+# to force fully serial execution.
+CLASSIFY_CONCURRENCY="${CLASSIFY_CONCURRENCY:-8}"
+# Guard against bad overrides: a non-integer or < 1 value would make the numeric
+# throttle test below fail under `set -e` or spin forever. Coerce to an int >= 1.
+if ! [[ "$CLASSIFY_CONCURRENCY" =~ ^[0-9]+$ ]] || [ "$CLASSIFY_CONCURRENCY" -lt 1 ]; then
+  echo "::warning::invalid CLASSIFY_CONCURRENCY='${CLASSIFY_CONCURRENCY}'; falling back to 1" >&2
+  CLASSIFY_CONCURRENCY=1
+fi
 
 MAX_API_RETRIES=3
 API_RETRY_DELAY=5
@@ -212,8 +223,13 @@ compute_rerun_eligibility() {
 
 entries=()
 
-while read -r cand; do
-  [ -z "$cand" ] && continue
+# Classify a single candidate PR and write its plan entry (one JSON object) to
+# <out_file>. Progress is logged to stderr. Designed to run as a background
+# worker: it only reads the pre-warmed REQUIRED_CACHE, never writes it, so it is
+# safe to fork. A PR that fails its initial GET writes nothing (skipped).
+classify_one_pr() {
+  local cand="$1" out_file="$2"
+  local num base head_sha ms
   num=$(echo "$cand" | jq -r '.number')
   base=$(echo "$cand" | jq -r '.base')
   head_sha=$(echo "$cand" | jq -r '.head_sha')
@@ -221,7 +237,7 @@ while read -r cand; do
   # mergeable_state is computed asynchronously and reset by base pushes; poll
   # with backoff. A residual "unknown" is handled conservatively in the case
   # statement below (deferred, never acted on).
-  ms=$(mergeable_state_for_pr "$num") || { echo "::warning::skip PR #${num}: GET failed"; continue; }
+  ms=$(mergeable_state_for_pr "$num") || { echo "::warning::skip PR #${num}: GET failed" >&2; return 0; }
 
   # Per-PR diagnostic/plan fields. Defaulted here, then filled lazily by the
   # case below — we only fetch what each state's decision actually needs:
@@ -232,15 +248,8 @@ while read -r cand; do
   # dirty/behind/unknown have a fixed action and fetch nothing further.
   # apply.sh consumes only number/action/run_ids, so the defaulted diagnostic
   # fields (behind_by/age_hours) on fixed-action states are cosmetic, not load-bearing.
-  behind_by=0
-  age_hours=0
-  required_count=0
-  eligible_ids="[]"
-  eligible_count=0
-  stale=false
-
-  action="none"
-  reason=""
+  local behind_by=0 age_hours=0 required_count=0 eligible_ids="[]" eligible_count=0 stale=false
+  local action="none" reason=""
   case "$ms" in
     dirty)
       action="skip"; reason="merge conflict; Renovate owns the rebase" ;;
@@ -273,9 +282,9 @@ while read -r cand; do
       action="none"; reason="indeterminate mergeable_state ('${ms}'); deferring to next run" ;;
   esac
 
-  echo "PR #${num} [${ms}] behind_by=${behind_by} age=${age_hours}h required=${required_count} -> ${action} (${reason})"
+  echo "PR #${num} [${ms}] behind_by=${behind_by} age=${age_hours}h required=${required_count} -> ${action} (${reason})" >&2
 
-  entry=$(jq -nc \
+  jq -nc \
     --argjson num "$num" \
     --arg state "$ms" \
     --arg action "$action" \
@@ -283,9 +292,33 @@ while read -r cand; do
     --argjson rids "$eligible_ids" \
     --argjson behind "$behind_by" \
     --argjson age "$age_hours" \
-    '{number: $num, state: $state, action: $action, reason: $reason, run_ids: $rids, behind_by: $behind, age_hours: $age}')
-  entries+=("$entry")
+    '{number: $num, state: $state, action: $action, reason: $reason, run_ids: $rids, behind_by: $behind, age_hours: $age}' \
+    > "$out_file"
+}
+
+# Fan out classification across a bounded pool of background workers. Each PR
+# writes its entry to a separate, index-named file so we can reassemble the plan
+# in stable (input) order regardless of completion order.
+work_dir=$(mktemp -d)
+trap 'rm -rf "$work_dir"' EXIT
+
+idx=0
+while read -r cand; do
+  [ -z "$cand" ] && continue
+  # Throttle: keep at most CLASSIFY_CONCURRENCY workers in flight.
+  while [ "$(jobs -rp | wc -l)" -ge "$CLASSIFY_CONCURRENCY" ]; do
+    wait -n 2>/dev/null || break
+  done
+  classify_one_pr "$cand" "$work_dir/$(printf '%05d' "$idx").json" &
+  idx=$((idx + 1))
 done < <(echo "$candidates" | jq -c '.[]')
+wait
+
+# Reassemble entries in stable order (skipped PRs simply have no file).
+while IFS= read -r f; do
+  [ -z "$f" ] && continue
+  entries+=("$(cat "$f")")
+done < <(find "$work_dir" -type f -name '*.json' | sort)
 
 if [ "${#entries[@]}" -gt 0 ]; then
   printf '%s\n' "${entries[@]}" | jq -s '.' > "$PLAN_FILE"
