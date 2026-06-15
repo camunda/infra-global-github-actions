@@ -64,6 +64,7 @@ runs:
         STALE_HOURS: ${{ inputs.stale-hours }}
         RERUN_BUDGET: ${{ inputs.rerun-budget }}
         BASE_BRANCH: ${{ inputs.base-branch }}
+        REBASE_LABEL: "rebase"
         PLAN_FILE: ${{ runner.temp }}/renovate-pr-maintainer-plan.json
       run: bash "$GITHUB_ACTION_PATH/classify.sh"
 

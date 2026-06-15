@@ -6,6 +6,10 @@
 # JSON plan to $PLAN_FILE which apply.sh consumes.
 #
 # Decision model (see camunda/team-infrastructure#1053):
+#   - already carries the rebase label               -> pending (rebase requested but not
+#                                                       yet consumed by Renovate; do
+#                                                       nothing, just report), checked
+#                                                       first — cheapest, no fetch needed
 #   - branch edited by a non-Renovate author        -> skip (Renovate's "Edited/Blocked"
 #                                                       state; rebasing would discard the
 #                                                       human's commits), checked first
@@ -31,6 +35,10 @@ BEHIND_THRESHOLD="${BEHIND_THRESHOLD:-60}"
 STALE_HOURS="${STALE_HOURS:-24}"
 RERUN_BUDGET="${RERUN_BUDGET:-1}"
 BASE_BRANCH="${BASE_BRANCH:-}"
+# Renovate's rebase label. A PR already carrying it has a rebase queued (Renovate
+# strips the label once it rebases), so the maintainer leaves it alone and just
+# reports it. Must match apply.sh's REBASE_LABEL.
+REBASE_LABEL="${REBASE_LABEL:-rebase}"
 # GitHub stamps this login as the committer on Renovate's API-created (signed)
 # commits, so it is treated as Renovate-owned, not a human edit. Any other
 # non-Renovate author/committer on the head commit marks the branch as edited.
@@ -270,6 +278,20 @@ classify_one_pr() {
   num=$(echo "$cand" | jq -r '.number')
   base=$(echo "$cand" | jq -r '.base')
   head_sha=$(echo "$cand" | jq -r '.head_sha')
+
+  # Already-queued rebase: the PR still carries the Renovate rebase label, so a
+  # rebase was requested but Renovate has not consumed it yet (it strips the
+  # label once done). Re-adding the label is a no-op and any CI we trigger now is
+  # wasted because the SHA is about to change, so do nothing and report it. The
+  # label list is already in the candidate, so this short-circuits before the
+  # mergeable_state poll and every per-PR fetch — the cheapest exit.
+  if [ -n "$REBASE_LABEL" ] && echo "$cand" | jq -e --arg l "$REBASE_LABEL" '(.labels // []) | index($l)' >/dev/null; then
+    echo "PR #${num} [rebase-labeled] -> pending (rebase already requested; awaiting Renovate)" >&2
+    jq -nc --argjson num "$num" \
+      '{number: $num, state: "rebase-labeled", action: "pending", reason: "rebase label already set; awaiting Renovate", run_ids: [], behind_by: 0, age_hours: 0}' \
+      > "$out_file"
+    return 0
+  fi
 
   # mergeable_state is computed asynchronously and reset by base pushes; poll
   # with backoff. A residual "unknown" is handled conservatively in the case
