@@ -8,8 +8,10 @@
 # Decision model (see camunda/team-infrastructure#1053):
 #   - dirty (merge conflict)                  -> skip   (Renovate rebases conflicts itself)
 #   - behind (blocked by "require up to date") -> rebase (apply the rebase label)
-#   - blocked/unstable (required checks red)   -> rerun  if a failed run still has budget,
-#                                                 else rebase if stale, else none
+#   - blocked/unstable (required checks red)   -> rebase if stale (rerunning stale code
+#                                                 burns CI for a SHA that can't merge),
+#                                                 else rerun if a failed run has budget,
+#                                                 else none
 #   - clean/has_hooks                          -> rebase if stale, else none
 #   - unknown (mergeability not yet computed)  -> none   (defer; never act on a guess)
 #
@@ -241,10 +243,11 @@ classify_one_pr() {
 
   # Per-PR diagnostic/plan fields. Defaulted here, then filled lazily by the
   # case below — we only fetch what each state's decision actually needs:
+  #   - staleness (compare + commit date) gates every rebase-on-stale state
+  #     (blocked/unstable/clean/has_hooks) and is checked first for those.
   #   - rerun eligibility (check-runs + actions/runs, the costliest pair) only
-  #     matters for blocked/unstable.
-  #   - staleness (compare + commit date) only matters for states that can
-  #     rebase-on-stale (blocked/unstable/clean/has_hooks).
+  #     matters for blocked/unstable that are NOT stale, so it is skipped
+  #     entirely once a blocked/unstable PR is found stale.
   # dirty/behind/unknown have a fixed action and fetch nothing further.
   # apply.sh consumes only number/action/run_ids, so the defaulted diagnostic
   # fields (behind_by/age_hours) on fixed-action states are cosmetic, not load-bearing.
@@ -256,16 +259,20 @@ classify_one_pr() {
     behind)
       action="rebase"; reason="behind base (require-up-to-date blocks merge)" ;;
     blocked|unstable)
-      # Needs rerun eligibility; staleness is the rebase fallback and also
-      # populates behind_by/age diagnostics for these (the actionable) PRs.
-      compute_rerun_eligibility "$base" "$head_sha"
+      # Staleness wins over rerun: a stale PR must rebase to merge anyway, so
+      # rerunning its (stale) SHA burns a full CI matrix for nothing. Only when
+      # fresh do we pay for rerun eligibility and prefer the cheap failed-job
+      # rerun over a full rebase.
       compute_staleness "$base" "$head_sha"
-      if [ "$eligible_count" -gt 0 ]; then
-        action="rerun"; reason="failing required checks; rerun ${eligible_count} run(s) (budget left)"
-      elif [ "$stale" = "true" ]; then
-        action="rebase"; reason="checks failing, no required rerun left, stale -> fresh SHA"
+      if [ "$stale" = "true" ]; then
+        action="rebase"; reason="checks failing + stale -> rebase (fresh SHA; skip rerun on stale code)"
       else
-        action="none"; reason="checks failing, no required rerun candidate, not stale"
+        compute_rerun_eligibility "$base" "$head_sha"
+        if [ "$eligible_count" -gt 0 ]; then
+          action="rerun"; reason="failing required checks on fresh SHA; rerun ${eligible_count} run(s) (budget left)"
+        else
+          action="none"; reason="checks failing, fresh, no required rerun candidate"
+        fi
       fi ;;
     clean|has_hooks)
       compute_staleness "$base" "$head_sha"
