@@ -10,21 +10,57 @@ two independent severity thresholds:
 Only dependencies whose scope is listed in FAIL_ON_SCOPES are gated; others are
 reported as non-blocking. Covers the downgrade scenario: a version downgrade
 shows the old version as "removed" and the new vulnerable version as "added".
+
+Base-snapshot resolution
+------------------------
+The dependency diff is ``effective_base...head``. ``effective_base`` is the most
+recent commit on the PR's base branch that (a) has a submitted Maven dependency
+snapshot and (b) is an ancestor-or-equal of the PR's ``base.sha``. Trusting the
+raw ``base.sha`` is unsafe: the snapshot workflow is path-filtered, so a code-only
+base commit has no snapshot, leaving the base side of the compare empty and
+flagging the *entire* head tree as "added" (pre-existing deps surface as new).
+
+The gate FAILS CLOSED when it cannot verify a PR (no snapshotted ancestor, or a
+GitHub API failure that survives retries). A human may bypass a genuinely
+un-checkable PR by adding the override label (read live, not from the stale event
+payload). The label never bypasses a real finding.
 """
 import json
 import os
 import re
 import sys
+import time
 import urllib.error
 import urllib.request
 
 
 _GITHUB_API = "https://api.github.com"
 _COMMENT_MARKER = "<!-- dependency-vuln-check -->"
+_DEVOPS_TEAM = "@camunda/monorepo-devops-team"
+
+# Retry policy for transient GitHub API failures (5xx, network, timeout, rate limit).
+_MAX_ATTEMPTS = 3
+_BACKOFF_BASE_SECONDS = 2
 
 # Severity ranking used by both threshold gates. These are the only values the
 # Dependency Review API emits for `severity`.
 SEVERITY_ORDER = {"low": 0, "moderate": 1, "high": 2, "critical": 3}
+
+
+class ApiError(Exception):
+    """A GitHub API call that could not be completed.
+
+    `reason` is a short, human-readable cause — deliberately named so the GHA log
+    states *why* the gate failed (rate limit vs 5xx vs timeout vs permissions vs
+    not-found), instead of a bare stack trace. `retryable` separates transient
+    infra failures (retried) from definitive responses (surfaced immediately).
+    """
+
+    def __init__(self, reason: str, status: int | None = None, retryable: bool = False):
+        self.reason = reason
+        self.status = status
+        self.retryable = retryable
+        super().__init__(reason)
 
 
 def severity_rank(name: str) -> int:
@@ -55,23 +91,145 @@ def _blocks(severity: str, fixable: bool, fail_sev_rank: int, fail_fixable_rank:
     return rank >= threshold
 
 
-def _api_get(url: str, token: str) -> list:
-    """Fetch all pages of a GitHub API GET response."""
-    results, next_url = [], url
-    while next_url:
+def _classify_http_error(e: urllib.error.HTTPError) -> ApiError:
+    """Map an HTTPError to a named ApiError, deciding retryability.
+
+    Retryable (transient infra): 5xx, 429, and 403 carrying rate-limit signals
+    (secondary rate limit). Definitive (surfaced at once): 403 without rate-limit
+    headers (genuine permission/scope denial), 404, 422, other 4xx.
+    """
+    code = e.code
+    if code >= 500:
+        return ApiError(f"GitHub server error (HTTP {code})", code, retryable=True)
+    if code == 429:
+        return ApiError("rate limit exceeded (HTTP 429)", code, retryable=True)
+    if code == 403:
+        remaining = (e.headers or {}).get("X-RateLimit-Remaining")
+        retry_after = (e.headers or {}).get("Retry-After")
+        if retry_after is not None or remaining == "0":
+            return ApiError("secondary rate limit (HTTP 403)", code, retryable=True)
+        return ApiError(
+            "permission denied — token lacks required scope (HTTP 403)", code, retryable=False
+        )
+    if code == 404:
+        return ApiError("resource not found (HTTP 404)", code, retryable=False)
+    if code == 422:
+        return ApiError("unprocessable request (HTTP 422)", code, retryable=False)
+    return ApiError(f"client error (HTTP {code})", code, retryable=False)
+
+
+def _http_get_json(url: str, token: str):
+    """Single authenticated GET, returning (parsed_json, headers).
+
+    Retries transient failures with exponential backoff; raises ApiError (with a
+    named reason) on a definitive response or once retries are exhausted. Each
+    retry is logged with its cause so the GHA log shows exactly why.
+    """
+    last: ApiError | None = None
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
         req = urllib.request.Request(
-            next_url,
+            url,
             headers={
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/vnd.github+json",
                 "X-GitHub-Api-Version": "2026-03-10",
             },
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            results.extend(json.loads(resp.read()))
-            match = re.search(r'<([^>]+)>;\s*rel="next"', resp.headers.get("Link", ""))
-            next_url = match.group(1) if match else None
+        try:
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                return json.loads(resp.read()), resp.headers
+        except urllib.error.HTTPError as e:  # subclass of URLError — catch first
+            err = _classify_http_error(e)
+        except (urllib.error.URLError, TimeoutError) as e:
+            err = ApiError(f"network error ({e})", None, retryable=True)
+
+        if not err.retryable:
+            print(f"::error::API call failed, no retry ({err.reason}): {url}")
+            raise err
+        last = err
+        if attempt < _MAX_ATTEMPTS:
+            delay = _BACKOFF_BASE_SECONDS * (2 ** (attempt - 1))
+            print(
+                f"::warning::API call failed (attempt {attempt}/{_MAX_ATTEMPTS}, {err.reason}) "
+                f"— retrying in {delay}s: {url}"
+            )
+            time.sleep(delay)
+    print(f"::error::API call failed after {_MAX_ATTEMPTS} attempts ({last.reason}): {url}")
+    raise last
+
+
+def _api_get(url: str, token: str) -> list:
+    """Fetch all pages of a list GitHub API GET. Retries transient failures per page."""
+    results, next_url = [], url
+    while next_url:
+        payload, headers = _http_get_json(next_url, token)
+        results.extend(payload)
+        match = re.search(r'<([^>]+)>;\s*rel="next"', headers.get("Link", ""))
+        next_url = match.group(1) if match else None
     return results
+
+
+def _compare_status(repository: str, base: str, head: str, token: str) -> str:
+    """Return the commit-comparison status: identical | ahead | behind | diverged."""
+    payload, _ = _http_get_json(
+        f"{_GITHUB_API}/repos/{repository}/compare/{base}...{head}?per_page=1", token
+    )
+    return payload.get("status", "") if isinstance(payload, dict) else ""
+
+
+def latest_snapshotted_ancestor(
+    repository: str, base_ref: str, base_sha: str, workflow: str, token: str, lookback: int
+):
+    """Most recent snapshotted commit that is an ancestor-or-equal of base_sha.
+
+    Lists successful push-event runs of `workflow` on `base_ref` (newest-first;
+    a successful run guarantees a submitted snapshot — the workflow's submit step
+    is unconditional). For each run's head_sha, compares head_sha...base_sha and
+    accepts the first whose status is `identical` (same commit) or `ahead`
+    (base_sha is ahead → the run commit is an ancestor).
+
+    Returns (effective_base_sha, run_id, scanned_count); (None, None, scanned) if
+    no ancestor is found within the window. Raises ApiError on API failure so the
+    caller can fail closed.
+    """
+    runs_url = (
+        f"{_GITHUB_API}/repos/{repository}/actions/workflows/{workflow}/runs"
+        f"?branch={base_ref}&status=success&event=push&per_page={lookback}"
+    )
+    payload, _ = _http_get_json(runs_url, token)
+    runs = payload.get("workflow_runs", []) if isinstance(payload, dict) else []
+    scanned = 0
+    for run in runs:
+        head = run.get("head_sha")
+        if not head:
+            continue
+        scanned += 1
+        status = _compare_status(repository, head, base_sha, token)
+        if status in ("identical", "ahead"):
+            return head, run.get("id"), scanned
+    return None, None, scanned
+
+
+def has_override_label(repository: str, pr_number, token: str, label: str) -> bool:
+    """Live read of the PR's labels (NOT the stale event payload) to honor a
+    freshly-added override label on a re-run.
+
+    Best-effort: on label-API failure we cannot confirm an override, so we return
+    False and stay fail-closed (logged).
+    """
+    if not pr_number:
+        return False
+    try:
+        labels = _api_get(
+            f"{_GITHUB_API}/repos/{repository}/issues/{pr_number}/labels", token
+        )
+    except ApiError as e:
+        print(
+            f"::warning::Could not read PR labels to check for '{label}' ({e.reason}) "
+            "— treating as not overridden (gate stays closed)"
+        )
+        return False
+    return any(lbl.get("name") == label for lbl in labels)
 
 
 def _ghsa_ids(vuln: dict) -> set:
@@ -218,10 +376,39 @@ def _api_write(url: str, token: str, method: str, body: dict) -> None:
         resp.read()
 
 
+def _write_summary(summary_path, text: str) -> None:
+    """Append to the GitHub Step Summary if available (always-on run trail)."""
+    if summary_path:
+        with open(summary_path, "a") as f:
+            f.write(text.rstrip("\n") + "\n")
+
+
+def _upsert_comment(repository: str, pr_number: int, token: str, body: str) -> None:
+    """Create or update the gate's single marker comment. Tolerates comment-API
+    failures (e.g. fork PR without pull-requests:write) with a warning."""
+    full = _COMMENT_MARKER + "\n" + body
+    comments_url = f"{_GITHUB_API}/repos/{repository}/issues/{pr_number}/comments"
+    try:
+        existing_id = next(
+            (c["id"] for c in _api_get(comments_url, token) if _COMMENT_MARKER in c.get("body", "")),
+            None,
+        )
+        if existing_id:
+            _api_write(
+                f"{_GITHUB_API}/repos/{repository}/issues/comments/{existing_id}",
+                token, "PATCH", {"body": full},
+            )
+        else:
+            _api_write(comments_url, token, "POST", {"body": full})
+    except (ApiError, urllib.error.HTTPError, urllib.error.URLError) as e:
+        code = getattr(e, "code", None)
+        print(f"::warning::Cannot post PR comment ({code or e}) — token may lack pull-requests:write (fork PR?)")
+
+
 def post_pr_comment(
     repository: str, pr_number: int, blocking: list, allowed: list, scope_excluded: list, token: str
 ) -> None:
-    sections = [_COMMENT_MARKER]
+    sections = []
 
     if blocking:
         sections += [
@@ -258,16 +445,74 @@ def post_pr_comment(
             _table(scope_excluded),
         ]
 
-    body = "\n".join(sections)
-    comments_url = f"{_GITHUB_API}/repos/{repository}/issues/{pr_number}/comments"
-    existing_id = next(
-        (c["id"] for c in _api_get(comments_url, token) if _COMMENT_MARKER in c.get("body", "")),
-        None,
+    _upsert_comment(repository, pr_number, token, "\n".join(sections))
+
+
+def _pr_number():
+    """PR number from the event payload, or None if unavailable."""
+    event_path = os.environ.get("GITHUB_EVENT_PATH")
+    if not event_path:
+        return None
+    try:
+        with open(event_path) as f:
+            return json.load(f).get("pull_request", {}).get("number")
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def fail_closed(repository, pr_number, token, override_label, reason, summary_path):
+    """Block the PR (exit 1) unless the override label is present (exit 0).
+
+    Loud on both paths: the run log, step summary, and PR comment all explain that
+    the gate could not verify the PR and why. The override label only bypasses an
+    unverifiable PR — never a real vulnerability finding.
+    """
+    if has_override_label(repository, pr_number, token, override_label):
+        msg = (
+            f"Vulnerability gate could not verify dependencies ({reason}), but the "
+            f"`{override_label}` label is present — BYPASSING. {_DEVOPS_TEAM}"
+        )
+        print(f"::warning::{msg}")
+        _write_summary(
+            summary_path,
+            f"### ⚠️ Vulnerability gate bypassed via `{override_label}`\n\n"
+            f"The gate could not verify dependencies (**{reason}**). The override label "
+            f"is present, so the PR is allowed through. {_DEVOPS_TEAM} — confirm this was intentional.",
+        )
+        if pr_number:
+            _upsert_comment(
+                repository, pr_number, token,
+                f"## ⚠️ Vulnerability Gate bypassed via `{override_label}`\n\n"
+                f"The gate could **not verify** this PR's dependencies (**{reason}**), but the "
+                f"`{override_label}` label is present, so it is being bypassed.\n\n"
+                f"{_DEVOPS_TEAM} — please confirm this bypass was intentional and remove the label "
+                f"once the underlying issue is resolved.",
+            )
+        sys.exit(0)
+
+    msg = (
+        f"Vulnerability gate FAILED CLOSED: {reason}. Add the `{override_label}` label and "
+        f"re-run to bypass if this is a known GitHub outage. {_DEVOPS_TEAM}"
     )
-    if existing_id:
-        _api_write(f"{_GITHUB_API}/repos/{repository}/issues/comments/{existing_id}", token, "PATCH", {"body": body})
-    else:
-        _api_write(comments_url, token, "POST", {"body": body})
+    print(f"::error::{msg}")
+    _write_summary(
+        summary_path,
+        f"### 🚨 Vulnerability gate failed closed\n\n"
+        f"**Reason:** {reason}\n\n"
+        f"The gate blocks when it cannot confirm the PR introduces no new vulnerable "
+        f"dependencies. If this is a known GitHub outage, add the `{override_label}` label "
+        f"and re-run the job to bypass. {_DEVOPS_TEAM}",
+    )
+    if pr_number:
+        _upsert_comment(
+            repository, pr_number, token,
+            f"## 🚨 Vulnerability Gate could not verify this PR\n\n"
+            f"**Reason:** {reason}\n\n"
+            f"The gate blocks when it cannot confirm this PR introduces no new vulnerable "
+            f"dependencies (fail-closed). If this is a known GitHub outage, add the "
+            f"`{override_label}` label and **re-run the job** to bypass. {_DEVOPS_TEAM}",
+        )
+    sys.exit(1)
 
 
 def main() -> None:
@@ -276,7 +521,12 @@ def main() -> None:
     repository = os.environ["GITHUB_REPOSITORY"]
     base_sha = os.environ["BASE_SHA"]
     head_sha = os.environ["HEAD_SHA"]
+    base_ref = os.environ["BASE_REF"]
+    snapshot_workflow = os.environ["SNAPSHOT_WORKFLOW"]
+    lookback = int(os.environ.get("MAX_SNAPSHOT_LOOKBACK", "30"))
+    override_label = os.environ.get("OVERRIDE_LABEL", "ci:vuln-gate-override")
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+    pr_number = _pr_number()
 
     fail_sev_rank = severity_rank(os.environ.get("FAIL_ON_SEVERITY", "high").strip().lower())
     fail_fixable_rank = severity_rank(os.environ.get("FAIL_ON_FIXABLE_SEVERITY", "low").strip().lower())
@@ -289,17 +539,47 @@ def main() -> None:
         print(f"::notice::Config file {config_file} not found — proceeding with empty allow-ghsas list")
         allowed_ghsas = set()
 
+    # ── Resolve the effective base to a snapshotted ancestor (Workstream D) ──
+    print(f"::notice::Resolving base {base_sha} on '{base_ref}' to the nearest snapshotted ancestor")
+    try:
+        effective_base, run_id, scanned = latest_snapshotted_ancestor(
+            repository, base_ref, base_sha, snapshot_workflow, token, lookback
+        )
+    except ApiError as e:
+        fail_closed(
+            repository, pr_number, token, override_label,
+            f"could not resolve base snapshot ({e.reason})", summary_path,
+        )
+        return  # unreachable: fail_closed exits
+
+    if effective_base is None:
+        fail_closed(
+            repository, pr_number, token, override_label,
+            f"no snapshotted ancestor of {base_sha} found within the last {scanned} "
+            f"snapshot run(s) on '{base_ref}'",
+            summary_path,
+        )
+        return
+
+    if effective_base == base_sha:
+        print(f"::notice::Base {base_sha} is itself snapshotted (scanned {scanned} run(s))")
+    else:
+        print(
+            f"::notice::Resolved effective base {effective_base} "
+            f"(scanned {scanned} run(s); snapshot run {run_id})"
+        )
+
+    # ── Dependency diff against the resolved base ──
     try:
         diff = _api_get(
-            f"{_GITHUB_API}/repos/{repository}/dependency-graph/compare/{base_sha}...{head_sha}",
+            f"{_GITHUB_API}/repos/{repository}/dependency-graph/compare/{effective_base}...{head_sha}",
             token,
         )
-    except (urllib.error.HTTPError, urllib.error.URLError) as e:
-        msg = f"Dependency Review API unavailable ({e}) — skipping vulnerability gate"
-        print(f"::warning::{msg}")
-        if summary_path:
-            with open(summary_path, "a") as f:
-                f.write(f"Warning: {msg}\n")
+    except ApiError as e:
+        fail_closed(
+            repository, pr_number, token, override_label,
+            f"dependency review API failed ({e.reason})", summary_path,
+        )
         return
 
     blocking, allowed, scope_excluded = find_blocking(
@@ -311,31 +591,32 @@ def main() -> None:
     for d in scope_excluded:
         print(f"::notice::Non-gated dep: {d['ghsa']} in {d['package']} (severity: {d['severity']}, rule: {d['rule']}) — excluded (scope: {d['scope']})")
 
-    if summary_path:
-        with open(summary_path, "a") as f:
-            if blocking:
-                f.write("### Blocking\n" + _table(blocking) + "\n")
-            else:
-                f.write("No blocking vulnerabilities found.\n")
-            if allowed:
-                f.write("### Allowed exceptions\n" + _table(allowed) + "\n")
-            if scope_excluded:
-                f.write("### Non-gated scope (not blocking)\n" + _table(scope_excluded) + "\n")
+    # ── Always-on run summary trail ──
+    base_line = f"`{effective_base}`"
+    if effective_base != base_sha:
+        base_line += f" (resolved from `{base_sha}`, scanned {scanned} run(s))"
+    summary = [
+        "## Dependency Vulnerability Gate",
+        "",
+        f"- **PR base ref:** `{base_ref}`",
+        f"- **Effective base:** {base_line}",
+        f"- **Head:** `{head_sha}`",
+        "",
+    ]
+    if blocking:
+        summary += [f"**Verdict:** 🚨 {len(blocking)} blocking issue(s)", "", _table(blocking)]
+    else:
+        summary += ["**Verdict:** ✅ no blocking vulnerabilities"]
+    if allowed:
+        summary += ["", "### Allowed exceptions (allow-ghsas)", _table(allowed)]
+    if scope_excluded:
+        summary += ["", "### Non-gated scope (not blocking)", _table(scope_excluded)]
+    _write_summary(summary_path, "\n".join(summary))
 
-    event_path = os.environ.get("GITHUB_EVENT_PATH")
-    if event_path and (blocking or allowed or scope_excluded):
-        with open(event_path) as f:
-            pr_number = json.load(f).get("pull_request", {}).get("number")
-        if pr_number:
-            try:
-                post_pr_comment(repository, pr_number, blocking, allowed, scope_excluded, token)
-            except urllib.error.HTTPError as e:
-                if e.code in (403, 404):
-                    print(f"::warning::Cannot post PR comment (HTTP {e.code}) — token may lack pull-requests:write (fork PR?)")
-                else:
-                    raise
-        else:
-            print(f"::warning::Could not determine PR number from event payload — skipping PR comment (event_path={event_path!r})")
+    if pr_number and (blocking or allowed or scope_excluded):
+        post_pr_comment(repository, pr_number, blocking, allowed, scope_excluded, token)
+    elif not pr_number and (blocking or allowed or scope_excluded):
+        print("::warning::Could not determine PR number from event payload — skipping PR comment")
 
     if blocking:
         for b in blocking:
