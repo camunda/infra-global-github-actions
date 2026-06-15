@@ -104,10 +104,14 @@ def _classify_http_error(e: urllib.error.HTTPError) -> ApiError:
     if code == 429:
         return ApiError("rate limit exceeded (HTTP 429)", code, retryable=True)
     if code == 403:
-        remaining = (e.headers or {}).get("X-RateLimit-Remaining")
-        retry_after = (e.headers or {}).get("Retry-After")
-        if retry_after is not None or remaining == "0":
+        headers = e.headers or {}
+        # Retry-After signals a *secondary* rate limit; X-RateLimit-Remaining: 0
+        # signals the *primary* rate limit is exhausted. Both are transient, but
+        # the named reason must distinguish them for accurate audit/troubleshooting.
+        if headers.get("Retry-After") is not None:
             return ApiError("secondary rate limit (HTTP 403)", code, retryable=True)
+        if headers.get("X-RateLimit-Remaining") == "0":
+            return ApiError("primary rate limit exhausted (HTTP 403)", code, retryable=True)
         return ApiError(
             "permission denied — token lacks required scope (HTTP 403)", code, retryable=False
         )
@@ -191,22 +195,31 @@ def latest_snapshotted_ancestor(
     Returns (effective_base_sha, run_id, scanned_count); (None, None, scanned) if
     no ancestor is found within the window. Raises ApiError on API failure so the
     caller can fail closed.
+
+    `lookback` is honored even beyond the API's 100-per-page cap by following
+    pagination, so a large lookback never silently scans fewer runs than asked.
     """
-    runs_url = (
+    per_page = min(lookback, 100)  # GitHub caps per_page at 100
+    url = (
         f"{_GITHUB_API}/repos/{repository}/actions/workflows/{workflow}/runs"
-        f"?branch={base_ref}&status=success&event=push&per_page={lookback}"
+        f"?branch={base_ref}&status=success&event=push&per_page={per_page}"
     )
-    payload, _ = _http_get_json(runs_url, token)
-    runs = payload.get("workflow_runs", []) if isinstance(payload, dict) else []
     scanned = 0
-    for run in runs:
-        head = run.get("head_sha")
-        if not head:
-            continue
-        scanned += 1
-        status = _compare_status(repository, head, base_sha, token)
-        if status in ("identical", "ahead"):
-            return head, run.get("id"), scanned
+    while url and scanned < lookback:
+        payload, headers = _http_get_json(url, token)
+        runs = payload.get("workflow_runs", []) if isinstance(payload, dict) else []
+        for run in runs:
+            if scanned >= lookback:
+                break
+            head = run.get("head_sha")
+            if not head:
+                continue
+            scanned += 1
+            status = _compare_status(repository, head, base_sha, token)
+            if status in ("identical", "ahead"):
+                return head, run.get("id"), scanned
+        match = re.search(r'<([^>]+)>;\s*rel="next"', headers.get("Link", "") or "")
+        url = match.group(1) if match else None
     return None, None, scanned
 
 

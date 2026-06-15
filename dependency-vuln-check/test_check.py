@@ -230,6 +230,11 @@ def test_classify_403_secondary_ratelimit_retryable():
     assert err.retryable is True and "secondary rate limit" in err.reason
 
 
+def test_classify_403_primary_ratelimit_retryable():
+    err = check._classify_http_error(_http_error(403, {"X-RateLimit-Remaining": "0"}))
+    assert err.retryable is True and "primary rate limit" in err.reason
+
+
 def test_ancestor_picks_newest(monkeypatch):
     runs = {"workflow_runs": [
         {"head_sha": "newer", "id": 3},
@@ -271,6 +276,33 @@ def test_ancestor_query_uses_base_ref_and_workflow(monkeypatch):
     assert "branch=stable/8.8" in captured["url"]
     assert "maven-dependency-snapshot.yml" in captured["url"]
     assert "event=push" in captured["url"] and "status=success" in captured["url"]
+
+
+def test_ancestor_paginates_to_honor_lookback(monkeypatch):
+    # lookback > 100 → per_page capped at 100, follow the next page to keep scanning.
+    page1 = {"workflow_runs": [{"head_sha": f"p1-{i}", "id": i} for i in range(100)]}
+    page2 = {"workflow_runs": [{"head_sha": "anc", "id": 999}]}
+    calls = []
+
+    def fake_get(url, tok):
+        calls.append(url)
+        if len(calls) == 1:
+            assert "per_page=100" in url  # capped, not per_page=150
+            return page1, {"Link": '<https://api.github.com/next>; rel="next"'}
+        return page2, {"Link": ""}
+
+    monkeypatch.setattr(check, "_http_get_json", fake_get)
+    # only "anc" (on page 2) is an ancestor
+    monkeypatch.setattr(
+        check, "_compare_status",
+        lambda repo, head, base, tok: "ahead" if head == "anc" else "diverged",
+    )
+    eff, run_id, scanned = check.latest_snapshotted_ancestor(
+        "o/r", "main", "BASE", "wf.yml", "tok", 150
+    )
+    assert eff == "anc" and run_id == 999
+    assert scanned == 101  # 100 from page 1 + 1 match on page 2
+    assert len(calls) == 2  # followed pagination
 
 
 def test_has_override_label_live_read(monkeypatch):
