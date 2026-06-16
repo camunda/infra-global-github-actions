@@ -34,7 +34,11 @@ version shows up as `added` in the diff and is evaluated normally.
   with:
     base-sha: ${{ github.event.pull_request.base.sha }}
     head-sha: ${{ github.event.pull_request.head.sha }}
+    base-ref: ${{ github.event.pull_request.base.ref }}
+    snapshot-workflow: maven-dependency-snapshot.yml
     # optional — defaults shown
+    max-snapshot-lookback: "30"
+    override-label: ci:vuln-gate-override
     config-file: .github/dependency-review-config.json
     fail-on-severity: high
     fail-on-fixable-severity: low
@@ -47,6 +51,10 @@ version shows up as `added` in the diff and is evaluated normally.
 |-------|----------|---------|-------------|
 | `base-sha` | yes | — | Base commit SHA of the PR |
 | `head-sha` | yes | — | Head commit SHA of the PR |
+| `base-ref` | yes | — | Base **branch** of the PR (e.g. `main`, `stable/8.8`). Used to find the nearest snapshotted ancestor on the correct branch |
+| `snapshot-workflow` | yes | — | Filename of the workflow that submits the base snapshot (e.g. `maven-dependency-snapshot.yml`). Its successful push-event runs are scanned to resolve the effective base |
+| `max-snapshot-lookback` | no | `30` | How many recent successful snapshot runs to scan when resolving the effective base |
+| `override-label` | no | `ci:vuln-gate-override` | PR label that bypasses the gate **only** when it cannot verify the PR (outage / no-ancestor). Never bypasses a real finding |
 | `config-file` | no | `.github/dependency-review-config.json` | Path to the JSON config holding `allow-ghsas` |
 | `fail-on-severity` | no | `high` | Min severity (`low`/`moderate`/`high`/`critical`) that blocks when **no fix** is available |
 | `fail-on-fixable-severity` | no | `low` | Min severity that blocks when a **fix is** available |
@@ -59,15 +67,55 @@ The action uses the workflow's `github.token`. The calling job must grant:
 ```yaml
 permissions:
   contents: read         # read the dependency graph / Dependency Review API
-  pull-requests: write   # post or update the findings comment
+  actions: read          # list snapshot-workflow runs to resolve the effective base
+  pull-requests: write   # post or update the findings comment; read the override label
 ```
 
-- `contents: read` is required for `GET /repos/{owner}/{repo}/dependency-graph/compare/{base}...{head}`.
-  The repository must have the **Dependency graph** feature enabled.
-- `pull-requests: write` is required to post the findings comment. On **fork PRs** the
-  token is often read-only; the action then emits a `::warning::` instead of failing.
+- `contents: read` is required for `GET /repos/{owner}/{repo}/dependency-graph/compare/{base}...{head}`
+  **and** the commit-compare used during base resolution. The repository must have the
+  **Dependency graph** feature enabled.
+- `actions: read` is required to list runs of the `snapshot-workflow`
+  (`GET /repos/{owner}/{repo}/actions/workflows/{workflow}/runs`) when resolving the base.
+- `pull-requests: write` is required to post the findings comment and to read the PR's
+  labels (override check). On **fork PRs** the token is often read-only; the action then
+  emits a `::warning::` instead of failing.
 - The GraphQL Advisory fallback (used only when the diff omits `first_patched_version`)
   reads public advisory data and needs no extra scope.
+
+## Base-snapshot resolution & fail-closed contract
+
+The diff compares `effective_base...head`, **not** the raw `base.sha`. The base snapshot
+workflow is path-filtered (it only runs when poms change), so a code-only base commit has
+**no snapshot** — leaving the base side of the compare empty and flagging the *entire* head
+tree as `added` (pre-existing dependencies falsely surface as new). To avoid this, the action
+resolves `base.sha` to the most recent commit on `base-ref` that has a submitted snapshot and
+is an **ancestor-or-equal** of `base.sha`, then diffs from there.
+
+The gate **fails closed** when it cannot verify a PR:
+
+| Situation | Result |
+|-----------|--------|
+| GitHub API error, transient | retried (3 attempts, exponential backoff) |
+| API error survives retries | **fail closed** (block), reason named in the log |
+| No snapshotted ancestor found within `max-snapshot-lookback` | **fail closed** (block) |
+| API works, real vulnerable dependency added | block (normal finding) |
+| API works, no vulnerable dependency added | pass |
+
+Every run writes a summary trail (resolved base, runs scanned, verdict). Failure reasons are
+named explicitly in the log (rate-limit vs 5xx vs timeout vs permissions vs not-found).
+
+### Override label (for sustained outages)
+
+If the gate fails closed because it genuinely **cannot verify** the PR (a sustained GitHub
+outage, or no resolvable base snapshot), a maintainer may bypass it:
+
+1. Add the `override-label` (default `ci:vuln-gate-override`) to the PR.
+2. **Re-run** the failed gate job.
+
+The label is read **live** from the PR (not the frozen event payload), so a re-run after
+labeling takes effect. The bypass is logged loudly (`::warning::` + PR comment) for audit. The
+label **never** bypasses a real vulnerability finding — only the can't-verify (fail-closed)
+paths. Create the label in the consuming repo first: `gh label create "ci:vuln-gate-override"`.
 
 ## Configuration — exceptions (`allow-ghsas`)
 
@@ -128,15 +176,18 @@ your-repo/
 - Posts (or updates in place) a single PR comment marked `<!-- dependency-vuln-check -->`,
   with separate sections for blocking findings (🚨), allowed exceptions (⚠️), and
   non-gated-scope findings (⚠️).
-- Writes the same tables to the job step summary.
-- Exits non-zero if any blocking finding remains.
+- Writes the same tables to the job step summary, plus the resolved-base trail.
+- Exits non-zero if any blocking finding remains, or if the gate fails closed
+  (unverifiable PR without the override label).
 
 ## Limitations
 
 - Evaluates only **newly added** dependencies in the PR diff; deps already on the base
   branch are not re-scanned (pair with a scheduled SCA scan for ongoing monitoring).
 - For transitive / BOM-pinned dependencies to appear in the diff, both base and head
-  commits need a submitted dependency snapshot (GitHub Dependency Submission API).
+  commits need a submitted dependency snapshot (GitHub Dependency Submission API). The
+  base side is resolved automatically to the nearest snapshotted ancestor; the head side
+  must be submitted by the consuming workflow before this action runs.
 
 ## Tests
 

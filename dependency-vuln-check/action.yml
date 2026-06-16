@@ -16,6 +16,31 @@ inputs:
   head-sha:
     description: Head commit SHA of the pull request
     required: true
+  base-ref:
+    description: >
+      Base branch of the pull request (e.g. main, stable/8.8). Used to find the
+      nearest snapshotted ancestor of base-sha on the correct branch.
+    required: true
+  snapshot-workflow:
+    description: >
+      Filename of the workflow that submits the base Maven dependency snapshot
+      (e.g. maven-dependency-snapshot.yml). Its successful push-event runs are
+      scanned to resolve the effective base.
+    required: true
+  max-snapshot-lookback:
+    description: >
+      How many recent successful snapshot-workflow runs to scan when resolving the
+      effective base. The nearest ancestor is normally near the top; raise this only
+      if a very old base must be resolved.
+    required: false
+    default: "30"
+  override-label:
+    description: >
+      PR label that bypasses the gate ONLY when it cannot verify the PR (GitHub
+      outage after retries, or no snapshotted ancestor). Never bypasses a real
+      finding. Read live from the PR, so adding it and re-running takes effect.
+    required: false
+    default: ci:vuln-gate-override
   config-file:
     description: Path to the vulnerability gate config file containing the allow-ghsas list
     required: false
@@ -48,6 +73,10 @@ runs:
         GH_TOKEN: ${{ github.token }}
         BASE_SHA: ${{ inputs.base-sha }}
         HEAD_SHA: ${{ inputs.head-sha }}
+        BASE_REF: ${{ inputs.base-ref }}
+        SNAPSHOT_WORKFLOW: ${{ inputs.snapshot-workflow }}
+        MAX_SNAPSHOT_LOOKBACK: ${{ inputs.max-snapshot-lookback }}
+        OVERRIDE_LABEL: ${{ inputs.override-label }}
         CONFIG_FILE: ${{ inputs.config-file }}
         FAIL_ON_SEVERITY: ${{ inputs.fail-on-severity }}
         FAIL_ON_FIXABLE_SEVERITY: ${{ inputs.fail-on-fixable-severity }}

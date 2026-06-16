@@ -2,7 +2,11 @@
 
 The GitHub Dependency Review API diff and the Advisory GraphQL lookup are not
 hit: tests feed `find_blocking` synthetic diff entries and stub `_lookup_patch`.
+Base-resolution, retry, and fail-closed tests stub the HTTP layer (`_http_get_json`
+/ `urllib.request.urlopen`) and `time.sleep`, so nothing touches the network.
 """
+import urllib.error
+
 import pytest
 
 import check
@@ -160,3 +164,226 @@ def test_parse_scopes():
 def test_severity_rank_invalid_exits():
     with pytest.raises(SystemExit):
         severity_rank("bogus")
+
+
+# --- base-snapshot resolution (Workstream D) ----------------------------------
+
+class _FakeResp:
+    """Minimal context-manager stand-in for urllib's response."""
+
+    def __init__(self, body: bytes, headers=None):
+        self._body = body
+        self.headers = headers or {}
+
+    def read(self):
+        return self._body
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+def _http_error(code, headers=None):
+    return urllib.error.HTTPError("https://api.github.com/x", code, "err", headers or {}, None)
+
+
+def test_http_get_json_retries_then_succeeds(monkeypatch):
+    sleeps, attempts = [], []
+    monkeypatch.setattr(check.time, "sleep", lambda s: sleeps.append(s))
+
+    def fake_urlopen(req, timeout=30):
+        attempts.append(1)
+        if len(attempts) < 3:
+            raise _http_error(503)
+        return _FakeResp(b'{"ok": true}', {"Link": ""})
+
+    monkeypatch.setattr(check.urllib.request, "urlopen", fake_urlopen)
+    payload, _ = check._http_get_json("https://api.github.com/x", "tok")
+    assert payload == {"ok": True}
+    assert len(attempts) == 3
+    assert sleeps == [2, 4]  # exponential backoff before attempts 2 and 3
+
+
+def test_http_get_json_exhausts_then_raises(monkeypatch):
+    monkeypatch.setattr(check.time, "sleep", lambda s: None)
+    monkeypatch.setattr(check.urllib.request, "urlopen", lambda req, timeout=30: (_ for _ in ()).throw(_http_error(500)))
+    with pytest.raises(check.ApiError) as ei:
+        check._http_get_json("https://api.github.com/x", "tok")
+    assert ei.value.retryable is True
+    assert "server error" in ei.value.reason
+
+
+def test_classify_429_retryable():
+    err = check._classify_http_error(_http_error(429))
+    assert err.retryable is True and "rate limit" in err.reason
+
+
+def test_classify_403_perms_not_retryable():
+    err = check._classify_http_error(_http_error(403))
+    assert err.retryable is False and "permission" in err.reason
+
+
+def test_classify_403_secondary_ratelimit_retryable():
+    err = check._classify_http_error(_http_error(403, {"Retry-After": "5"}))
+    assert err.retryable is True and "secondary rate limit" in err.reason
+
+
+def test_classify_403_primary_ratelimit_retryable():
+    err = check._classify_http_error(_http_error(403, {"X-RateLimit-Remaining": "0"}))
+    assert err.retryable is True and "primary rate limit" in err.reason
+
+
+def test_ancestor_picks_newest(monkeypatch):
+    runs = {"workflow_runs": [
+        {"head_sha": "newer", "id": 3},
+        {"head_sha": "anc", "id": 2},
+        {"head_sha": "older", "id": 1},
+    ]}
+    monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
+    statuses = {"newer": "diverged", "anc": "ahead", "older": "ahead"}
+    monkeypatch.setattr(check, "_compare_status", lambda repo, head, base, tok: statuses[head])
+    eff, run_id, scanned = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    assert (eff, run_id, scanned) == ("anc", 2, 2)  # skipped newer (diverged), matched anc
+
+
+def test_ancestor_identical_at_top(monkeypatch):
+    runs = {"workflow_runs": [{"head_sha": "BASE", "id": 9}]}
+    monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
+    monkeypatch.setattr(check, "_compare_status", lambda *a: "identical")
+    eff, _, scanned = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    assert eff == "BASE" and scanned == 1
+
+
+def test_ancestor_none_found(monkeypatch):
+    runs = {"workflow_runs": [{"head_sha": "x", "id": 1}, {"head_sha": "y", "id": 2}]}
+    monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
+    monkeypatch.setattr(check, "_compare_status", lambda *a: "behind")
+    eff, run_id, scanned = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    assert eff is None and run_id is None and scanned == 2
+
+
+def test_ancestor_query_uses_base_ref_and_workflow(monkeypatch):
+    captured = {}
+
+    def fake_get(url, tok):
+        captured["url"] = url
+        return {"workflow_runs": []}, {}
+
+    monkeypatch.setattr(check, "_http_get_json", fake_get)
+    check.latest_snapshotted_ancestor("o/r", "stable/8.8", "BASE", "maven-dependency-snapshot.yml", "tok", 30)
+    # branch name with slash must be percent-encoded so it is not misread as a path segment
+    assert "branch=stable%2F8.8" in captured["url"]
+    assert "maven-dependency-snapshot.yml" in captured["url"]
+    assert "event=push" in captured["url"] and "status=success" in captured["url"]
+
+
+def test_ancestor_query_plain_branch_not_double_encoded(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (captured.update(url=url) or ({}, {})) and ({"workflow_runs": []}, {}))
+
+    def fake_get(url, tok):
+        captured["url"] = url
+        return {"workflow_runs": []}, {}
+
+    monkeypatch.setattr(check, "_http_get_json", fake_get)
+    check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    assert "branch=main" in captured["url"]  # no encoding needed, no %
+
+
+def test_has_override_label_no_pr_number(monkeypatch):
+    # pr_number=None → return False without touching the API
+    api_called = []
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: api_called.append(url) or [])
+    assert check.has_override_label("o/r", None, "tok", "ci:vuln-gate-override") is False
+    assert api_called == []
+
+
+def test_ancestor_paginates_to_honor_lookback(monkeypatch):
+    # lookback > 100 → per_page capped at 100, follow the next page to keep scanning.
+    page1 = {"workflow_runs": [{"head_sha": f"p1-{i}", "id": i} for i in range(100)]}
+    page2 = {"workflow_runs": [{"head_sha": "anc", "id": 999}]}
+    calls = []
+
+    def fake_get(url, tok):
+        calls.append(url)
+        if len(calls) == 1:
+            assert "per_page=100" in url  # capped, not per_page=150
+            return page1, {"Link": '<https://api.github.com/next>; rel="next"'}
+        return page2, {"Link": ""}
+
+    monkeypatch.setattr(check, "_http_get_json", fake_get)
+    # only "anc" (on page 2) is an ancestor
+    monkeypatch.setattr(
+        check, "_compare_status",
+        lambda repo, head, base, tok: "ahead" if head == "anc" else "diverged",
+    )
+    eff, run_id, scanned = check.latest_snapshotted_ancestor(
+        "o/r", "main", "BASE", "wf.yml", "tok", 150
+    )
+    assert eff == "anc" and run_id == 999
+    assert scanned == 101  # 100 from page 1 + 1 match on page 2
+    assert len(calls) == 2  # followed pagination
+
+
+def test_has_override_label_live_read(monkeypatch):
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: [{"name": "other"}, {"name": "ci:vuln-gate-override"}])
+    assert check.has_override_label("o/r", 5, "tok", "ci:vuln-gate-override") is True
+
+
+def test_has_override_label_api_failure_stays_closed(monkeypatch):
+    def boom(url, tok):
+        raise check.ApiError("labels API down", retryable=False)
+
+    monkeypatch.setattr(check, "_api_get", boom)
+    assert check.has_override_label("o/r", 5, "tok", "ci:vuln-gate-override") is False
+
+
+def test_fail_closed_bypassed_with_label(monkeypatch):
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: True)
+    monkeypatch.setattr(check, "_upsert_comment", lambda *a, **k: None)
+    with pytest.raises(SystemExit) as ei:
+        check.fail_closed("o/r", 5, "tok", "ci:vuln-gate-override", "outage", None)
+    assert ei.value.code == 0  # honored bypass
+
+
+def test_fail_closed_blocks_without_label(monkeypatch):
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: False)
+    monkeypatch.setattr(check, "_upsert_comment", lambda *a, **k: None)
+    with pytest.raises(SystemExit) as ei:
+        check.fail_closed("o/r", 5, "tok", "ci:vuln-gate-override", "no ancestor", None)
+    assert ei.value.code == 1
+
+
+def _set_main_env(monkeypatch):
+    monkeypatch.setenv("GH_TOKEN", "t")
+    monkeypatch.setenv("GITHUB_REPOSITORY", "o/r")
+    monkeypatch.setenv("BASE_SHA", "B")
+    monkeypatch.setenv("HEAD_SHA", "H")
+    monkeypatch.setenv("BASE_REF", "main")
+    monkeypatch.setenv("SNAPSHOT_WORKFLOW", "wf.yml")
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
+    monkeypatch.delenv("CONFIG_FILE", raising=False)
+
+
+def test_main_real_vuln_blocks_even_with_override_label(monkeypatch):
+    # API works, base resolves, a real fixable vuln is added → blocks (exit 1).
+    # The override label is present but must be IGNORED for a genuine finding.
+    _set_main_env(monkeypatch)
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1))
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: [_dep(severity="high", fix="2.0.0")])
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: True)
+    with pytest.raises(SystemExit) as ei:
+        check.main()
+    assert ei.value.code == 1
+
+
+def test_main_fail_closed_when_no_ancestor(monkeypatch):
+    _set_main_env(monkeypatch)
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: (None, None, 5))
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: False)
+    with pytest.raises(SystemExit) as ei:
+        check.main()
+    assert ei.value.code == 1
