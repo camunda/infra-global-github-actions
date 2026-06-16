@@ -1,89 +1,46 @@
 # Renovate PR maintainer
 
-Keeps open [Renovate](https://docs.renovatebot.com/) PRs **fresh** and **unstuck** on
-repositories that adopt `rebaseWhen: "conflicted"`, without reintroducing the per-push
-"rebase storm" of Renovate's default `rebaseWhen: "behind-base-branch"`.
-
-Background and rationale: [camunda/team-infrastructure#1053](https://github.com/camunda/team-infrastructure/issues/1053).
-
-## Why
-
-With `rebaseWhen: "conflicted"`, Renovate stops rebasing PRs on every base-branch push — which
-saves a large amount of CI — but two things can regress on busy repositories:
-
-1. PRs drift far behind `main` and only get refreshed when they conflict.
-2. PRs that hit a flaky required check never get retried, so they stop auto-merging.
-
-This action runs on a schedule and, for each in-scope Renovate PR, takes the **minimum** action
-needed: request a one-off Renovate rebase for stale PRs, or re-run failed jobs (within a budget)
-for PRs whose required checks are red.
+Keeps open [Renovate](https://docs.renovatebot.com/) PRs fresh and unstuck on repositories using `rebaseWhen: "conflicted"` by taking the **minimum** action per PR — rebase stale PRs (via the Renovate `rebase` label) or re-run failed required jobs (within a budget). Background: [camunda/team-infrastructure#1053](https://github.com/camunda/team-infrastructure/issues/1053).
 
 ## Decision model
 
-For every open, non-draft Renovate PR that does not carry an excluded label:
+```mermaid
+stateDiagram-v2
+    state "head-ownership check" as owned
+    state "blocked / unstable" as red
+    state "clean / has_hooks" as green
 
-| `mergeable_state` | Condition | Action |
-|:------------------|:----------|:-------|
-| `dirty` | merge conflict | **skip** — Renovate rebases conflicts itself |
-| `behind` | "require up to date" blocks merge — with `require-up-to-date: true` | **rebase** |
-| `behind` | with `require-up-to-date: false` (default) | decided by staleness/rerun, like `blocked`/`unstable` |
-| `blocked` / `unstable` | a **required** check is failing, run attempt ≤ `rerun-budget` | **rerun** the failed run(s) |
-| `blocked` / `unstable` | no required rerun candidate, but PR is stale | **rebase** |
-| `clean` (and others) | PR is stale | **rebase** |
-| any | otherwise | **none** |
+    [*] --> classify: in-scope Renovate PR
 
-"Stale" is the OR of two stateless signals, both reset by a rebase:
+    classify --> report: carries rebase label
+    classify --> skip: dirty (merge conflict)
+    classify --> none: unknown (mergeability pending)
+    classify --> owned: behind / blocked / unstable / clean
 
-```text
-behind_by >= behind-threshold   OR   age_since_head >= stale-hours
+    owned --> skip: head edited by a human
+    owned --> behind: behind
+    owned --> red: blocked / unstable
+    owned --> green: clean / has_hooks
+
+    behind --> rebase: require-up-to-date = true
+    behind --> red: require-up-to-date = false
+
+    red --> rebase: stale
+    red --> rerun: else, required check failing & attempt ≤ rerun-budget
+    red --> none: otherwise
+
+    green --> rebase: stale
+    green --> none: fresh
+
+    note right of green
+        stale = behind_by ≥ behind-threshold
+                OR head age ≥ stale-hours
+    end note
 ```
 
-- **rebase** = add the Renovate `rebase` label. Renovate performs the real rebase on its next
-  run (re-running the package manager, regenerating lockfiles, pushing a fresh SHA). This action
-  **never pushes commits itself**.
-- **rerun** = re-run the failed workflow run(s) in place (increments
-  `run_attempt`, no new SHA). Only runs that produced a **failing required check** are
-  rerun: the action discovers required check contexts from the repository rulesets targeting
-  the PR base branch, finds failing required check-runs on the head SHA, and maps them to
-  their workflow runs via the shared check suite. Non-required (non-blocking) failures are
-  never rerun unless their check name is listed in `extra-rerun-checks`. The budget is
-  derived from `run_attempt`, so a new head SHA naturally refreshes it — no state is persisted.
-
-## Usage
-
-```yaml
-# .github/workflows/renovate-pr-maintainer.yml
-name: Renovate PR maintainer
-
-on:
-  schedule:
-    - cron: "0 6 * * *" # daily, off-peak; scheduled runs are always dry-run
-  workflow_dispatch:
-    inputs:
-      dry-run:
-        description: "Run without modifying any PR"
-        type: boolean
-        default: true
-
-permissions:
-  pull-requests: write  # apply the rebase label + read PR metadata / mergeable_state
-  actions: write        # re-run failed jobs
-  checks: read          # read check/run state
-  contents: read        # read compare/commit state
-
-jobs:
-  maintain:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: camunda/infra-global-github-actions/renovate-pr-maintainer@main
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          # Scheduled runs stay dry-run; manual runs honor the dispatch input.
-          dry-run: ${{ github.event_name == 'schedule' || inputs.dry-run }}
-```
-
-Going live is a deliberate, auditable action: trigger the workflow manually
-(`workflow_dispatch`) with `dry-run: false`. Scheduled runs never mutate PRs.
+- **rebase** — add the Renovate `rebase` label; Renovate does the real rebase (regenerates lockfiles, pushes a fresh SHA). This action never pushes commits.
+- **rerun** — re-run the failed required workflow run(s) in place, no new SHA; budget derives from `run_attempt`.
+- **skip · report · none** — no mutation (left for Renovate, a human, or the next run).
 
 ## Inputs
 
@@ -101,15 +58,3 @@ Going live is a deliberate, auditable action: trigger the workflow manually
 | `extra-rerun-checks` | `""` | Comma- or newline-separated check-run names to also treat as required for the rerun decision (unioned with ruleset-discovered checks). Use to retry a non-required/flaky check or one enforced via classic branch protection. |
 | `require-up-to-date` | `false` | Treat the `behind` state ("require branches up to date") as a merge blocker and rebase immediately. When `false`, that signal is ignored and behind PRs are decided by staleness. |
 | `dry-run` | `false` | When true, classify and log only; never modify any PR. |
-
-## Scope and limitations (v1)
-
-- **Rebases are requested via the Renovate `rebase` label, never `update-branch`.** This ensures
-  lockfiles are regenerated against the new base and CI is re-triggered by Renovate.
-- **Reruns are scoped to required checks discovered from rulesets.** Required contexts are read
-  from repository **rulesets** targeting the PR base branch (classic branch protection is not
-  inspected, mirroring the `wait-for-required-checks` action). On a repo with no matching
-  rulesets, no required checks are found and the action will not rerun anything — only the
-  staleness rebase path applies.
-- **No persisted state.** Both staleness and rerun budget are derived from GitHub data, so the
-  action is safe to run on any cadence and resets correctly on every new head SHA.
