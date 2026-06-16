@@ -25,7 +25,8 @@ For every open, non-draft Renovate PR that does not carry an excluded label:
 | `mergeable_state` | Condition | Action |
 |:------------------|:----------|:-------|
 | `dirty` | merge conflict | **skip** — Renovate rebases conflicts itself |
-| `behind` | "require up to date" blocks merge | **rebase** |
+| `behind` | "require up to date" blocks merge — with `require-up-to-date: true` | **rebase** |
+| `behind` | with `require-up-to-date: false` (default) | decided by staleness/rerun, like `blocked`/`unstable` |
 | `blocked` / `unstable` | a **required** check is failing, run attempt ≤ `rerun-budget` | **rerun** the failed run(s) |
 | `blocked` / `unstable` | no required rerun candidate, but PR is stale | **rebase** |
 | `clean` (and others) | PR is stale | **rebase** |
@@ -45,8 +46,8 @@ behind_by >= behind-threshold   OR   age_since_head >= stale-hours
   rerun: the action discovers required check contexts from the repository rulesets targeting
   the PR base branch, finds failing required check-runs on the head SHA, and maps them to
   their workflow runs via the shared check suite. Non-required (non-blocking) failures are
-  never rerun. The budget is derived from `run_attempt`, so a new head SHA naturally
-  refreshes it — no state is persisted.
+  never rerun unless their check name is listed in `extra-rerun-checks`. The budget is
+  derived from `run_attempt`, so a new head SHA naturally refreshes it — no state is persisted.
 
 ## Usage
 
@@ -95,9 +96,12 @@ Going live is a deliberate, auditable action: trigger the workflow manually
 | `exclude-labels` | `keep-updated,stop-updating` | Comma-separated labels that take a PR out of scope. |
 | `behind-threshold` | `60` | Rebase when at least this many commits behind base (`B`). |
 | `stale-hours` | `24` | Rebase when the PR head is at least this many hours old (`C`). |
-| `rerun-budget` | `1` | Max workflow-run attempts per head SHA before reruns stop (`N`). |
+| `rerun-budget` | `0` | Max workflow-run attempts per head SHA before reruns stop (`N`). `0` (default) disables reruns; set to `1`+ to enable. |
 | `batch-size` | `10` | Max PRs acted on per run (blast-radius cap). |
 | `base-branch` | `""` | Optional exact base-branch filter; empty means all. |
+| `extra-trusted-logins` | `""` | Comma- or newline-separated extra logins (author/committer) treated as Renovate-owned, so trusted bots like `github-actions[bot]` don't mark a branch as human-edited. |
+| `extra-rerun-checks` | `""` | Comma- or newline-separated check-run names to also treat as required for the rerun decision (unioned with ruleset-discovered checks). Use to retry a non-required/flaky check or one enforced via classic branch protection. |
+| `require-up-to-date` | `false` | Treat the `behind` state ("require branches up to date") as a merge blocker and rebase immediately. When `false`, that signal is ignored and behind PRs are decided by staleness. |
 | `rebase-label` | `rebase` | Renovate one-off rebase label to apply. |
 | `dry-run` | `true` | When true, classify and log only; never modify any PR. |
 

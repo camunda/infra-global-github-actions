@@ -15,7 +15,8 @@
 #                                                       human's commits), checked first
 #                                                       for every actionable state below
 #   - dirty (merge conflict)                  -> skip   (Renovate rebases conflicts itself)
-#   - behind (blocked by "require up to date") -> rebase (apply the rebase label)
+#   - behind (blocked by "require up to date") -> rebase if REQUIRE_UP_TO_DATE=true,
+#                                                 else decided by staleness (like clean)
 #   - blocked/unstable (required checks red)   -> rebase if stale (rerunning stale code
 #                                                 burns CI for a SHA that can't merge),
 #                                                 else rerun if a failed run has budget,
@@ -33,8 +34,18 @@ RENOVATE_AUTHOR="${RENOVATE_AUTHOR:-renovate[bot]}"
 EXCLUDE_LABELS="${EXCLUDE_LABELS:-keep-updated,stop-updating}"
 BEHIND_THRESHOLD="${BEHIND_THRESHOLD:-60}"
 STALE_HOURS="${STALE_HOURS:-24}"
-RERUN_BUDGET="${RERUN_BUDGET:-1}"
+RERUN_BUDGET="${RERUN_BUDGET:-0}"
+# Comma- or newline-separated extra check-run names to treat as required for the
+# rerun decision, unioned with the contexts discovered from rulesets. Lets an
+# operator opt a non-required check (e.g. a flaky job, or one enforced only via
+# classic branch protection, which this action does not read) into reruns.
+EXTRA_RERUN_CHECKS="${EXTRA_RERUN_CHECKS:-}"
 BASE_BRANCH="${BASE_BRANCH:-}"
+# When false (default), the `behind` mergeable_state ("Require branches to be up
+# to date before merging") is ignored from the decision logic: a behind PR is
+# decided purely by staleness, like a clean PR. Set true to treat behind as a
+# hard merge blocker and rebase it immediately.
+REQUIRE_UP_TO_DATE="${REQUIRE_UP_TO_DATE:-false}"
 # Renovate's rebase label. A PR already carrying it has a rebase queued (Renovate
 # strips the label once it rebases), so the maintainer leaves it alone and just
 # reports it. Must match apply.sh's REBASE_LABEL.
@@ -43,6 +54,12 @@ REBASE_LABEL="${REBASE_LABEL:-rebase}"
 # commits, so it is treated as Renovate-owned, not a human edit. Any other
 # non-Renovate author/committer on the head commit marks the branch as edited.
 GITHUB_SIGNING_COMMITTER="${GITHUB_SIGNING_COMMITTER:-web-flow}"
+# Comma- or newline-separated extra logins (author or committer) that are ALSO
+# treated as Renovate-owned, in addition to RENOVATE_AUTHOR and
+# GITHUB_SIGNING_COMMITTER. Lets trusted automation that pushes follow-up commits
+# to Renovate branches (e.g. github-actions[bot] running upgrade scripts) avoid
+# being misread as a human edit. Whitespace around entries is trimmed.
+EXTRA_TRUSTED_LOGINS="${EXTRA_TRUSTED_LOGINS:-}"
 # Polling for GitHub's asynchronously-computed mergeable_state. Every push to
 # the base branch resets it to "unknown", so a single retry is often not enough
 # on busy repos; poll a few times with backoff before giving up.
@@ -160,8 +177,10 @@ required_checks_for_base() {
 }
 
 echo "Scanning open PRs in ${REPOSITORY} authored by '${RENOVATE_AUTHOR}'"
-echo "Thresholds: behind_by>=${BEHIND_THRESHOLD}, age>=${STALE_HOURS}h, rerun-budget=${RERUN_BUDGET}"
+echo "Thresholds: behind_by>=${BEHIND_THRESHOLD}, age>=${STALE_HOURS}h, rerun-budget=${RERUN_BUDGET}, require-up-to-date=${REQUIRE_UP_TO_DATE}"
 [ -n "$BASE_BRANCH" ] && echo "Base-branch filter: ${BASE_BRANCH}"
+[ -n "$EXTRA_TRUSTED_LOGINS" ] && echo "Extra trusted logins (author/committer): ${EXTRA_TRUSTED_LOGINS}"
+[ -n "$EXTRA_RERUN_CHECKS" ] && echo "Extra rerun checks: ${EXTRA_RERUN_CHECKS}"
 
 # List open PRs (the list endpoint omits mergeable_state, so we only collect
 # cheap metadata here and fetch mergeable_state per-PR below).
@@ -192,13 +211,31 @@ while IFS= read -r warm_base; do
   required_checks_for_base "$warm_base" >/dev/null
 done < <(echo "$candidates" | jq -r '.[].base' | sort -u)
 
+# True when $1 is one of the EXTRA_TRUSTED_LOGINS extra logins. The list is
+# split on commas AND newlines and each entry is whitespace-trimmed, so a YAML
+# block scalar (one login per line) works as well as a comma-separated string.
+# Widens the set of identities considered Renovate-owned beyond RENOVATE_AUTHOR
+# and GITHUB_SIGNING_COMMITTER. An empty login or empty list is never a match
+# (the caller handles the empty-login case).
+login_is_extra_allowed() {
+  local login="$1" extra
+  { [ -z "$login" ] || [ -z "$EXTRA_TRUSTED_LOGINS" ]; } && return 1
+  # `|| [ -n "$extra" ]` processes the final entry even when the pipeline emits
+  # no trailing newline (true for a single login or the last item of any list).
+  while IFS= read -r extra || [ -n "$extra" ]; do
+    [ -n "$extra" ] && [ "$login" = "$extra" ] && return 0
+  done < <(printf '%s' "$EXTRA_TRUSTED_LOGINS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+  return 1
+}
+
 # Fetch the head commit once and derive age + edit ownership: sets age_hours and
 # head_modified (globals), memoized per PR via head_meta_done. Renovate refuses
 # to auto-rebase a branch it did not author ("Edited/Blocked"); we mirror that by
 # flagging head_modified when the head commit's author or committer is anyone
 # other than Renovate (GITHUB_SIGNING_COMMITTER is Renovate's signed-commit
-# committer and does not count). Login mapping is best-effort: an unmapped author
-# (null login) is treated as Renovate-owned to avoid skipping legitimate PRs.
+# committer and does not count, and EXTRA_TRUSTED_LOGINS adds further
+# trusted logins). Login mapping is best-effort: an unmapped author (null login)
+# is treated as Renovate-owned to avoid skipping legitimate PRs.
 # Cost: 1 commit GET (shared with compute_staleness).
 fetch_head_meta() {
   local head_sha="$1" head_json author committer head_date head_epoch
@@ -211,8 +248,8 @@ fetch_head_meta() {
   fi
   author=$(echo "$head_json" | jq -r '.author.login // ""')
   committer=$(echo "$head_json" | jq -r '.committer.login // ""')
-  if { [ -n "$author" ] && [ "$author" != "$RENOVATE_AUTHOR" ]; } ||
-     { [ -n "$committer" ] && [ "$committer" != "$RENOVATE_AUTHOR" ] && [ "$committer" != "$GITHUB_SIGNING_COMMITTER" ]; }; then
+  if { [ -n "$author" ] && [ "$author" != "$RENOVATE_AUTHOR" ] && ! login_is_extra_allowed "$author"; } ||
+     { [ -n "$committer" ] && [ "$committer" != "$RENOVATE_AUTHOR" ] && [ "$committer" != "$GITHUB_SIGNING_COMMITTER" ] && ! login_is_extra_allowed "$committer"; }; then
     head_modified=true
   fi
   head_date=$(echo "$head_json" | jq -r '.commit.committer.date // ""')
@@ -242,21 +279,43 @@ compute_staleness() {
 
 # Compute rerun eligibility for one PR, scoped to REQUIRED checks only:
 #   failing required check-run -> its check suite -> the workflow run that produced it.
-# Sets required_count, eligible_ids, eligible_count (globals). This avoids
-# rerunning non-required (non-blocking) workflows.
+# The required set is the ruleset-discovered contexts unioned with EXTRA_RERUN_CHECKS.
+# Sets required_count, eligible_ids, eligible_count, checks_in_progress (globals).
+# This avoids rerunning non-required (non-blocking) workflows.
 # Cost: 1 check-runs + 1 actions/runs GET (both paginated — the most expensive
-# pair). Called only for blocked/unstable, the only states with a rerun path.
+# pair). Called for blocked/unstable and for behind when require-up-to-date is
+# disabled (the states with a rerun path); short-circuits when reruns are off.
 compute_rerun_eligibility() {
   local base="$1" head_sha="$2" required_checks required_json checkruns_ndjson failing_suites runs_ndjson
+  # Reruns disabled (budget < 1): no run can ever be eligible (run_attempt is
+  # always >= 1), so short-circuit before the two costly paginated GETs.
+  if [ "$RERUN_BUDGET" -lt 1 ]; then
+    required_count=0; eligible_ids="[]"; eligible_count=0; checks_in_progress=false; failing_required_count=0
+    return 0
+  fi
   required_checks=$(required_checks_for_base "$base")
-  required_json=$(printf '%s\n' "$required_checks" | jq -R . | jq -s 'map(select(length > 0))')
+  # Union the ruleset-discovered contexts with any operator-supplied extra rerun
+  # checks (comma- or newline-separated, whitespace-trimmed, de-duplicated). With
+  # no extras this is identical to the ruleset set (already sort -u'd).
+  required_json=$(
+    { printf '%s\n' "$required_checks"
+      printf '%s' "$EXTRA_RERUN_CHECKS" | tr ',' '\n'
+    } | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | jq -R . | jq -s 'map(select(length > 0)) | unique')
   required_count=$(echo "$required_json" | jq 'length')
 
-  # Check suites on the head SHA that contain a failing REQUIRED check-run.
+  # Check suites on the head SHA that contain a failing REQUIRED check-run. We
+  # also carry each run's status so we can tell "failing" from "still running":
+  # GitHub reports `unstable` for both a failing AND a merely-pending non-required
+  # check, so a fresh PR with no rerun candidate may simply be mid-CI.
   checkruns_ndjson=$(gh_api "repos/${REPOSITORY}/commits/${head_sha}/check-runs?per_page=100" --paginate \
-    --jq '.check_runs[] | {name, conclusion, suite: .check_suite.id}' 2>/dev/null || echo "")
+    --jq '.check_runs[] | {name, status, conclusion, suite: .check_suite.id}' 2>/dev/null || echo "")
+  checks_in_progress=$(printf '%s\n' "$checkruns_ndjson" | jq -s 'any(.[]; .status != "completed")' 2>/dev/null || echo false)
   failing_suites=$(printf '%s\n' "$checkruns_ndjson" | jq -s --argjson req "$required_json" \
     '[.[] | select(.conclusion == "failure" and ((.name as $n | $req | index($n)) != null)) | .suite] | unique' 2>/dev/null || echo "[]")
+  # Number of failing REQUIRED suites, regardless of rerun budget. Lets the
+  # caller distinguish "a required check is failing but its run is over budget"
+  # from "nothing required is failing" — they look identical via eligible_count.
+  failing_required_count=$(echo "$failing_suites" | jq 'length' 2>/dev/null || echo 0)
 
   # Workflow runs whose suite has a failing required check, still within rerun budget.
   runs_ndjson=$(gh_api "repos/${REPOSITORY}/actions/runs?head_sha=${head_sha}&per_page=100" --paginate \
@@ -264,6 +323,22 @@ compute_rerun_eligibility() {
   eligible_ids=$(printf '%s\n' "$runs_ndjson" | jq -s --argjson n "$RERUN_BUDGET" --argjson suites "$failing_suites" \
     '[.[] | select(((.suite as $s | $suites | index($s)) != null) and .run_attempt <= $n) | .id] | unique' 2>/dev/null || echo "[]")
   eligible_count=$(echo "$eligible_ids" | jq 'length' 2>/dev/null || echo 0)
+}
+
+# Reason for a fresh PR that ends up with no rerun ($1 = context prefix). Keeps
+# the wording honest: a no-candidate `unstable`/`behind` PR is often just mid-CI
+# (pending non-required checks), not actually failing. Reads RERUN_BUDGET,
+# checks_in_progress and failing_required_count (globals).
+no_rerun_reason() {
+  if [ "$RERUN_BUDGET" -lt 1 ]; then
+    printf '%sreruns disabled (rerun-budget=0)' "$1"
+  elif [ "$failing_required_count" -gt 0 ]; then
+    printf '%sfailing required check but rerun budget exhausted (attempt > %s)' "$1" "$RERUN_BUDGET"
+  elif [ "$checks_in_progress" = "true" ]; then
+    printf '%schecks still in progress, nothing to rerun yet' "$1"
+  else
+    printf '%sno failing required check to rerun' "$1"
+  fi
 }
 
 entries=()
@@ -303,8 +378,9 @@ classify_one_pr() {
   #   - staleness (compare + commit date) gates every rebase-on-stale state
   #     (blocked/unstable/clean/has_hooks) and is checked first for those.
   #   - rerun eligibility (check-runs + actions/runs, the costliest pair) only
-  #     matters for blocked/unstable that are NOT stale, so it is skipped
-  #     entirely once a blocked/unstable PR is found stale.
+  #     matters for a fresh PR with a rerun path (blocked/unstable, or behind
+  #     when require-up-to-date is disabled), so it is skipped once such a PR is
+  #     found stale, and short-circuits entirely when reruns are off.
   #   - head ownership (head_modified) gates every action that would push a new
   #     SHA; it rides along on the commit GET that staleness already does, and
   #     is fetched standalone for `behind` (otherwise a no-fetch state).
@@ -312,18 +388,42 @@ classify_one_pr() {
   # apply.sh consumes only number/action/run_ids, so the defaulted diagnostic
   # fields (behind_by/age_hours) on fixed-action states are cosmetic, not load-bearing.
   local behind_by=0 age_hours=0 required_count=0 eligible_ids="[]" eligible_count=0 stale=false
-  local head_modified=false head_meta_done=false
+  local head_modified=false head_meta_done=false checks_in_progress=false failing_required_count=0
   local action="none" reason=""
   case "$ms" in
     dirty)
       action="skip"; reason="merge conflict; Renovate owns the rebase" ;;
     behind)
-      # A rebase here would push a fresh SHA, so honor an edited branch first.
-      fetch_head_meta "$head_sha"
-      if [ "$head_modified" = "true" ]; then
-        action="skip"; reason="branch edited by non-Renovate author; leave for human (rebase would discard manual commits)"
+      if [ "$REQUIRE_UP_TO_DATE" = "true" ]; then
+        # "Require branches up to date" blocks the merge until a rebase happens,
+        # so a rebase is unavoidable regardless of staleness. It pushes a fresh
+        # SHA, so honor an edited branch first.
+        fetch_head_meta "$head_sha"
+        if [ "$head_modified" = "true" ]; then
+          action="skip"; reason="branch edited by non-Renovate author; leave for human (rebase would discard manual commits)"
+        else
+          action="rebase"; reason="behind base (require-up-to-date blocks merge)"
+        fi
       else
-        action="rebase"; reason="behind base (require-up-to-date blocks merge)"
+        # require-up-to-date disabled: `behind` is not itself a blocker, but
+        # GitHub's `behind` state masks any failing-check state (behind outranks
+        # blocked/unstable in mergeable_state). So decide exactly like
+        # blocked/unstable: staleness first, then rerun failing required checks
+        # on a fresh SHA. Without this, a behind PR's failing checks would never
+        # be rerun — and on busy repos nearly every PR is behind.
+        compute_staleness "$base" "$head_sha"
+        if [ "$head_modified" = "true" ]; then
+          action="skip"; reason="branch edited by non-Renovate author; leave for human (Renovate won't auto-rebase it)"
+        elif [ "$stale" = "true" ]; then
+          action="rebase"; reason="stale (behind_by>=${BEHIND_THRESHOLD} or age>=${STALE_HOURS}h)"
+        else
+          compute_rerun_eligibility "$base" "$head_sha"
+          if [ "$eligible_count" -gt 0 ]; then
+            action="rerun"; reason="behind (ignored) + failing required checks on fresh SHA; rerun ${eligible_count} run(s) (budget left)"
+          else
+            action="none"; reason="$(no_rerun_reason "behind (ignored), fresh; ")"
+          fi
+        fi
       fi ;;
     blocked|unstable)
       # Staleness wins over rerun: a stale PR must rebase to merge anyway, so
@@ -334,13 +434,13 @@ classify_one_pr() {
       if [ "$head_modified" = "true" ]; then
         action="skip"; reason="branch edited by non-Renovate author; leave for human (Renovate won't auto-rebase it)"
       elif [ "$stale" = "true" ]; then
-        action="rebase"; reason="checks failing + stale -> rebase (fresh SHA; skip rerun on stale code)"
+        action="rebase"; reason="stale -> rebase (fresh SHA; rerun skipped on stale code)"
       else
         compute_rerun_eligibility "$base" "$head_sha"
         if [ "$eligible_count" -gt 0 ]; then
           action="rerun"; reason="failing required checks on fresh SHA; rerun ${eligible_count} run(s) (budget left)"
         else
-          action="none"; reason="checks failing, fresh, no required rerun candidate"
+          action="none"; reason="$(no_rerun_reason "fresh; ")"
         fi
       fi ;;
     clean|has_hooks)

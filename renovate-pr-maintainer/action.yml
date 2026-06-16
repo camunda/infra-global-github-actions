@@ -34,9 +34,12 @@ inputs:
     required: false
     default: "24"
   rerun-budget:
-    description: "Max workflow-run attempts per head SHA before reruns stop (N)."
+    description: >
+      Max workflow-run attempts per head SHA before reruns stop (N). 0 (the
+      default) disables reruns entirely; set to 1+ to re-run failed required
+      jobs within that per-SHA budget.
     required: false
-    default: "1"
+    default: "0"
   batch-size:
     description: "Max number of PRs acted on per run (blast-radius cap)."
     required: false
@@ -45,6 +48,34 @@ inputs:
     description: "Optional exact base-branch filter; empty means all base branches."
     required: false
     default: ""
+  extra-trusted-logins:
+    description: >
+      Comma- or newline-separated extra GitHub logins (author or committer) to
+      treat as Renovate-owned when detecting human-edited branches. Renovate's
+      own author and GitHub's signing committer (web-flow) are always trusted;
+      add logins here when trusted automation pushes follow-up commits to
+      Renovate branches under another identity (e.g. github-actions[bot]), so
+      those PRs are not skipped as edited.
+    required: false
+    default: ""
+  extra-rerun-checks:
+    description: >
+      Comma- or newline-separated check-run names to also treat as required when
+      deciding whether to rerun a failing PR, unioned with the contexts
+      discovered from rulesets. Use this to retry a check that is not a required
+      status check (e.g. a flaky job) or one enforced via classic branch
+      protection, which this action does not read. These are check-run names (the
+      job/context), not workflow names.
+    required: false
+    default: ""
+  require-up-to-date:
+    description: >
+      When true, treat the `behind` mergeable_state ("Require branches to be up
+      to date before merging") as a hard merge blocker and rebase the PR
+      immediately. When false (default), that signal is ignored and a behind PR
+      is decided purely by staleness, like any other PR.
+    required: false
+    default: "false"
   dry-run:
     description: "When true, classify and log only; never modify any PR."
     required: false
@@ -64,6 +95,9 @@ runs:
         STALE_HOURS: ${{ inputs.stale-hours }}
         RERUN_BUDGET: ${{ inputs.rerun-budget }}
         BASE_BRANCH: ${{ inputs.base-branch }}
+        REQUIRE_UP_TO_DATE: ${{ inputs.require-up-to-date }}
+        EXTRA_TRUSTED_LOGINS: ${{ inputs.extra-trusted-logins }}
+        EXTRA_RERUN_CHECKS: ${{ inputs.extra-rerun-checks }}
         REBASE_LABEL: "rebase"
         PLAN_FILE: ${{ runner.temp }}/renovate-pr-maintainer-plan.json
       run: bash "$GITHUB_ACTION_PATH/classify.sh"
