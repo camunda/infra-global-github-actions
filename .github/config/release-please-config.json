@@ -85,6 +85,9 @@
     "previous-version": {
       "package-name": "previous-version"
     },
+    "renovate-pr-maintainer": {
+      "package-name": "renovate-pr-maintainer"
+    },
     "rerun-failed-run": {
       "package-name": "rerun-failed-run"
     },
