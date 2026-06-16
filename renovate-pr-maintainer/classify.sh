@@ -5,7 +5,7 @@
 # Renovate PR and decides one of: skip / rerun / rebase / none, then writes a
 # JSON plan to $PLAN_FILE which apply.sh consumes.
 #
-# Decision model (see camunda/team-infrastructure#1053):
+# Decision model:
 #   - already carries the rebase label               -> pending (rebase requested but not
 #                                                       yet consumed by Renovate; do
 #                                                       nothing, just report), checked
@@ -236,6 +236,9 @@ login_is_extra_allowed() {
 # committer and does not count, and EXTRA_TRUSTED_LOGINS adds further
 # trusted logins). Login mapping is best-effort: an unmapped author (null login)
 # is treated as Renovate-owned to avoid skipping legitimate PRs.
+# If the commit GET itself fails (after retries), we fail closed and mark the
+# head modified: an unverifiable branch must never be rebased ("never rebases
+# human-edited branches"); the PR is just deferred to the next run.
 # Cost: 1 commit GET (shared with compute_staleness).
 fetch_head_meta() {
   local head_sha="$1" head_json author committer head_date head_epoch
@@ -243,6 +246,8 @@ fetch_head_meta() {
   head_meta_done=true
   head_json=$(gh_api "repos/${REPOSITORY}/commits/${head_sha}" 2>/dev/null || echo "")
   if [ -z "$head_json" ]; then
+    # Fail closed: ownership unverifiable, so block any rebase of this branch.
+    head_modified=true
     age_hours=0
     return 0
   fi
