@@ -22,13 +22,11 @@ REBASE_LABEL="${REBASE_LABEL:-rebase}"
 MAX_API_RETRIES="${MAX_API_RETRIES:-3}"
 API_RETRY_DELAY="${API_RETRY_DELAY:-5}"
 
-# gh api write (POST ...) with bounded retries on transient failures, mirroring
-# classify.sh's gh_api. Retrying a write here is safe: re-adding the rebase label
-# is a no-op, and a rerun whose first POST already took effect just gets a 4xx on
-# retry (the run is no longer "completed"), so retries never double-act. On
-# success returns 0 and prints nothing; on final failure prints the last gh error
-# body to stdout and returns 1 so the caller can surface the reason. Per-attempt
-# failures are logged to stderr.
+# gh api write (POST) with bounded retries, mirroring classify.sh's gh_api.
+# Retrying is safe: re-adding the rebase label is a no-op, and a rerun whose POST
+# already took effect just 4xxs on retry, so writes never double-act. Returns 0
+# and prints nothing on success; on final failure prints the last gh error body
+# to stdout (per-attempt warnings go to stderr) so the caller can surface it.
 gh_api_write() {
   local attempt=1 out rc
   while [ "$attempt" -le "$MAX_API_RETRIES" ]; do
