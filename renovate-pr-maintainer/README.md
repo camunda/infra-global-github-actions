@@ -91,7 +91,6 @@ Going live is a deliberate, auditable action: trigger the workflow manually
 |:------|:--------|:------------|
 | `github-token` | — (required) | Token with `pull-requests: write`, `actions: write`, `checks: read`, `contents: read`. Labeling a PR via the Issues Labels API is authorized by the `pull-requests` scope, not `issues`. |
 | `repository` | `${{ github.repository }}` | Target repository (`owner/name`). |
-| `renovate-author` | `renovate[bot]` | PR author login identifying Renovate PRs. |
 | `exclude-labels` | `keep-updated,stop-updating` | Comma-separated labels that take a PR out of scope. |
 | `behind-threshold` | `60` | Rebase when at least this many commits behind base (`B`). |
 | `stale-hours` | `24` | Rebase when the PR head is at least this many hours old (`C`). |
@@ -101,8 +100,7 @@ Going live is a deliberate, auditable action: trigger the workflow manually
 | `extra-trusted-logins` | `""` | Comma- or newline-separated extra logins (author/committer) treated as Renovate-owned, so trusted bots like `github-actions[bot]` don't mark a branch as human-edited. |
 | `extra-rerun-checks` | `""` | Comma- or newline-separated check-run names to also treat as required for the rerun decision (unioned with ruleset-discovered checks). Use to retry a non-required/flaky check or one enforced via classic branch protection. |
 | `require-up-to-date` | `false` | Treat the `behind` state ("require branches up to date") as a merge blocker and rebase immediately. When `false`, that signal is ignored and behind PRs are decided by staleness. |
-| `rebase-label` | `rebase` | Renovate one-off rebase label to apply. |
-| `dry-run` | `true` | When true, classify and log only; never modify any PR. |
+| `dry-run` | `false` | When true, classify and log only; never modify any PR. |
 
 ## Scope and limitations (v1)
 
