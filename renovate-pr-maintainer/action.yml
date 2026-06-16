@@ -10,10 +10,10 @@ description: >
 inputs:
   github-token:
     description: >
-      Token used for all API calls. Needs `issues: write` (apply the rebase
-      label via the Issues Labels API), `actions: write` (re-run failed jobs),
-      `pull-requests: read`, `checks: read` and `contents: read` (read PR/commit/
-      compare state).
+      Token used for all API calls. Needs `pull-requests: write` (apply the
+      rebase label; labeling a PR via the Issues Labels API is authorized by the
+      PR scope, not `issues`), `actions: write` (re-run failed jobs), and
+      `checks: read` + `contents: read` (read PR/commit/compare state).
     required: true
   repository:
     description: "Target repository (owner/name)."

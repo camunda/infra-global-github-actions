@@ -66,11 +66,10 @@ on:
         default: true
 
 permissions:
-  issues: write        # apply the rebase label (Issues Labels API)
-  pull-requests: read  # read PR metadata / mergeable_state
-  actions: write       # re-run failed jobs
-  checks: read         # read check/run state
-  contents: read       # read compare/commit state
+  pull-requests: write  # apply the rebase label + read PR metadata / mergeable_state
+  actions: write        # re-run failed jobs
+  checks: read          # read check/run state
+  contents: read        # read compare/commit state
 
 jobs:
   maintain:
@@ -90,7 +89,7 @@ Going live is a deliberate, auditable action: trigger the workflow manually
 
 | Input | Default | Description |
 |:------|:--------|:------------|
-| `github-token` | — (required) | Token with `issues: write`, `pull-requests: read`, `actions: write`, `checks: read`, `contents: read`. |
+| `github-token` | — (required) | Token with `pull-requests: write`, `actions: write`, `checks: read`, `contents: read`. Labeling a PR via the Issues Labels API is authorized by the `pull-requests` scope, not `issues`. |
 | `repository` | `${{ github.repository }}` | Target repository (`owner/name`). |
 | `renovate-author` | `renovate[bot]` | PR author login identifying Renovate PRs. |
 | `exclude-labels` | `keep-updated,stop-updating` | Comma-separated labels that take a PR out of scope. |
