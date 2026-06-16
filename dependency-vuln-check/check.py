@@ -31,6 +31,7 @@ import re
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -202,7 +203,8 @@ def latest_snapshotted_ancestor(
     per_page = min(lookback, 100)  # GitHub caps per_page at 100
     url = (
         f"{_GITHUB_API}/repos/{repository}/actions/workflows/{workflow}/runs"
-        f"?branch={base_ref}&status=success&event=push&per_page={per_page}"
+        f"?branch={urllib.parse.quote(base_ref, safe='')}"
+        f"&status=success&event=push&per_page={per_page}"
     )
     scanned = 0
     while url and scanned < lookback:
@@ -211,13 +213,15 @@ def latest_snapshotted_ancestor(
         for run in runs:
             if scanned >= lookback:
                 break
-            head = run.get("head_sha")
-            if not head:
+            run_sha = run.get("head_sha")
+            if not run_sha:
                 continue
             scanned += 1
-            status = _compare_status(repository, head, base_sha, token)
+            # compare/{run_sha}...{base_sha}: "ahead" = base_sha is ahead of run_sha
+            # = run_sha is an ancestor of base_sha (what we want).
+            status = _compare_status(repository, run_sha, base_sha, token)
             if status in ("identical", "ahead"):
-                return head, run.get("id"), scanned
+                return run_sha, run.get("id"), scanned
         match = re.search(r'<([^>]+)>;\s*rel="next"', headers.get("Link", "") or "")
         url = match.group(1) if match else None
     return None, None, scanned
@@ -374,6 +378,8 @@ def _table(entries: list) -> str:
 
 
 def _api_write(url: str, token: str, method: str, body: dict) -> None:
+    # Write calls (PATCH/POST) are not retried: all callers tolerate failure with
+    # a warning, so a transient error here surfaces immediately but is non-fatal.
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode(),

@@ -273,9 +273,31 @@ def test_ancestor_query_uses_base_ref_and_workflow(monkeypatch):
 
     monkeypatch.setattr(check, "_http_get_json", fake_get)
     check.latest_snapshotted_ancestor("o/r", "stable/8.8", "BASE", "maven-dependency-snapshot.yml", "tok", 30)
-    assert "branch=stable/8.8" in captured["url"]
+    # branch name with slash must be percent-encoded so it is not misread as a path segment
+    assert "branch=stable%2F8.8" in captured["url"]
     assert "maven-dependency-snapshot.yml" in captured["url"]
     assert "event=push" in captured["url"] and "status=success" in captured["url"]
+
+
+def test_ancestor_query_plain_branch_not_double_encoded(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (captured.update(url=url) or ({}, {})) and ({"workflow_runs": []}, {}))
+
+    def fake_get(url, tok):
+        captured["url"] = url
+        return {"workflow_runs": []}, {}
+
+    monkeypatch.setattr(check, "_http_get_json", fake_get)
+    check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    assert "branch=main" in captured["url"]  # no encoding needed, no %
+
+
+def test_has_override_label_no_pr_number(monkeypatch):
+    # pr_number=None → return False without touching the API
+    api_called = []
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: api_called.append(url) or [])
+    assert check.has_override_label("o/r", None, "tok", "ci:vuln-gate-override") is False
+    assert api_called == []
 
 
 def test_ancestor_paginates_to_honor_lookback(monkeypatch):
