@@ -1,6 +1,68 @@
 # Renovate PR maintainer
 
-Keeps open [Renovate](https://docs.renovatebot.com/) PRs fresh and unstuck on repositories using `rebaseWhen: "conflicted"` by taking the **minimum** action per PR — rebase stale PRs (via the Renovate `rebase` label) or re-run failed required jobs (within a budget). Background: [camunda/team-infrastructure#1053](https://github.com/camunda/team-infrastructure/issues/1053).
+Keeps open [Renovate](https://docs.renovatebot.com/) PRs fresh and unstuck on repositories using `rebaseWhen: "conflicted"` by taking the **minimum** action per PR — rebase stale PRs (via the Renovate `rebase` label) or re-run failed required jobs (within a budget). On `rebaseWhen: "conflicted"`, PRs silently drift behind base until their checks rot, yet eager rebasing triggers a CI-burning rebase storm — this nudges only the PRs that are actually stale or stuck. Background: [camunda/team-infrastructure#1053](https://github.com/camunda/team-infrastructure/issues/1053).
+
+## Usage
+
+Run it on a schedule so it periodically nudges open Renovate PRs. With the defaults it only **rebases stale PRs** (reruns are off until you set a `rerun-budget`):
+
+```yaml
+name: Renovate PR maintainer
+
+on:
+  schedule:
+    - cron: "0 */4 * * *" # every 4 hours
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  checks: read
+  actions: write
+  pull-requests: write
+
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: camunda/infra-global-github-actions/renovate-pr-maintainer@main
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+```
+
+### Common tweaks
+
+Try it safely first — classify and log only, change nothing:
+
+```yaml
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          dry-run: true
+```
+
+Also re-run failed required checks (up to 2 attempts per commit):
+
+```yaml
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          rerun-budget: 2
+```
+
+## What it does
+
+A few common situations and the action it takes (with the defaults: rebase once a PR is ≥ 60 commits behind base **or** its head is > 24h old):
+
+| Renovate PR situation | What the maintainer does |
+|:----------------------|:-------------------------|
+| 70 commits behind base, or head 30h old | Adds the `rebase` label → Renovate rebases it (fresh SHA) |
+| Green and fresh (few commits behind, recent head) | Nothing — leaves it alone |
+| Has a merge conflict | Nothing — Renovate rebases conflicts itself |
+| Failing required check, fresh head¹ | Re-runs the failed jobs in place (no new SHA) |
+| Already carries the `rebase` label | Nothing — a rebase is already queued |
+| Branch has human-pushed commits | Nothing — leaves it for the human |
+
+¹ Only when `rerun-budget` ≥ 1 (reruns are off by default).
+
+See the [decision model](#decision-model) below for the exact rules.
 
 ## Decision model
 
@@ -12,9 +74,9 @@ stateDiagram-v2
 
     [*] --> classify: in-scope Renovate PR
 
-    classify --> report: carries rebase label
+    classify --> pending: carries rebase label
     classify --> skip: dirty (merge conflict)
-    classify --> none: unknown (mergeability pending)
+    classify --> none: unknown (mergeability undecided)
     classify --> owned: behind / blocked / unstable / clean
 
     owned --> skip: head edited by a human
@@ -40,7 +102,10 @@ stateDiagram-v2
 
 - **rebase** — add the Renovate `rebase` label; Renovate does the real rebase (regenerates lockfiles, pushes a fresh SHA). This action never pushes commits.
 - **rerun** — re-run the failed required workflow run(s) in place, no new SHA; budget derives from `run_attempt`.
-- **skip · report · none** — no mutation (left for Renovate, a human, or the next run).
+- **no action** — the PR is left untouched this run; three states share that outcome but differ by reason and what comes next:
+  - **`skip`** — merge conflict (Renovate rebases it itself) or a human-edited head (a rebase would discard manual commits); stays skipped until that changes.
+  - **`pending`** — already carries the `rebase` label, so a rebase is queued; clears once Renovate acts on it.
+  - **`none`** — fresh & green, or mergeability not yet known; re-evaluated next run.
 
 ## Inputs
 
