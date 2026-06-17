@@ -458,15 +458,6 @@ else
   echo '[]' > "$PLAN_FILE"
 fi
 
-# Optional human-readable summary.
-if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
-  {
-    echo "### Renovate PR maintainer — plan"
-    echo ""
-    echo "| PR | state | behind_by | age (h) | action | reason |"
-    echo "|---:|:------|----------:|--------:|:-------|:-------|"
-    jq -r '.[] | "| #\(.number) | \(.state) | \(.behind_by) | \(.age_hours) | \(.action) | \(.reason) |"' "$PLAN_FILE"
-  } >> "$GITHUB_STEP_SUMMARY"
-fi
-
+# The human-readable step summary is rendered by apply.sh (the final step), which
+# also knows each PR's applied/deferred outcome under the batch cap.
 echo "Plan written to ${PLAN_FILE}"
