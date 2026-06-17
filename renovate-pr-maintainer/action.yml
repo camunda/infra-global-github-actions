@@ -111,4 +111,9 @@ runs:
         DRY_RUN: ${{ inputs.dry-run }}
         REBASE_LABEL: "rebase"
         PLAN_FILE: ${{ runner.temp }}/renovate-pr-maintainer-plan.json
+        # Surfaced in the step-summary footnote (recap of thresholds/logic).
+        BEHIND_THRESHOLD: ${{ inputs.behind-threshold }}
+        STALE_HOURS: ${{ inputs.stale-hours }}
+        RERUN_BUDGET: ${{ inputs.rerun-budget }}
+        REQUIRE_UP_TO_DATE: ${{ inputs.require-up-to-date }}
       run: bash "$GITHUB_ACTION_PATH/apply.sh"
