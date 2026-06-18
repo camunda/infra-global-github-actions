@@ -47,6 +47,9 @@ runs:
       DATASET="${DATASET_TABLE%%.*}"
       TABLE="${DATASET_TABLE#*.}"
 
+      WORKFLOW_REF_PATH="${GITHUB_WORKFLOW_REF%@*}"
+      WORKFLOW_REF_PATH="${WORKFLOW_REF_PATH#"$GITHUB_REPOSITORY/"}"
+
       gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" --jq '.jobs[] | select(.conclusion=="failure") .id' | while read job_id; do
         echo "Checking failed job $job_id for abort due to runner problem..."
 
@@ -66,6 +69,7 @@ runs:
         "report_time": "$(date '+%Y-%m-%d %H:%M:%S')",
         "ci_url": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY",
         "workflow_name": "$GITHUB_WORKFLOW",
+        "workflow_ref": "$WORKFLOW_REF_PATH",
         "job_name": "$job_name",
         "build_id": "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT",
         "build_trigger": "$GITHUB_EVENT_NAME",

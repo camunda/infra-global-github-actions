@@ -102,6 +102,9 @@ runs:
         RUNNER_TYPE_FIELD=$(printf ', "runner_type": "%s"' "$RUNS_ON")
       fi
 
+      WORKFLOW_REF_PATH="${GITHUB_WORKFLOW_REF%@*}"
+      WORKFLOW_REF_PATH="${WORKFLOW_REF_PATH#"$GITHUB_REPOSITORY/"}"
+
       # ── Parse BigQuery table name (format: project_id:dataset.table) ──
       TABLE_NAME="${{ inputs.big_query_table_name }}"
       PROJECT_ID="${TABLE_NAME%%:*}"
@@ -115,6 +118,7 @@ runs:
         "report_time": "$(date '+%Y-%m-%d %H:%M:%S')",
         "ci_url": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY",
         "workflow_name": "$GITHUB_WORKFLOW",
+        "workflow_ref": "$WORKFLOW_REF_PATH",
         "job_name": "${{ (inputs.job_name_override == '') && '$GITHUB_JOB' || inputs.job_name_override }}",
         "build_id": "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT",
         "build_trigger": "$GITHUB_EVENT_NAME",
