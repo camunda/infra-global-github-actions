@@ -30,6 +30,7 @@ All data submitted by this action is stored as one record in the Big Query table
 | report_time      | TIMESTAMP  | REQUIRED   | Time of record submission |
 | ci_url           | STRING     | REQUIRED   | Github repository URL from `"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"` |
 | workflow_name    | STRING     | NULLABLE   | GHA workflow name from `"$GITHUB_WORKFLOW"` |
+| workflow_ref     | STRING     | NULLABLE   | GHA workflow file path extracted from `"$GITHUB_WORKFLOW_REF"`, e.g. `.github/workflows/ci.yml` |
 | job_name         | STRING     | REQUIRED   | GHA workflow job ID from `"$GITHUB_JOB"` |
 | build_id         | STRING     | REQUIRED   | GHA workflow run ID from `"$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT"` |
 | build_trigger    | STRING     | NULLABLE   | Github event name from `"$GITHUB_EVENT_NAME"` |
