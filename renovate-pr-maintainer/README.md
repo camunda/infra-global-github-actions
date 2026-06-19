@@ -58,7 +58,7 @@ Keep the automerge merge-train moving on a repo that requires up-to-date branche
           require-up-to-date-strategy: automerge
 ```
 
-On a busy repo where Renovate merges only a couple of PRs per run, keep it moving with **minimal rebases** — per base branch, rebase just the one least-behind *mergeable* auto-merging PR (blocked ones are skipped so they can'́t stall the train):
+On a busy repo where Renovate merges only a couple of PRs per run, keep it moving with **minimal rebases** — per base branch, rebase just the one least-behind *mergeable* auto-merging PR (blocked ones are skipped so they can't stall the train):
 
 ```yaml
         with:
@@ -158,5 +158,5 @@ Every PR in the step-summary plan also shows its **blockers** — why GitHub won
 | `extra-trusted-logins` | `""` | Comma- or newline-separated extra logins (author/committer) treated as Renovate-owned, so trusted bots like `github-actions[bot]` don't mark a branch as human-edited. |
 | `extra-rerun-checks` | `""` | Comma- or newline-separated check-run names to also treat as required for the rerun decision (unioned with ruleset-discovered checks). Use to retry a non-required/flaky check or one enforced via classic branch protection. |
 | `require-up-to-date-strategy` | `none` | How to handle the `behind` state ("require branches up to date"). `none`: ignored, decided by staleness. `automerge`: every behind auto-merging PR is rebased immediately (non-automerge PRs still staleness-driven). `automerge-optimized`: per base branch, only one least-behind **mergeable** auto-merging PR is rebased (blocked ones excluded so they can't stall the train), and only when no auto-merging PR is already merge-ready or being rebased. `all`: every behind PR is rebased immediately. |
-| `automerge-labels` | `automerge` | Comma- or newline-separated labels marking a Renovate PR as auto-merging (used only by `require-up-to-date-strategy: automerge`). GitHub native auto-merge is detected too; set empty to rely on that only. |
+| `automerge-labels` | `automerge` | Comma- or newline-separated labels marking a Renovate PR as auto-merging (used by `require-up-to-date-strategy: automerge` and `automerge-optimized`). GitHub native auto-merge is detected too; set empty to rely on that only. |
 | `dry-run` | `false` | When true, classify and log only; never modify any PR. |
