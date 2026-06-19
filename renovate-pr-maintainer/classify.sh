@@ -199,7 +199,7 @@ required_checks_for_base() {
 
 echo "Scanning open PRs in ${REPOSITORY} authored by '${RENOVATE_AUTHOR}'"
 echo "Thresholds: behind_by>=${BEHIND_THRESHOLD}, age>=${STALE_HOURS}h, rerun-budget=${RERUN_BUDGET}, require-up-to-date-strategy=${REQUIRE_UP_TO_DATE_STRATEGY}"
-[ "$REQUIRE_UP_TO_DATE_STRATEGY" = "automerge" ] && echo "Automerge labels: ${AUTOMERGE_LABELS:-<none> (native auto-merge only)}"
+[[ "$REQUIRE_UP_TO_DATE_STRATEGY" == automerge* ]] && echo "Automerge labels: ${AUTOMERGE_LABELS:-<none> (native auto-merge only)}"
 [ -n "$BASE_BRANCH" ] && echo "Base-branch filter: ${BASE_BRANCH}"
 [ -n "$EXTRA_TRUSTED_LOGINS" ] && echo "Extra trusted logins (author/committer): ${EXTRA_TRUSTED_LOGINS}"
 [ -n "$EXTRA_RERUN_CHECKS" ] && echo "Extra rerun checks: ${EXTRA_RERUN_CHECKS}"
