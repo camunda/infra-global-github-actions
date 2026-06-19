@@ -473,11 +473,13 @@ classify_one_pr() {
 
   # Rebase already queued: the PR still carries the label (Renovate strips it once
   # done), so acting now is wasted — the SHA is about to change. Decided from the
-  # candidate's labels alone, before any per-PR fetch: the cheapest exit.
+  # candidate's labels alone, before any per-PR fetch: the cheapest exit. We never
+  # fetch this PR's mergeability, so blockers are reported as not-evaluated rather
+  # than empty (empty renders as "—" = "nothing blocking", which we can't claim here).
   if [ -n "$REBASE_LABEL" ] && echo "$cand" | jq -e --arg l "$REBASE_LABEL" '(.labels // []) | index($l)' >/dev/null; then
     echo "PR #${num} [rebase-labeled] -> pending (rebase already requested; awaiting Renovate)" >&2
     jq -nc --argjson num "$num" --arg base "$base" --argjson am "$is_automerge" \
-      '{number: $num, base: $base, state: "rebase-labeled", action: "pending", reason: "rebase label already set; awaiting Renovate", run_ids: [], behind_by: 0, age_hours: 0, automerge: $am, blockers: ""}' \
+      '{number: $num, base: $base, state: "rebase-labeled", action: "pending", reason: "rebase label already set; awaiting Renovate", run_ids: [], behind_by: 0, age_hours: 0, automerge: $am, blockers: "not evaluated (rebase queued)"}' \
       > "$out_file"
     return 0
   fi
