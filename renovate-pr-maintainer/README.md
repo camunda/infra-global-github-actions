@@ -2,6 +2,9 @@
 
 Keeps open [Renovate](https://docs.renovatebot.com/) PRs fresh and unstuck on repositories using `rebaseWhen: "conflicted"` by taking the **minimum** action per PR — rebase stale PRs (via the Renovate `rebase` label) or re-run failed required jobs (within a budget). On `rebaseWhen: "conflicted"`, PRs silently drift behind base until their checks rot, yet eager rebasing triggers a CI-burning rebase storm — this nudges only the PRs that are actually stale or stuck. Background: [camunda/team-infrastructure#1053](https://github.com/camunda/team-infrastructure/issues/1053).
 
+> [!TIP]
+> **Recommended: turn off "Require branches to be up to date before merging" on your base branch.** That branch-protection rule forces every open PR to be continually rebased onto the moving base tip — an ever-growing CI and rebase tax (the exact churn this action exists to contain) that scales with PR volume. Enforce the "tested against the latest base" guarantee further upstream with a **merge queue** instead: it builds and tests each PR against the current base *only at merge time*, so PRs never need to be kept up to date beforehand. With the rule off, leave `require-up-to-date-strategy` at its default `none` and let this action rebase only genuinely stale PRs. The `automerge*` strategies below exist solely for bases where that rule must stay enabled.
+
 ## Usage
 
 Run it on a schedule so it periodically nudges open Renovate PRs. With the defaults it only **rebases stale PRs** (reruns are off until you set a `rerun-budget`):
