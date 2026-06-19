@@ -12,8 +12,9 @@ inputs:
     description: >
       Token used for all API calls. Needs `pull-requests: write` (apply the
       rebase label; labeling a PR via the Issues Labels API is authorized by the
-      PR scope, not `issues`), `actions: write` (re-run failed jobs), and
-      `checks: read` + `contents: read` (read PR/commit/compare state).
+      PR scope, not `issues`; the PR scope also covers the GraphQL `reviewDecision`
+      read used to surface review blockers), `actions: write` (re-run failed jobs),
+      and `checks: read` + `contents: read` (read PR/commit/compare state).
     required: true
   repository:
     description: "Target repository (owner/name)."
@@ -30,7 +31,7 @@ inputs:
     required: false
     default: "60"
   stale-hours:
-    description: "Rebase when the PR head is at least this many hours old (C)."
+    description: "Rebase a behind PR when its head is at least this many hours old (C); a PR level with base is never rebased on age alone."
     required: false
     default: "24"
   rerun-budget:
@@ -68,14 +69,37 @@ inputs:
       job/context), not workflow names.
     required: false
     default: ""
-  require-up-to-date:
+  require-up-to-date-strategy:
     description: >
-      When true, treat the `behind` mergeable_state ("Require branches to be up
-      to date before merging") as a hard merge blocker and rebase the PR
-      immediately. When false (default), that signal is ignored and a behind PR
-      is decided purely by staleness, like any other PR.
+      How to handle the `behind` mergeable_state ("Require branches to be up to
+      date before merging"). One of:
+      `none` (default) — the signal is ignored; a behind PR is decided purely by
+      staleness, like any other PR.
+      `automerge` — every behind auto-merging PR is rebased immediately so Renovate
+      can merge it on its next scan (non-automerge PRs are still decided by
+      staleness). Use on a base that requires up-to-date branches where Renovate
+      auto-merges.
+      `automerge-optimized` — minimal-churn variant of `automerge`: per base branch,
+      rebase only the single least-behind *mergeable* behind auto-merging PR, and
+      only when that base has no auto-merging PR already merge-ready or being
+      rebased. Behind auto-merging PRs that are themselves blocked (failing/pending
+      required check, awaiting review, changes requested) are excluded from priming
+      so they can't stall the train — they still rebase on the staleness cadence.
+      Best for busy repos where Renovate merges only a couple of PRs per run.
+      `all` — every behind PR is treated as a hard merge blocker and rebased
+      immediately.
     required: false
-    default: "false"
+    default: "none"
+  automerge-labels:
+    description: >
+      Comma- or newline-separated PR labels marking a Renovate PR as auto-merging,
+      used by `require-up-to-date-strategy: automerge` and `automerge-optimized` to
+      choose which PRs to rebase. GitHub native auto-merge (the PR's `auto_merge`) is
+      always detected too, so set this empty to rely on native auto-merge only.
+      Defaults to `automerge`, the label Camunda's shared Renovate preset adds to
+      auto-merging PRs.
+    required: false
+    default: "automerge"
   dry-run:
     description: "When true, classify and log only; never modify any PR."
     required: false
@@ -95,7 +119,8 @@ runs:
         STALE_HOURS: ${{ inputs.stale-hours }}
         RERUN_BUDGET: ${{ inputs.rerun-budget }}
         BASE_BRANCH: ${{ inputs.base-branch }}
-        REQUIRE_UP_TO_DATE: ${{ inputs.require-up-to-date }}
+        REQUIRE_UP_TO_DATE_STRATEGY: ${{ inputs.require-up-to-date-strategy }}
+        AUTOMERGE_LABELS: ${{ inputs.automerge-labels }}
         EXTRA_TRUSTED_LOGINS: ${{ inputs.extra-trusted-logins }}
         EXTRA_RERUN_CHECKS: ${{ inputs.extra-rerun-checks }}
         REBASE_LABEL: "rebase"
@@ -115,5 +140,4 @@ runs:
         BEHIND_THRESHOLD: ${{ inputs.behind-threshold }}
         STALE_HOURS: ${{ inputs.stale-hours }}
         RERUN_BUDGET: ${{ inputs.rerun-budget }}
-        REQUIRE_UP_TO_DATE: ${{ inputs.require-up-to-date }}
       run: bash "$GITHUB_ACTION_PATH/apply.sh"
