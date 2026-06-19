@@ -9,12 +9,24 @@
 # actionable state to skip, since Renovate won't auto-rebase it):
 #   rebase label present  -> pending (rebase already queued; report only, no fetch)
 #   dirty (conflict)      -> skip    (Renovate rebases conflicts itself)
-#   behind                -> rebase if require-up-to-date, else treat like blocked
+#   behind                -> rebase now if require-up-to-date-strategy=all, or =automerge and
+#                            the PR auto-merges; else treat like blocked
 #   blocked / unstable    -> rebase if stale, else rerun a failing required run, else none
 #   clean / has_hooks     -> rebase if stale, else none
 #   unknown               -> none    (mergeability pending; never act on a guess)
 #
-# Stale = behind_by >= BEHIND_THRESHOLD OR head age >= STALE_HOURS (both reset by a rebase).
+# Stale = behind AND (behind_by >= BEHIND_THRESHOLD OR head age >= STALE_HOURS): a rebase only
+# helps a PR that is behind its base, so a PR level with base (behind_by=0) is never stale and
+# is never rebased on age alone (its failing checks are re-run instead). A rebase resets both.
+# After classification, when require-up-to-date-strategy=automerge, behind auto-merging PRs are
+# rebased immediately (see the behind case); when automerge-optimized, a per-base post-pass
+# instead rebases just one least-behind MERGEABLE behind automerge PR per base (blocked ones
+# excluded). Every plan entry also carries `blockers`: the human-readable merge gate(s)
+# GitHub enforces (failing/pending required check, awaiting required review, changes
+# requested, conflict, behind base), surfaced in the step summary. For `blocked` PRs (and,
+# in automerge-optimized mode, behind automerge PRs) the review gate is read via GraphQL
+# reviewDecision, since REST mergeable_state collapses "failing required check" and "missing
+# required review" into the same `blocked` value (and `behind` masks both).
 set -euo pipefail
 
 : "${REPOSITORY:?REPOSITORY is required (owner/name)}"
@@ -25,8 +37,10 @@ RENOVATE_AUTHOR="${RENOVATE_AUTHOR:-renovate[bot]}"
 # Comma-separated labels that take a PR out of scope (e.g. Renovate already keeps
 # `keep-updated` PRs continuously rebased, so this action leaves them alone).
 EXCLUDE_LABELS="${EXCLUDE_LABELS:-keep-updated,stop-updating}"
-# Staleness signals (OR'd, both reset by a rebase): rebase once the head is at
-# least this many commits behind base, or at least this many hours old.
+# Staleness signals (both reset by a rebase, and both gated on the PR actually
+# being behind base): rebase once the head is at least this many commits behind
+# base, or -- while behind -- at least this many hours old. A PR level with base
+# is never rebased.
 BEHIND_THRESHOLD="${BEHIND_THRESHOLD:-60}"
 STALE_HOURS="${STALE_HOURS:-24}"
 # Max workflow-run attempts per head SHA before reruns stop. 0 (default) disables
@@ -38,10 +52,27 @@ RERUN_BUDGET="${RERUN_BUDGET:-0}"
 EXTRA_RERUN_CHECKS="${EXTRA_RERUN_CHECKS:-}"
 # Optional exact base-branch filter; empty (default) means all base branches.
 BASE_BRANCH="${BASE_BRANCH:-}"
-# When true, treat the `behind` mergeable_state ("Require branches up to date")
-# as a hard merge blocker and rebase immediately. When false (default), ignore it
-# and decide a behind PR by staleness, like a clean one.
-REQUIRE_UP_TO_DATE="${REQUIRE_UP_TO_DATE:-false}"
+# How to handle the `behind` mergeable_state ("Require branches up to date"):
+#   none       (default) ignore it; decide a behind PR by staleness, like a clean one.
+#   automerge  rebase every behind auto-merging PR immediately so Renovate can merge it
+#              next scan; non-automerge PRs are still decided by staleness.
+#   automerge-optimized  keep just one auto-merging PR per base branch fresh: a post-pass
+#              rebases the single least-behind MERGEABLE behind automerge PR (blocked ones
+#              are excluded so they can't stall the train) only when that base has no
+#              auto-merging PR already merge-ready or being rebased. Minimal-churn variant
+#              of `automerge` for busy repos where Renovate merges few PRs per run.
+#   all        treat behind as a hard merge blocker and rebase immediately.
+REQUIRE_UP_TO_DATE_STRATEGY="${REQUIRE_UP_TO_DATE_STRATEGY:-none}"
+case "$REQUIRE_UP_TO_DATE_STRATEGY" in
+  none|automerge|automerge-optimized|all) ;;
+  *)
+    echo "::warning::invalid require-up-to-date-strategy='${REQUIRE_UP_TO_DATE_STRATEGY}'; falling back to 'none'" >&2
+    REQUIRE_UP_TO_DATE_STRATEGY="none" ;;
+esac
+# PR labels (comma/newline-separated) that mark a Renovate PR as auto-merging, used
+# by require-up-to-date-strategy=automerge and automerge-optimized. Native GitHub
+# auto-merge is detected too; empty relies on native auto-merge only.
+AUTOMERGE_LABELS="${AUTOMERGE_LABELS:-automerge}"
 # Renovate's one-off rebase label. A PR already carrying it has a rebase queued,
 # so it is reported, not acted on. Must match apply.sh's REBASE_LABEL.
 REBASE_LABEL="${REBASE_LABEL:-rebase}"
@@ -94,14 +125,17 @@ gh_api() {
 
 # Resolve a PR's mergeable_state, polling with linear backoff past the transient
 # "unknown" GitHub returns while (re)computing it after a base push. A residual
-# "unknown" is returned as-is so the caller defers. Non-zero only if the GET fails.
+# "unknown" is returned as-is so the caller defers. The same GET also yields native
+# auto-merge state, printed after the state as "<mergeable_state> <true|false>".
+# Non-zero only if the GET fails.
 mergeable_state_for_pr() {
-  local num="$1" attempt=1 ms pr
+  local num="$1" attempt=1 ms am pr
   while [ "$attempt" -le "$MERGEABLE_MAX_POLLS" ]; do
     pr=$(gh_api "repos/${REPOSITORY}/pulls/${num}") || return 1
     ms=$(echo "$pr" | jq -r '.mergeable_state // "unknown"')
+    am=$(echo "$pr" | jq -r 'if .auto_merge then "true" else "false" end')
     if [ "$ms" != "unknown" ]; then
-      printf '%s' "$ms"
+      printf '%s %s' "$ms" "$am"
       return 0
     fi
     if [ "$attempt" -lt "$MERGEABLE_MAX_POLLS" ]; then
@@ -109,7 +143,7 @@ mergeable_state_for_pr() {
     fi
     attempt=$((attempt + 1))
   done
-  printf 'unknown'
+  printf 'unknown %s' "${am:-false}"
   return 0
 }
 
@@ -164,7 +198,8 @@ required_checks_for_base() {
 }
 
 echo "Scanning open PRs in ${REPOSITORY} authored by '${RENOVATE_AUTHOR}'"
-echo "Thresholds: behind_by>=${BEHIND_THRESHOLD}, age>=${STALE_HOURS}h, rerun-budget=${RERUN_BUDGET}, require-up-to-date=${REQUIRE_UP_TO_DATE}"
+echo "Thresholds: behind_by>=${BEHIND_THRESHOLD}, age>=${STALE_HOURS}h, rerun-budget=${RERUN_BUDGET}, require-up-to-date-strategy=${REQUIRE_UP_TO_DATE_STRATEGY}"
+[ "$REQUIRE_UP_TO_DATE_STRATEGY" = "automerge" ] && echo "Automerge labels: ${AUTOMERGE_LABELS:-<none> (native auto-merge only)}"
 [ -n "$BASE_BRANCH" ] && echo "Base-branch filter: ${BASE_BRANCH}"
 [ -n "$EXTRA_TRUSTED_LOGINS" ] && echo "Extra trusted logins (author/committer): ${EXTRA_TRUSTED_LOGINS}"
 [ -n "$EXTRA_RERUN_CHECKS" ] && echo "Extra rerun checks: ${EXTRA_RERUN_CHECKS}"
@@ -207,6 +242,19 @@ login_is_extra_allowed() {
     [ -n "$extra" ] && [ "$login" = "$extra" ] && return 0
   done < <(printf '%s' "$EXTRA_TRUSTED_LOGINS" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
   return 1
+}
+
+# True when the candidate PR ($1, a candidate JSON object) carries any label listed
+# in AUTOMERGE_LABELS (comma/newline-separated, trimmed). Lets require-up-to-date-strategy=
+# automerge spot auto-merging Renovate PRs from labels alone (no extra API call).
+# An empty list never matches.
+labels_has_automerge() {
+  local cand="$1"
+  [ -z "$AUTOMERGE_LABELS" ] && return 1
+  echo "$cand" | jq -e --arg lbls "$AUTOMERGE_LABELS" '
+    ([$lbls | splits("[,\n]")] | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))) as $am
+    | ((.labels // []) | any(. as $l | ($am | index($l)) != null))
+  ' >/dev/null 2>&1
 }
 
 # Fetch the head commit once to derive age + edit ownership: sets age_hours and
@@ -253,25 +301,23 @@ compute_staleness() {
   behind_by=$(gh_api "repos/${REPOSITORY}/compare/${base_enc}...${head_sha}" --jq '.behind_by' 2>/dev/null || echo 0)
   [ -z "$behind_by" ] && behind_by=0
   fetch_head_meta "$head_sha"
-  if [ "$behind_by" -ge "$BEHIND_THRESHOLD" ] || [ "$age_hours" -ge "$STALE_HOURS" ]; then
+  # A rebase only helps a PR that is actually behind its base; one level with base
+  # (behind_by=0) would just get an identical tree re-run through CI. So staleness
+  # requires being behind, then fires when far behind OR sitting too long unrebased.
+  if [ "$behind_by" -gt 0 ] && { [ "$behind_by" -ge "$BEHIND_THRESHOLD" ] || [ "$age_hours" -ge "$STALE_HOURS" ]; }; then
     stale=true
   fi
 }
 
-# Rerun eligibility for one PR, scoped to REQUIRED checks only (never reruns
-# non-blocking workflows): failing required check-run -> its suite -> the workflow
-# run that produced it. Required set = ruleset contexts ∪ EXTRA_RERUN_CHECKS. Sets
-# required_count, eligible_ids, eligible_count, checks_in_progress (globals).
-# Cost: 1 check-runs + 1 actions/runs GET (paginated, the costliest pair);
-# short-circuits when reruns are off.
-compute_rerun_eligibility() {
-  local base="$1" head_sha="$2" required_checks required_json checkruns_ndjson failing_suites runs_ndjson
-  # Reruns disabled (budget < 1): nothing can be eligible, so short-circuit
-  # before the two costly paginated GETs.
-  if [ "$RERUN_BUDGET" -lt 1 ]; then
-    required_count=0; eligible_ids="[]"; eligible_count=0; checks_in_progress=false; failing_required_count=0
-    return 0
-  fi
+# Required-check status for one PR's head SHA, independent of rerun budget so it can
+# also feed blocker reporting: the REQUIRED contexts (ruleset ∪ EXTRA_RERUN_CHECKS),
+# whether any check is still running, and the suites with a failing required check.
+# Memoized per PR via check_status_done. Sets required_count, checks_in_progress,
+# failing_suites, failing_required_count (caller locals). Cost: 1 check-runs GET.
+compute_required_check_status() {
+  local base="$1" head_sha="$2" required_checks required_json checkruns_ndjson
+  [ "$check_status_done" = "true" ] && return 0
+  check_status_done=true
   required_checks=$(required_checks_for_base "$base")
   # Union ruleset contexts with EXTRA_RERUN_CHECKS (split, trimmed, de-duped);
   # with no extras this is just the ruleset set.
@@ -281,17 +327,32 @@ compute_rerun_eligibility() {
     } | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | jq -R . | jq -s 'map(select(length > 0)) | unique')
   required_count=$(echo "$required_json" | jq 'length')
 
-  # Suites on the head SHA with a failing REQUIRED check-run. Status is carried
-  # too so the caller can tell "failing" from "still running": `unstable` covers
-  # both a failing and a merely-pending non-required check.
+  # Suites on the head SHA with a failing REQUIRED check-run. Status is carried too
+  # so we can tell "failing" from "still running": `unstable` covers both a failing
+  # and a merely-pending non-required check.
   checkruns_ndjson=$(gh_api "repos/${REPOSITORY}/commits/${head_sha}/check-runs?per_page=100" --paginate \
     --jq '.check_runs[] | {name, status, conclusion, suite: .check_suite.id}' 2>/dev/null || echo "")
   checks_in_progress=$(printf '%s\n' "$checkruns_ndjson" | jq -s 'any(.[]; .status != "completed")' 2>/dev/null || echo false)
   failing_suites=$(printf '%s\n' "$checkruns_ndjson" | jq -s --argjson req "$required_json" \
     '[.[] | select(.conclusion == "failure" and ((.name as $n | $req | index($n)) != null)) | .suite] | unique' 2>/dev/null || echo "[]")
-  # Failing REQUIRED suites regardless of budget, so the caller can tell "failing
-  # but over budget" from "nothing required failing" (both give eligible_count 0).
   failing_required_count=$(echo "$failing_suites" | jq 'length' 2>/dev/null || echo 0)
+}
+
+# Rerun eligibility for one PR, scoped to REQUIRED checks only (never reruns
+# non-blocking workflows): a failing required check's suite -> the workflow run that
+# produced it, still within budget. Sets eligible_ids, eligible_count (globals) and,
+# via compute_required_check_status, the check-status globals. Cost: 1 actions/runs GET
+# (plus the shared check-runs GET); short-circuits the runs GET when reruns are off.
+compute_rerun_eligibility() {
+  local base="$1" head_sha="$2" runs_ndjson
+  # Reruns disabled (budget < 1): nothing can be eligible, so skip the runs GET.
+  # Check status is computed on demand by compute_required_check_status (for blocker
+  # reporting), so we don't force the check-runs GET here either.
+  if [ "$RERUN_BUDGET" -lt 1 ]; then
+    eligible_ids="[]"; eligible_count=0
+    return 0
+  fi
+  compute_required_check_status "$base" "$head_sha"
 
   # Workflow runs whose suite has a failing required check, still within rerun budget.
   runs_ndjson=$(gh_api "repos/${REPOSITORY}/actions/runs?head_sha=${head_sha}&per_page=100" --paginate \
@@ -299,6 +360,24 @@ compute_rerun_eligibility() {
   eligible_ids=$(printf '%s\n' "$runs_ndjson" | jq -s --argjson n "$RERUN_BUDGET" --argjson suites "$failing_suites" \
     '[.[] | select(((.suite as $s | $suites | index($s)) != null) and .run_attempt <= $n) | .id] | unique' 2>/dev/null || echo "[]")
   eligible_count=$(echo "$eligible_ids" | jq 'length' 2>/dev/null || echo 0)
+}
+
+# Review gate for one PR via GraphQL reviewDecision: REST mergeable_state collapses a
+# missing required approval and a failing required check into the same `blocked`
+# value, so this disambiguates the review side. Prints REVIEW_REQUIRED |
+# CHANGES_REQUESTED | APPROVED | NONE (null/none/unreadable -> NONE). Cost: 1 GraphQL
+# call; only invoked for `blocked` PRs. The pull-requests token scope covers it.
+review_decision_for_pr() {
+  local num="$1" owner repo rd
+  owner="${REPOSITORY%%/*}"; repo="${REPOSITORY##*/}"
+  # SC2016: $o/$r/$n are GraphQL variables (bound by gh via -f/-F), not shell vars.
+  # shellcheck disable=SC2016
+  rd=$(gh_api graphql \
+    -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){reviewDecision}}}' \
+    -f o="$owner" -f r="$repo" -F n="$num" \
+    --jq '.data.repository.pullRequest.reviewDecision' 2>/dev/null || echo "")
+  { [ -z "$rd" ] || [ "$rd" = "null" ]; } && rd="NONE"
+  printf '%s' "$rd"
 }
 
 # Human-readable reason a fresh PR gets no rerun ($1 = context prefix): a
@@ -316,6 +395,63 @@ no_rerun_reason() {
   fi
 }
 
+# Human-readable merge blocker(s) for one PR — why GitHub won't merge it right now —
+# derived from mergeable_state plus, for `blocked`, the required-check status and review
+# decision read above. Independent of the maintainer's action: e.g. a PR awaiting review
+# is action=none but blockers="awaiting required review" (only a human approval unblocks
+# it). Joins parts with "; " and sets `blockers` (caller local); empty when unblocked.
+compute_blockers() {
+  local parts=() b="" p
+  case "$ms" in
+    dirty)    parts+=("merge conflict") ;;
+    behind)
+      parts+=("behind base branch")
+      [ "$failing_required_count" -gt 0 ] && parts+=("failing required check")
+      [ "$checks_in_progress" = "true" ] && parts+=("required check pending")
+      # In automerge-optimized mode behind automerge PRs also have reviewDecision read
+      # (REST `behind` masks it), so surface the review gate too; otherwise stays empty.
+      case "$review_decision" in
+        REVIEW_REQUIRED)   parts+=("awaiting required review") ;;
+        CHANGES_REQUESTED) parts+=("changes requested") ;;
+      esac
+      ;;
+    unstable)
+      # Differentiate pending from failing: if any check is still running, report
+      # pending (it may yet pass); once nothing is pending, the non-passing one is a
+      # failure. Falls back to the combined wording if check status wasn't fetched.
+      if [ "$check_status_done" = "true" ]; then
+        if [ "$checks_in_progress" = "true" ]; then
+          parts+=("non-required check pending")
+        else
+          parts+=("non-required check failing")
+        fi
+      else
+        parts+=("non-required check failing or pending")
+      fi
+      ;;
+    unknown)  parts+=("mergeability not yet computed") ;;
+    blocked)
+      [ "$failing_required_count" -gt 0 ] && parts+=("failing required check")
+      [ "$checks_in_progress" = "true" ] && parts+=("required check pending")
+      case "$review_decision" in
+        REVIEW_REQUIRED)   parts+=("awaiting required review") ;;
+        CHANGES_REQUESTED) parts+=("changes requested") ;;
+      esac
+      # Inspected (not head-edited) but no specific signal: name the residual required
+      # gate class so the row is never silently empty (e.g. unresolved conversation,
+      # required deployment, or signature).
+      if [ "${#parts[@]}" -eq 0 ] && [ "$head_modified" != "true" ]; then
+        parts+=("required branch-protection gate (review, conversation, deployment, or signature)")
+      fi
+      ;;
+  esac
+  [ "$head_modified" = "true" ] && parts+=("branch edited by non-Renovate author")
+  if [ "${#parts[@]}" -gt 0 ]; then
+    for p in "${parts[@]}"; do b="${b:+$b; }$p"; done
+  fi
+  blockers="$b"
+}
+
 entries=()
 
 # Classify one candidate PR and write its plan entry (one JSON object) to
@@ -328,20 +464,32 @@ classify_one_pr() {
   base=$(echo "$cand" | jq -r '.base')
   head_sha=$(echo "$cand" | jq -r '.head_sha')
 
+  # Automerge detection (for require-up-to-date-strategy=automerge): labels are known from
+  # the candidate alone; native GitHub auto-merge is added after the pulls GET
+  # below. Computed even when unused so every plan entry carries a stable
+  # `automerge` field.
+  local is_automerge=false
+  labels_has_automerge "$cand" && is_automerge=true
+
   # Rebase already queued: the PR still carries the label (Renovate strips it once
   # done), so acting now is wasted — the SHA is about to change. Decided from the
   # candidate's labels alone, before any per-PR fetch: the cheapest exit.
   if [ -n "$REBASE_LABEL" ] && echo "$cand" | jq -e --arg l "$REBASE_LABEL" '(.labels // []) | index($l)' >/dev/null; then
     echo "PR #${num} [rebase-labeled] -> pending (rebase already requested; awaiting Renovate)" >&2
-    jq -nc --argjson num "$num" \
-      '{number: $num, state: "rebase-labeled", action: "pending", reason: "rebase label already set; awaiting Renovate", run_ids: [], behind_by: 0, age_hours: 0}' \
+    jq -nc --argjson num "$num" --arg base "$base" --argjson am "$is_automerge" \
+      '{number: $num, base: $base, state: "rebase-labeled", action: "pending", reason: "rebase label already set; awaiting Renovate", run_ids: [], behind_by: 0, age_hours: 0, automerge: $am, blockers: ""}' \
       > "$out_file"
     return 0
   fi
 
   # mergeable_state is async and reset by base pushes; poll with backoff. A
-  # residual "unknown" is deferred (never acted on) in the case below.
-  ms=$(mergeable_state_for_pr "$num") || { echo "::warning::skip PR #${num}: GET failed" >&2; return 0; }
+  # residual "unknown" is deferred (never acted on) in the case below. The same
+  # GET also yields native auto-merge state, appended after a space.
+  local ms_am auto_merge_native
+  ms_am=$(mergeable_state_for_pr "$num") || { echo "::warning::skip PR #${num}: GET failed" >&2; return 0; }
+  ms="${ms_am%% *}"
+  auto_merge_native="${ms_am##* }"
+  [ "$auto_merge_native" = "true" ] && is_automerge=true
 
   # Per-PR fields, defaulted here and filled lazily by the case below — each state
   # fetches only what its decision needs: staleness (compare + commit GET) gates
@@ -350,37 +498,65 @@ classify_one_pr() {
   # staleness commit GET. dirty/unknown fetch nothing further.
   local behind_by=0 age_hours=0 required_count=0 eligible_ids="[]" eligible_count=0 stale=false
   local head_modified=false head_meta_done=false checks_in_progress=false failing_required_count=0
+  local check_status_done=false failing_suites="[]" review_decision="" blockers=""
   local action="none" reason=""
   case "$ms" in
     dirty)
       action="skip"; reason="merge conflict; Renovate owns the rebase" ;;
     behind)
-      if [ "$REQUIRE_UP_TO_DATE" = "true" ]; then
+      # Rebase a behind PR immediately when require-up-to-date-strategy demands it: `all`
+      # covers every PR, `automerge` only the auto-merging ones (so Renovate can
+      # merge them next scan on a base that requires up-to-date branches). Any
+      # other case (none, or automerge mode + non-automerge PR) falls through to
+      # the staleness path below.
+      local immediate_rebase=false
+      if [ "$REQUIRE_UP_TO_DATE_STRATEGY" = "all" ]; then
+        immediate_rebase=true
+      elif [ "$REQUIRE_UP_TO_DATE_STRATEGY" = "automerge" ] && [ "$is_automerge" = "true" ]; then
+        immediate_rebase=true
+      fi
+      if [ "$immediate_rebase" = "true" ]; then
         # "Require branches up to date" blocks merge until a rebase, so rebase is
         # unavoidable regardless of staleness — but honor an edited branch first.
         fetch_head_meta "$head_sha"
         if [ "$head_modified" = "true" ]; then
           action="skip"; reason="branch edited by non-Renovate author; leave for human (rebase would discard manual commits)"
+        elif [ "$REQUIRE_UP_TO_DATE_STRATEGY" = "all" ]; then
+          action="rebase"; reason="behind base (require-up-to-date-strategy=all blocks merge)"
         else
-          action="rebase"; reason="behind base (require-up-to-date blocks merge)"
+          action="rebase"; reason="behind automerge PR (require-up-to-date-strategy=automerge); rebased so Renovate can merge it next scan"
         fi
       else
-        # require-up-to-date disabled: `behind` outranks (masks) blocked/unstable
-        # in mergeable_state, so decide it identically — staleness first, then
-        # rerun failing required checks on a fresh SHA. Otherwise a behind PR's
-        # failing checks would never rerun, and on busy repos nearly all are behind.
+        # require-up-to-date-strategy none, or automerge mode but this PR doesn't auto-merge:
+        # `behind` outranks (masks) blocked/unstable in mergeable_state, so decide it
+        # identically — staleness first, then rerun failing required checks on a fresh
+        # SHA. Otherwise a behind PR's failing checks would never rerun, and on busy
+        # repos nearly all are behind.
         compute_staleness "$base" "$head_sha"
         if [ "$head_modified" = "true" ]; then
           action="skip"; reason="branch edited by non-Renovate author; leave for human (Renovate won't auto-rebase it)"
         elif [ "$stale" = "true" ]; then
-          action="rebase"; reason="stale (behind_by>=${BEHIND_THRESHOLD} or age>=${STALE_HOURS}h)"
+          action="rebase"; reason="stale: behind & (>=${BEHIND_THRESHOLD} commits or >=${STALE_HOURS}h old)"
         else
           compute_rerun_eligibility "$base" "$head_sha"
           if [ "$eligible_count" -gt 0 ]; then
             action="rerun"; reason="behind (ignored) + failing required checks on fresh SHA; rerun ${eligible_count} run(s) (budget left)"
           else
-            action="none"; reason="$(no_rerun_reason "behind (ignored), fresh; ")"
+            action="none"; reason="$(no_rerun_reason "behind (ignored), not stale; ")"
           fi
+        fi
+      fi
+      # automerge-optimized: a behind auto-merging PR that the per-PR pass left as `none`
+      # is a candidate for the per-base merge-train prime. `behind` masks its real
+      # mergeability, so compute the blockers now: required-check status (cheap, memoized;
+      # shared with rerun) and — only when checks are clean, where it actually decides
+      # candidacy — the GraphQL reviewDecision. A behind PR whose only blocker is "behind
+      # base branch" is a mergeable candidate; anything else (failing/pending check,
+      # awaiting review, changes requested) excludes it so it can't stall the train.
+      if [ "$REQUIRE_UP_TO_DATE_STRATEGY" = "automerge-optimized" ] && [ "$is_automerge" = "true" ] && [ "$action" = "none" ]; then
+        compute_required_check_status "$base" "$head_sha"
+        if [ "$failing_required_count" -eq 0 ] && [ "$checks_in_progress" != "true" ]; then
+          review_decision=$(review_decision_for_pr "$num")
         fi
       fi ;;
     blocked|unstable)
@@ -391,7 +567,7 @@ classify_one_pr() {
       if [ "$head_modified" = "true" ]; then
         action="skip"; reason="branch edited by non-Renovate author; leave for human (Renovate won't auto-rebase it)"
       elif [ "$stale" = "true" ]; then
-        action="rebase"; reason="stale -> rebase (fresh SHA; rerun skipped on stale code)"
+        action="rebase"; reason="stale: behind & (>=${BEHIND_THRESHOLD} commits or >=${STALE_HOURS}h old); rebased not rerun (stale SHA)"
       else
         compute_rerun_eligibility "$base" "$head_sha"
         if [ "$eligible_count" -gt 0 ]; then
@@ -399,13 +575,26 @@ classify_one_pr() {
         else
           action="none"; reason="$(no_rerun_reason "fresh; ")"
         fi
+      fi
+      # Surface the true merge gate: REST collapses "failing required check" and
+      # "missing required review" into `blocked`, and `unstable` hides whether the
+      # non-required check is failing vs still pending. So for an unmodified PR fetch
+      # check status (cheap, memoized), plus reviewDecision (1 GraphQL) for `blocked`.
+      if [ "$head_modified" != "true" ]; then
+        case "$ms" in
+          blocked)
+            compute_required_check_status "$base" "$head_sha"
+            review_decision=$(review_decision_for_pr "$num") ;;
+          unstable)
+            compute_required_check_status "$base" "$head_sha" ;;
+        esac
       fi ;;
     clean|has_hooks)
       compute_staleness "$base" "$head_sha"
       if [ "$head_modified" = "true" ]; then
         action="skip"; reason="branch edited by non-Renovate author; leave for human (Renovate won't auto-rebase it)"
       elif [ "$stale" = "true" ]; then
-        action="rebase"; reason="stale (behind_by>=${BEHIND_THRESHOLD} or age>=${STALE_HOURS}h)"
+        action="rebase"; reason="stale: behind & (>=${BEHIND_THRESHOLD} commits or >=${STALE_HOURS}h old)"
       else
         action="none"; reason="fresh & green"
       fi ;;
@@ -415,17 +604,22 @@ classify_one_pr() {
       action="none"; reason="indeterminate mergeable_state ('${ms}'); deferring to next run" ;;
   esac
 
-  echo "PR #${num} [${ms}] behind_by=${behind_by} age=${age_hours}h required=${required_count} -> ${action} (${reason})" >&2
+  compute_blockers
+
+  echo "PR #${num} [${ms}] behind_by=${behind_by} age=${age_hours}h required=${required_count} blockers=[${blockers}] -> ${action} (${reason})" >&2
 
   jq -nc \
     --argjson num "$num" \
+    --arg base "$base" \
     --arg state "$ms" \
     --arg action "$action" \
     --arg reason "$reason" \
+    --arg blockers "$blockers" \
     --argjson rids "$eligible_ids" \
     --argjson behind "$behind_by" \
     --argjson age "$age_hours" \
-    '{number: $num, state: $state, action: $action, reason: $reason, run_ids: $rids, behind_by: $behind, age_hours: $age}' \
+    --argjson am "$is_automerge" \
+    '{number: $num, base: $base, state: $state, action: $action, reason: $reason, blockers: $blockers, run_ids: $rids, behind_by: $behind, age_hours: $age, automerge: $am}' \
     > "$out_file"
 }
 
@@ -456,6 +650,54 @@ if [ "${#entries[@]}" -gt 0 ]; then
   printf '%s\n' "${entries[@]}" | jq -s '.' > "$PLAN_FILE"
 else
   echo '[]' > "$PLAN_FILE"
+fi
+
+# Automerge merge-train priming (require-up-to-date-strategy=automerge-optimized only), decided
+# independently PER BASE BRANCH — each base is its own Renovate merge-train. Goal: keep
+# exactly one auto-merging PR per base fresh, with minimal rebases, and never let a blocked
+# PR hold the front of the train (the caveat of the eager `automerge` mode).
+#
+# A base needs no prime when it already has a "merge-progressing" automerge PR — one that
+# will merge, or is being made fresh, without our help:
+#   - action rebase/pending (a fresh SHA is incoming), or
+#   - up-to-date (behind_by==0) and not hard-blocked: blockers empty (clean/has_hooks) or
+#     only "required check pending" (fresh & mid-CI — the running workflow is respected).
+# Otherwise rebase ONE candidate: a behind automerge PR still action=none whose ONLY
+# blocker is "behind base branch" (mergeable-behind), least-behind, ties by lowest number.
+# PRs with any other blocker (failing/pending check, awaiting review, changes requested)
+# are NOT candidates — they keep rebasing on staleness like any PR but never prime the
+# train. Whole-plan pass that buckets by base; plan order is preserved.
+if [ "$REQUIRE_UP_TO_DATE_STRATEGY" = "automerge-optimized" ]; then
+  jq '
+    def parts: (.blockers // "") | if . == "" then [] else split("; ") end;
+    def merge_progressing:
+      .automerge == true and (
+        (.action == "rebase" or .action == "pending")
+        or (.behind_by == 0 and (parts == [] or parts == ["required check pending"]))
+      );
+    def is_candidate:
+      .automerge == true and .state == "behind" and .action == "none"
+      and (parts == ["behind base branch"]);
+    # One PR number to prime per base whose train is stalled (no merge-progressing PR);
+    # group_by only chooses, map below preserves original order.
+    ([ group_by(.base)[]
+       | if any(.[]; merge_progressing) then empty
+         else (map(select(is_candidate)) | sort_by(.behind_by, .number))
+              | if length == 0 then empty else .[0].number end
+       end
+     ]) as $primes
+    | map(if (.number as $n | $primes | index($n)) != null
+          then .action = "rebase"
+             | .reason = "primed automerge merge-train (require-up-to-date-strategy=automerge-optimized): least-behind mergeable behind PR on this base so Renovate can merge it next scan"
+          else . end)
+  ' "$PLAN_FILE" > "${PLAN_FILE}.tmp" && mv "${PLAN_FILE}.tmp" "$PLAN_FILE"
+
+  primed=$(jq -r '[.[] | select(.reason | startswith("primed automerge")) | (.number | tostring)] | join(", ")' "$PLAN_FILE" 2>/dev/null || echo "")
+  if [ -n "$primed" ]; then
+    echo "Automerge merge-train (optimized): primed PR(s) #${primed} (one per base; least-behind mergeable automerge PR)"
+  else
+    echo "Automerge merge-train (optimized): no prime needed (each base already has a merge-progressing automerge PR, or none are mergeable-behind)"
+  fi
 fi
 
 # The human-readable step summary is rendered by apply.sh (the final step), which

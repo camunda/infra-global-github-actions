@@ -26,7 +26,6 @@ API_RETRY_DELAY="${API_RETRY_DELAY:-5}"
 BEHIND_THRESHOLD="${BEHIND_THRESHOLD:-60}"
 STALE_HOURS="${STALE_HOURS:-24}"
 RERUN_BUDGET="${RERUN_BUDGET:-0}"
-REQUIRE_UP_TO_DATE="${REQUIRE_UP_TO_DATE:-false}"
 
 # gh api write (POST) with bounded retries, mirroring classify.sh's gh_api.
 # Retrying is safe: re-adding the rebase label is a no-op, and a rerun whose POST
@@ -166,20 +165,44 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
   fi
 
   {
-    echo "### Renovate PR maintainer — plan"
+    echo "### Renovate PR maintainer"
     echo ""
-    echo "| PR | state | behind_by | head age (h) | action | applied?\\* | reason |"
-    echo "|---:|:------|----------:|-------------:|:-------|:----------|:-------|"
-    jq -r --arg server "$server_url" --arg repo "$REPOSITORY" --argjson outcomes "$outcomes_json" '
-      .[]
-      | ($outcomes[(.number | tostring)] // "—") as $applied
-      | "| [#\(.number)](\($server)/\($repo)/pull/\(.number)) | \(.state) | \(.behind_by) | \(.age_hours) | \(.action) | \($applied) | \(.reason) |"
-    ' "$PLAN_FILE"
-    echo ""
-    # Backticks here are literal Markdown code spans, so the single-quoted format
-    # is intentional (values are injected via the %s positional args).
+    # One section per base branch (sorted). Each base is an independent Renovate
+    # merge-train with its own up-to-date requirement, so grouping by base keeps
+    # the plan legible; the marker line names the base.
+    bases=$(jq -r '[.[].base] | unique | .[]' "$PLAN_FILE")
+    if [ -z "$bases" ]; then
+      echo "_No in-scope Renovate PRs._"
+      echo ""
+    else
+      while IFS= read -r base; do
+        [ -z "$base" ] && continue
+        echo "#### Base \`${base}\`"
+        echo ""
+        # "behind since (h)" = head-commit age, shown only while the PR is behind
+        # (state behind, or behind_by>0) since that is the staleness clock that
+        # drives a rebase; a PR level with base has no behind clock, so it shows —.
+        echo "| PR | state | blockers | automerge | behind_by | behind since (h) | action | note |"
+        echo "|---:|:------|:---------|:---------:|----------:|-----------------:|:-------|:-----|"
+        jq -r --arg server "$server_url" --arg repo "$REPOSITORY" --arg base "$base" --argjson outcomes "$outcomes_json" '
+          [.[] | select(.base == $base)] | .[]
+          | ($outcomes[(.number | tostring)] // "—") as $applied
+          | (if $applied == "—" then .action else "\(.action) (\($applied))" end) as $act
+          | (if .automerge then "yes" else "no" end) as $am
+          | ((.blockers // "") | if . == "" then "—" else . end) as $bl
+          | (if (.state == "behind" or .behind_by > 0) then (.age_hours | tostring) else "—" end) as $since
+          | "| [#\(.number)](\($server)/\($repo)/pull/\(.number)) | \(.state) | \($bl) | \($am) | \(.behind_by) | \($since) | \($act) | \(.reason) |"
+        ' "$PLAN_FILE"
+        echo ""
+      done <<< "$bases"
+    fi
+    # Legend + how-it-works as a scannable list, not a dense block: one bullet per
+    # non-obvious column, then a one-line summary. The leading \n keeps the format
+    # from starting with '-' (printf option parsing) and gives the list the blank
+    # line Markdown needs. Backticks are literal code spans, so the single-quoted
+    # format is intentional; values are injected via the %s positional args.
     # shellcheck disable=SC2016
-    printf '\\* **applied?** = this run'"'"'s outcome: `applied`, `dry-run`, `failed`, `deferred` (over the `batch-size`=%s cap, retried next run), or `—` (no action needed).\n\n**state** = GitHub'"'"'s `mergeable_state`: `clean`/`has_hooks` green · `blocked` a **required** check failing/pending · `unstable` only **non-required** failing · `dirty` merge conflict · `behind` head behind base · `unknown` not yet computed · `rebase-labeled` rebase already queued.\n\n**Decision:** **rebase** when stale — ≥ %s commits behind base or head ≥ %sh old — or immediately if behind base and `require-up-to-date`=true (currently %s); otherwise **re-run** failing required checks within `rerun-budget`=%s. Full [decision model](%s).\n' \
-      "$BATCH_SIZE" "$BEHIND_THRESHOLD" "$STALE_HOURS" "$REQUIRE_UP_TO_DATE" "$RERUN_BUDGET" "$readme_url"
+    printf '\n**Columns**\n\n- **state** — GitHub `mergeable_state`; the ones worth context: `blocked` (a required gate unmet — a failing/pending required check *or* a missing required review), `unstable` (only a *non-required* check is failing/pending, so GitHub still allows merge), `behind` (head behind base), `dirty` (merge conflict).\n- **blockers** — why the PR is not merge-ready now: failing/pending required check, awaiting required review, merge conflict, behind base; `—` = nothing blocking.\n- **behind since (h)** — hours since the head was pushed, shown only while behind base (the clock a stale rebase resets).\n- **action** — what the maintainer did, outcome in parens: `applied`, `dry-run`, `failed`, or `deferred` (past the `batch-size`=%s cap, retried next run); `none`/`skip`/`pending` change nothing.\n\n**How it works** — **rebases** stale behind PRs (≥ %s commits behind or ≥ %sh old) and **re-runs** failing required checks (`rerun-budget`=%s). Full [decision model](%s).\n' \
+      "$BATCH_SIZE" "$BEHIND_THRESHOLD" "$STALE_HOURS" "$RERUN_BUDGET" "$readme_url"
   } >> "$GITHUB_STEP_SUMMARY"
 fi
