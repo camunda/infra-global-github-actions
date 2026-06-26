@@ -179,19 +179,20 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
         [ -z "$base" ] && continue
         echo "#### Base \`${base}\`"
         echo ""
-        # "behind since (h)" = head-commit age, shown only while the PR is behind
-        # (state behind, or behind_by>0) since that is the staleness clock that
-        # drives a rebase; a PR level with base has no behind clock, so it shows —.
-        echo "| PR | state | blockers | automerge | behind_by | behind since (h) | action | note |"
-        echo "|---:|:------|:---------|:---------:|----------:|-----------------:|:-------|:-----|"
+        # "head age (h)" = hours since the head was pushed, shown for behind PRs
+        # (staleness clock) and dirty/rebase-labeled PRs (stuck clock); "—" when
+        # not measured (a level, up-to-date PR, whose head age isn't fetched).
+        echo "| PR | state | blockers | automerge | behind_by | head age (h) | action | note |"
+        echo "|---:|:------|:---------|:---------:|----------:|-------------:|:-------|:-----|"
         jq -r --arg server "$server_url" --arg repo "$REPOSITORY" --arg base "$base" --argjson outcomes "$outcomes_json" '
           [.[] | select(.base == $base)] | .[]
           | ($outcomes[(.number | tostring)] // "—") as $applied
           | (if $applied == "—" then .action else "\(.action) (\($applied))" end) as $act
           | (if .automerge then "yes" else "no" end) as $am
           | ((.blockers // "") | if . == "" then "—" else . end) as $bl
-          | (if (.state == "behind" or .behind_by > 0) then (.age_hours | tostring) else "—" end) as $since
-          | "| [#\(.number)](\($server)/\($repo)/pull/\(.number)) | \(.state) | \($bl) | \($am) | \(.behind_by) | \($since) | \($act) | \(.reason) |"
+          | (if (.state == "behind" or (.behind_by != null and .behind_by > 0) or .state == "dirty" or .state == "rebase-labeled") then (.age_hours | tostring) else "—" end) as $since
+          | (if .behind_by == null then "—" else (.behind_by | tostring) end) as $bb
+          | "| [#\(.number)](\($server)/\($repo)/pull/\(.number)) | \(.state) | \($bl) | \($am) | \($bb) | \($since) | \($act) | \(.reason) |"
         ' "$PLAN_FILE"
         echo ""
       done <<< "$bases"
@@ -202,7 +203,7 @@ if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
     # line Markdown needs. Backticks are literal code spans, so the single-quoted
     # format is intentional; values are injected via the %s positional args.
     # shellcheck disable=SC2016
-    printf '\n**Columns**\n\n- **state** — GitHub `mergeable_state`; the ones worth context: `blocked` (a required gate unmet — a failing/pending required check *or* a missing required review), `unstable` (only a *non-required* check is failing/pending, so GitHub still allows merge), `behind` (head behind base), `dirty` (merge conflict).\n- **blockers** — why the PR is not merge-ready now: failing/pending required check, awaiting required review, merge conflict, behind base; `—` = nothing blocking.\n- **behind since (h)** — hours since the head was pushed, shown only while behind base (the clock a stale rebase resets).\n- **action** — what the maintainer did, outcome in parens: `applied`, `dry-run`, `failed`, or `deferred` (past the `batch-size`=%s cap, retried next run); `none`/`skip`/`pending` change nothing.\n\n**How it works** — **rebases** stale behind PRs (≥ %s commits behind or ≥ %sh old) and **re-runs** failing required checks (`rerun-budget`=%s). Full [decision model](%s).\n' \
+    printf '\n**Columns**\n\n- **state** — GitHub `mergeable_state`; the ones worth context: `blocked` (a required gate unmet — a failing/pending required check *or* a missing required review), `unstable` (only a *non-required* check is failing/pending, so GitHub still allows merge), `behind` (head behind base), `dirty` (merge conflict).\n- **blockers** — why the PR is not merge-ready now: failing/pending required check, awaiting required review, merge conflict, behind base; `—` = nothing blocking.\n- **automerge** — `yes` when the PR is set to auto-merge once green (drives `require-up-to-date-strategy`).\n- **behind_by** — commits the head is behind base; `—` when not measured (indeterminate `unknown` state).\n- **head age (h)** — hours since the head was pushed: while behind base it is the staleness clock a rebase resets; for `dirty`/`rebase-labeled` PRs it is the stuck clock (how long the PR has sat conflicted or awaiting Renovate); `—` when not measured.\n- **action** — what the maintainer did, outcome in parens: `applied`, `dry-run`, `failed`, or `deferred` (past the `batch-size`=%s cap, retried next run); `none`/`skip`/`pending` change nothing.\n\n**How it works** — **rebases** stale behind PRs (≥ %s commits behind or ≥ %sh old) and **re-runs** failing required checks (`rerun-budget`=%s). Full [decision model](%s).\n' \
       "$BATCH_SIZE" "$BEHIND_THRESHOLD" "$STALE_HOURS" "$RERUN_BUDGET" "$readme_url"
   } >> "$GITHUB_STEP_SUMMARY"
 fi

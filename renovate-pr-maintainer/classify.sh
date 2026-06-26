@@ -300,6 +300,7 @@ compute_staleness() {
   base_enc="${base//\//%2F}"
   behind_by=$(gh_api "repos/${REPOSITORY}/compare/${base_enc}...${head_sha}" --jq '.behind_by' 2>/dev/null || echo 0)
   [ -z "$behind_by" ] && behind_by=0
+  behind_measured=true
   fetch_head_meta "$head_sha"
   # A rebase only helps a PR that is actually behind its base; one level with base
   # (behind_by=0) would just get an identical tree re-run through CI. So staleness
@@ -469,17 +470,25 @@ classify_one_pr() {
   # below. Computed even when unused so every plan entry carries a stable
   # `automerge` field.
   local is_automerge=false
+  # Head age + ownership (fetch_head_meta) and behind_by/staleness (compute_staleness),
+  # declared up here (not only in the case block below) so the rebase-labeled early
+  # return can also report a real head age AND behind_by, which stuck detection needs.
+  local age_hours=0 head_modified=false head_meta_done=false
+  local behind_by=0 behind_measured=false stale=false
   labels_has_automerge "$cand" && is_automerge=true
 
   # Rebase already queued: the PR still carries the label (Renovate strips it once
   # done), so acting now is wasted — the SHA is about to change. Decided from the
-  # candidate's labels alone, before any per-PR fetch: the cheapest exit. We never
-  # fetch this PR's mergeability, so blockers are reported as not-evaluated rather
-  # than empty (empty renders as "—" = "nothing blocking", which we can't claim here).
+  # candidate's labels alone. We still measure staleness (head-commit age + behind_by,
+  # one commit + one compare GET) so a caller can tell a freshly-labeled PR from one
+  # Renovate has left awaiting a rebase for too long / far behind (stuck). We do NOT
+  # poll the mergeable_state, so blockers are reported as not-evaluated rather than
+  # empty (empty renders as "—" = "nothing blocking", which we can't claim here).
   if [ -n "$REBASE_LABEL" ] && echo "$cand" | jq -e --arg l "$REBASE_LABEL" '(.labels // []) | index($l)' >/dev/null; then
-    echo "PR #${num} [rebase-labeled] -> pending (rebase already requested; awaiting Renovate)" >&2
-    jq -nc --argjson num "$num" --arg base "$base" --argjson am "$is_automerge" \
-      '{number: $num, base: $base, state: "rebase-labeled", action: "pending", reason: "rebase label already set; awaiting Renovate", run_ids: [], behind_by: 0, age_hours: 0, automerge: $am, blockers: "not evaluated (rebase queued)"}' \
+    compute_staleness "$base" "$head_sha"
+    echo "PR #${num} [rebase-labeled] -> pending (rebase already requested; awaiting Renovate; head ${age_hours}h old, behind_by=${behind_by})" >&2
+    jq -nc --argjson num "$num" --arg base "$base" --argjson am "$is_automerge" --argjson age "$age_hours" --argjson behind "$behind_by" \
+      '{number: $num, base: $base, state: "rebase-labeled", action: "pending", reason: "rebase label already set; awaiting Renovate", run_ids: [], behind_by: $behind, age_hours: $age, automerge: $am, blockers: "not evaluated (rebase queued)"}' \
       > "$out_file"
     return 0
   fi
@@ -497,13 +506,23 @@ classify_one_pr() {
   # fetches only what its decision needs: staleness (compare + commit GET) gates
   # the rebase-on-stale states, rerun eligibility (the costly check-runs + runs
   # pair) only a fresh PR with a rerun path, head ownership rides along on the
-  # staleness commit GET. dirty/unknown fetch nothing further.
-  local behind_by=0 age_hours=0 required_count=0 eligible_ids="[]" eligible_count=0 stale=false
-  local head_modified=false head_meta_done=false checks_in_progress=false failing_required_count=0
+  # staleness commit GET. dirty also runs staleness (compare + commit GET) for its
+  # stuck context (head age + behind_by) but never acts; unknown fetches nothing
+  # further. (age_hours/head_modified/head_meta_done/behind_by/stale are declared
+  # above so the rebase-labeled early return can use them too.)
+  # behind_by is only measured by compute_staleness (a compare API call). The one
+  # state that still skips it (unknown) must NOT report 0 — that reads as "level
+  # with base" when it is really "not measured" — so it emits null instead.
+  local required_count=0 eligible_ids="[]" eligible_count=0
+  local checks_in_progress=false failing_required_count=0
   local check_status_done=false failing_suites="[]" review_decision="" blockers=""
   local action="none" reason=""
   case "$ms" in
     dirty)
+      # Renovate owns the conflict rebase; we only READ staleness (head age +
+      # behind_by) so a caller can flag a PR that has stayed conflicted too long /
+      # far behind (Renovate not processing it). We never act on it ourselves.
+      compute_staleness "$base" "$head_sha"
       action="skip"; reason="merge conflict; Renovate owns the rebase" ;;
     behind)
       # Rebase a behind PR immediately when require-up-to-date-strategy demands it: `all`
@@ -608,7 +627,12 @@ classify_one_pr() {
 
   compute_blockers
 
-  echo "PR #${num} [${ms}] behind_by=${behind_by} age=${age_hours}h required=${required_count} blockers=[${blockers}] -> ${action} (${reason})" >&2
+  # Report behind_by only when actually measured; otherwise null ("n/a" in the log)
+  # so a skipped compare never masquerades as 0 (= level with base).
+  local behind_json behind_disp
+  if [ "$behind_measured" = "true" ]; then behind_json="$behind_by"; behind_disp="$behind_by"; else behind_json=null; behind_disp="n/a"; fi
+
+  echo "PR #${num} [${ms}] behind_by=${behind_disp} age=${age_hours}h required=${required_count} blockers=[${blockers}] -> ${action} (${reason})" >&2
 
   jq -nc \
     --argjson num "$num" \
@@ -618,7 +642,7 @@ classify_one_pr() {
     --arg reason "$reason" \
     --arg blockers "$blockers" \
     --argjson rids "$eligible_ids" \
-    --argjson behind "$behind_by" \
+    --argjson behind "$behind_json" \
     --argjson age "$age_hours" \
     --argjson am "$is_automerge" \
     '{number: $num, base: $base, state: $state, action: $action, reason: $reason, blockers: $blockers, run_ids: $rids, behind_by: $behind, age_hours: $age, automerge: $am}' \
@@ -700,6 +724,22 @@ if [ "$REQUIRE_UP_TO_DATE_STRATEGY" = "automerge-optimized" ]; then
   else
     echo "Automerge merge-train (optimized): no prime needed (each base already has a merge-progressing automerge PR, or none are mergeable-behind)"
   fi
+fi
+
+# Expose the per-PR plan as a structured output so a caller can act on it (e.g.
+# flag PRs stuck dirty/awaiting a rebase) without this action prescribing that
+# policy. Mirrors the step-summary facts, minus internal fields (run_ids/reason).
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  processed_json=$(jq -c '
+    [ .[] | {number, base, state, action, behind_by, age_hours, blockers, automerge} ]
+  ' "$PLAN_FILE")
+  processed_count=$(echo "$processed_json" | jq 'length')
+  {
+    echo "processed-prs<<EOF"
+    echo "$processed_json"
+    echo "EOF"
+  } >> "$GITHUB_OUTPUT"
+  echo "Processed PRs surfaced via processed-prs output: ${processed_count}"
 fi
 
 # The human-readable step summary is rendered by apply.sh (the final step), which

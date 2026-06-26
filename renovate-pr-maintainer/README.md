@@ -75,15 +75,17 @@ A few common situations and the action it takes (with the defaults: rebase once 
 | 70 commits behind base, or behind base with a 30h-old head | Adds the `rebase` label → Renovate rebases it (fresh SHA) |
 | Up to date with base, even with an old head | Nothing — not behind, so no rebase (its checks are re-run if they fail) |
 | Green and fresh (few commits behind, recent head) | Nothing — leaves it alone |
-| Has a merge conflict | Nothing — Renovate rebases conflicts itself |
+| Has a merge conflict | Nothing — Renovate rebases conflicts itself³ |
 | Failing required check, fresh head¹ | Re-runs the failed jobs in place (no new SHA) |
-| Already carries the `rebase` label | Nothing — a rebase is already queued |
+| Already carries the `rebase` label | Nothing — a rebase is already queued³ |
 | Branch has human-pushed commits | Nothing — leaves it for the human |
 | Behind base & auto-merging² | Rebases it immediately so Renovate can merge it next scan |
 
 ¹ Only when `rerun-budget` ≥ 1 (reruns are off by default).
 
 ² With `require-up-to-date-strategy: automerge`, every behind auto-merging PR is rebased; with `automerge-optimized`, only one least-behind **mergeable** auto-merging PR per base branch is (blocked ones excluded).
+
+³ Still left for Renovate to handle; its head age is recorded in the [`processed-prs`](#outputs) output so a **caller** can flag a PR stuck `dirty`/awaiting a rebase for too long — a sign Renovate is not processing the repo.
 
 See the [decision model](#decision-model) below for the exact rules.
 
@@ -160,3 +162,9 @@ Every PR in the step-summary plan also shows its **blockers** — why GitHub won
 | `require-up-to-date-strategy` | `none` | How to handle the `behind` state ("require branches up to date"). `none`: ignored, decided by staleness. `automerge`: every behind auto-merging PR is rebased immediately (non-automerge PRs still staleness-driven). `automerge-optimized`: per base branch, only one least-behind **mergeable** auto-merging PR is rebased (blocked ones excluded so they can't stall the train), and only when no auto-merging PR is already merge-ready or being rebased. `all`: every behind PR is rebased immediately. |
 | `automerge-labels` | `automerge` | Comma- or newline-separated labels marking a Renovate PR as auto-merging (used by `require-up-to-date-strategy: automerge` and `automerge-optimized`). GitHub native auto-merge is detected too; set empty to rely on that only. |
 | `dry-run` | `false` | When true, classify and log only; never modify any PR. |
+
+## Outputs
+
+| Output | Description |
+|:-------|:------------|
+| `processed-prs` | JSON array describing every in-scope Renovate PR the run processed, each `{number, base, state, action, behind_by, age_hours, blockers, automerge}` (the same per-PR facts as the step summary); `[]` when none. `behind_by` is `null` only when not measured (an indeterminate `unknown` mergeable_state, deferred to the next run). |

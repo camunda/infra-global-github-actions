@@ -105,10 +105,21 @@ inputs:
     required: false
     default: "false"
 
+outputs:
+  processed-prs:
+    description: >
+      JSON array describing every in-scope Renovate PR the run processed, each
+      `{number, base, state, action, behind_by, age_hours, blockers, automerge}`
+      (the same per-PR facts as the step summary). `behind_by` is `null` only when
+      not measured (an indeterminate `unknown` mergeable_state, deferred to the next
+      run). Empty array (`[]`) when there are none.
+    value: ${{ steps.classify.outputs.processed-prs }}
+
 runs:
   using: composite
   steps:
     - name: Classify in-scope Renovate PRs (read-only)
+      id: classify
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.github-token }}
