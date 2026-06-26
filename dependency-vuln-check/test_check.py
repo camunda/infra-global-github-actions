@@ -47,70 +47,71 @@ def _dep(name="acme", version="1.0.0", scope="runtime", change_type="added",
     }
 
 
-def _run(diff, allowed=None, fail_sev=HIGH, fail_fix=LOW, scopes=None):
+def _run(diff, allowed=None, fail_sev=HIGH, fail_fix=LOW, scopes=None, pre_existing=None):
     return find_blocking(
         diff, allowed or set(), token="",
         fail_sev_rank=fail_sev, fail_fixable_rank=fail_fix,
         gated_scopes=scopes if scopes is not None else {"runtime"},
+        pre_existing_deps=pre_existing or set(),
     )
 
 
 # --- default-policy rule matrix ------------------------------------------------
 
 def test_fixable_any_severity_blocks():
-    blocking, _, _ = _run([_dep(severity="low", fix="2.0.0")])
+    blocking, _, _, _ = _run([_dep(severity="low", fix="2.0.0")])
     assert len(blocking) == 1
     assert blocking[0]["rule"] == "fixable"
 
 
 def test_no_fix_high_blocks():
-    blocking, _, _ = _run([_dep(severity="high", fix=None)])
+    blocking, _, _, _ = _run([_dep(severity="high", fix=None)])
     assert len(blocking) == 1
     assert blocking[0]["rule"] == "no-fix/high-severity"
 
 
 def test_no_fix_moderate_does_not_block():
-    blocking, allowed, excluded = _run([_dep(severity="moderate", fix=None)])
-    assert (blocking, allowed, excluded) == ([], [], [])
+    blocking, allowed, excluded, pre = _run([_dep(severity="moderate", fix=None)])
+    assert (blocking, allowed, excluded, pre) == ([], [], [], [])
 
 
 def test_development_scope_excluded_by_default():
-    blocking, _, excluded = _run([_dep(scope="development", severity="critical", fix="2.0.0")])
+    blocking, _, excluded, _ = _run([_dep(scope="development", severity="critical", fix="2.0.0")])
     assert blocking == []
     assert len(excluded) == 1
 
 
 def test_allow_ghsas_moves_to_allowed():
-    blocking, allowed, _ = _run([_dep(fix="2.0.0")], allowed={"GHSA-AAAA-BBBB-CCCC"})
+    blocking, allowed, _, _ = _run([_dep(fix="2.0.0")], allowed={"GHSA-AAAA-BBBB-CCCC"})
     assert blocking == []
     assert len(allowed) == 1
 
 
 def test_unchanged_and_removed_ignored():
     diff = [_dep(change_type="removed", fix="2.0.0"), _dep(change_type="unchanged", fix="2.0.0")]
-    assert _run(diff) == ([], [], [])
+    assert _run(diff) == ([], [], [], [])
 
 
 def test_downgrade_added_low_version_blocks():
     # A downgrade surfaces the vulnerable lower version as `added`.
-    blocking, _, _ = _run([_dep(version="1.0.0", change_type="added", fix="1.5.0")])
+    blocking, _, _, _ = _run([_dep(version="1.0.0", change_type="added", fix="1.5.0")])
     assert len(blocking) == 1
 
 
 # --- threshold input behavior --------------------------------------------------
 
 def test_raising_fixable_threshold_spares_low():
-    blocking, _, _ = _run([_dep(severity="low", fix="2.0.0")], fail_fix=HIGH)
+    blocking, _, _, _ = _run([_dep(severity="low", fix="2.0.0")], fail_fix=HIGH)
     assert blocking == []
 
 
 def test_lowering_severity_threshold_blocks_moderate_no_fix():
-    blocking, _, _ = _run([_dep(severity="moderate", fix=None)], fail_sev=LOW)
+    blocking, _, _, _ = _run([_dep(severity="moderate", fix=None)], fail_sev=LOW)
     assert len(blocking) == 1
 
 
 def test_gating_development_scope_blocks_it():
-    blocking, _, excluded = _run(
+    blocking, _, excluded, _ = _run(
         [_dep(scope="development", fix="2.0.0")],
         scopes={"runtime", "development"},
     )
@@ -121,20 +122,20 @@ def test_gating_development_scope_blocks_it():
 # --- unknown-severity legacy contract -----------------------------------------
 
 def test_unknown_severity_fixable_blocks():
-    blocking, _, _ = _run([_dep(severity="", fix="2.0.0")])
+    blocking, _, _, _ = _run([_dep(severity="", fix="2.0.0")])
     assert len(blocking) == 1
 
 
 def test_unknown_severity_no_fix_does_not_block():
-    blocking, allowed, excluded = _run([_dep(severity="", fix=None)])
-    assert (blocking, allowed, excluded) == ([], [], [])
+    blocking, allowed, excluded, pre = _run([_dep(severity="", fix=None)])
+    assert (blocking, allowed, excluded, pre) == ([], [], [], [])
 
 
 # --- GraphQL fallback for missing first_patched_version -----------------------
 
 def test_graphql_fallback_marks_fixable(monkeypatch):
     monkeypatch.setattr(check, "_lookup_patch", lambda *a, **k: "9.9.9")
-    blocking, _, _ = _run([_dep(severity="low", fix=None)])
+    blocking, _, _, _ = _run([_dep(severity="low", fix=None)])
     assert len(blocking) == 1
     assert blocking[0]["fix"] == "9.9.9"
     assert blocking[0]["rule"] == "fixable"
@@ -244,24 +245,27 @@ def test_ancestor_picks_newest(monkeypatch):
     monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
     statuses = {"newer": "diverged", "anc": "ahead", "older": "ahead"}
     monkeypatch.setattr(check, "_compare_status", lambda repo, head, base, tok: statuses[head])
-    eff, run_id, scanned = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    eff, run_id, scanned, latest = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
     assert (eff, run_id, scanned) == ("anc", 2, 2)  # skipped newer (diverged), matched anc
+    assert latest == "newer"  # first sha seen — most recent snapshot on branch
 
 
 def test_ancestor_identical_at_top(monkeypatch):
     runs = {"workflow_runs": [{"head_sha": "BASE", "id": 9}]}
     monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
     monkeypatch.setattr(check, "_compare_status", lambda *a: "identical")
-    eff, _, scanned = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    eff, _, scanned, latest = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
     assert eff == "BASE" and scanned == 1
+    assert latest == "BASE"  # only one snapshot — effective_base == latest_on_branch → no drift
 
 
 def test_ancestor_none_found(monkeypatch):
     runs = {"workflow_runs": [{"head_sha": "x", "id": 1}, {"head_sha": "y", "id": 2}]}
     monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
     monkeypatch.setattr(check, "_compare_status", lambda *a: "behind")
-    eff, run_id, scanned = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    eff, run_id, scanned, latest = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
     assert eff is None and run_id is None and scanned == 2
+    assert latest == "x"  # still records the most recent snapshot even when no ancestor found
 
 
 def test_ancestor_query_uses_base_ref_and_workflow(monkeypatch):
@@ -319,12 +323,13 @@ def test_ancestor_paginates_to_honor_lookback(monkeypatch):
         check, "_compare_status",
         lambda repo, head, base, tok: "ahead" if head == "anc" else "diverged",
     )
-    eff, run_id, scanned = check.latest_snapshotted_ancestor(
+    eff, run_id, scanned, latest = check.latest_snapshotted_ancestor(
         "o/r", "main", "BASE", "wf.yml", "tok", 150
     )
     assert eff == "anc" and run_id == 999
     assert scanned == 101  # 100 from page 1 + 1 match on page 2
     assert len(calls) == 2  # followed pagination
+    assert latest == "p1-0"  # first sha examined across all pages
 
 
 def test_has_override_label_live_read(monkeypatch):
@@ -372,7 +377,7 @@ def test_main_real_vuln_blocks_even_with_override_label(monkeypatch):
     # API works, base resolves, a real fixable vuln is added → blocks (exit 1).
     # The override label is present but must be IGNORED for a genuine finding.
     _set_main_env(monkeypatch)
-    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1))
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "eff"))
     monkeypatch.setattr(check, "_api_get", lambda url, tok: [_dep(severity="high", fix="2.0.0")])
     monkeypatch.setattr(check, "has_override_label", lambda *a, **k: True)
     with pytest.raises(SystemExit) as ei:
@@ -382,8 +387,114 @@ def test_main_real_vuln_blocks_even_with_override_label(monkeypatch):
 
 def test_main_fail_closed_when_no_ancestor(monkeypatch):
     _set_main_env(monkeypatch)
-    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: (None, None, 5))
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: (None, None, 5, None))
     monkeypatch.setattr(check, "has_override_label", lambda *a, **k: False)
     with pytest.raises(SystemExit) as ei:
         check.main()
     assert ei.value.code == 1
+
+
+# --- pre-existing dep filter (advisory-timing FP suppression) -----------------
+
+def test_pre_existing_dep_moves_to_pre_existing_not_blocking():
+    dep = _dep(name="jackson-databind", version="2.21.4", fix="2.21.5")
+    pre = {("jackson-databind", "2.21.4")}
+    blocking, allowed, excluded, pre_existing = _run([dep], pre_existing=pre)
+    assert blocking == []
+    assert len(pre_existing) == 1
+    assert pre_existing[0]["package"] == "jackson-databind@2.21.4"
+
+
+def test_non_pre_existing_dep_still_blocks():
+    dep = _dep(name="jackson-databind", version="2.21.4", fix="2.21.5")
+    # dep not in pre_existing set → should block normally
+    blocking, _, _, pre_existing = _run([dep])
+    assert len(blocking) == 1
+    assert pre_existing == []
+
+
+def test_pre_existing_check_is_at_dep_level_covers_all_vulns():
+    # A dep with two vulns: both should move to pre_existing if dep is pre-existing.
+    dep = {
+        "change_type": "added", "scope": "runtime",
+        "name": "log4j", "version": "2.14.0", "ecosystem": "maven", "manifest": "pom.xml",
+        "vulnerabilities": [
+            {"severity": "critical", "first_patched_version": "2.15.0",
+             "advisory_ghsa_ids": ["GHSA-aaaa-bbbb-cccc"], "advisory_url": "...", "advisory_cve_id": ""},
+            {"severity": "high", "first_patched_version": "2.17.0",
+             "advisory_ghsa_ids": ["GHSA-dddd-eeee-ffff"], "advisory_url": "...", "advisory_cve_id": ""},
+        ],
+    }
+    blocking, _, _, pre_existing = _run([dep], pre_existing={("log4j", "2.14.0")})
+    assert blocking == []
+    assert len(pre_existing) == 2
+
+
+def test_pre_existing_dep_different_version_still_blocks():
+    # pre_existing has version 2.21.3; PR adds 2.21.4 — different version, should block.
+    dep = _dep(name="jackson-databind", version="2.21.4", fix="2.21.5")
+    blocking, _, _, pre_existing = _run([dep], pre_existing={("jackson-databind", "2.21.3")})
+    assert len(blocking) == 1
+    assert pre_existing == []
+
+
+def test_base_branch_pre_existing_no_drift(monkeypatch):
+    # effective_base == latest_on_branch → no API call, empty set
+    api_called = []
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: api_called.append(url) or [])
+    result = check._base_branch_pre_existing("o/r", "eff_sha", "eff_sha", "tok")
+    assert result == set()
+    assert api_called == []  # skipped the API call entirely
+
+
+def test_base_branch_pre_existing_no_latest(monkeypatch):
+    # latest_on_branch is None → no API call, empty set
+    api_called = []
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: api_called.append(url) or [])
+    result = check._base_branch_pre_existing("o/r", "eff_sha", None, "tok")
+    assert result == set()
+    assert api_called == []
+
+
+def test_base_branch_pre_existing_returns_added_deps(monkeypatch):
+    drift_diff = [
+        {"change_type": "added", "name": "jackson-databind", "version": "2.21.4"},
+        {"change_type": "removed", "name": "jackson-databind", "version": "2.21.3"},
+        {"change_type": "added", "name": "netty-handler", "version": "4.1.135.Final"},
+    ]
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: drift_diff)
+    result = check._base_branch_pre_existing("o/r", "base_sha", "latest_sha", "tok")
+    assert result == {("jackson-databind", "2.21.4"), ("netty-handler", "4.1.135.Final")}
+    # removed dep is not included
+
+
+def test_base_branch_pre_existing_fails_open_on_error(monkeypatch, capsys):
+    def boom(url, tok):
+        raise check.ApiError("service unavailable", retryable=True)
+
+    monkeypatch.setattr(check, "_api_get", boom)
+    result = check._base_branch_pre_existing("o/r", "base", "latest", "tok")
+    assert result == set()  # fail-open: missing filter is a FP risk, not safety risk
+    captured = capsys.readouterr()
+    assert "pre-existing dep filter disabled" in captured.out
+
+
+def test_main_pre_existing_dep_not_blocking(monkeypatch):
+    # End-to-end: effective_base != latest_on_branch → drift compare fires,
+    # dep appears in drift → classified as pre_existing, gate passes.
+    _set_main_env(monkeypatch)
+    monkeypatch.setattr(
+        check, "latest_snapshotted_ancestor",
+        lambda *a, **k: ("eff_base", 1, 1, "latest_main"),
+    )
+    jackson_dep = _dep(name="jackson-databind", version="2.21.4", fix="2.21.5")
+    drift_diff = [{"change_type": "added", "name": "jackson-databind", "version": "2.21.4"}]
+
+    def fake_api_get(url, tok):
+        if "compare/eff_base...latest_main" in url:
+            return drift_diff  # drift compare
+        return [jackson_dep]   # PR diff
+
+    monkeypatch.setattr(check, "_api_get", fake_api_get)
+    # should NOT exit(1) — pre_existing dep is not blocking
+    check.main()
