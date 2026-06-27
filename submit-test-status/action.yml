@@ -51,7 +51,7 @@ runs:
       echo "-----"
 
   - name: ensure that jq is available
-    uses: dcarbone/install-jq-action@v3.2.0
+    uses: dcarbone/install-jq-action@v4.0.1
 
   - name: load input
     shell: bash
