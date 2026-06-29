@@ -13,7 +13,8 @@
 #                            the PR auto-merges; else treat like blocked
 #   blocked / unstable    -> rebase if stale, else rerun a failing required run, else none
 #   clean / has_hooks     -> rebase if stale, else none
-#   unknown               -> none    (mergeability pending; never act on a guess)
+#   unknown               -> none    (mergeability pending; never act on a guess; a PR
+#                            in the merge queue is surfaced as `queued`, also none)
 #
 # Stale = behind AND (behind_by >= BEHIND_THRESHOLD OR head age >= STALE_HOURS): a rebase only
 # helps a PR that is behind its base, so a PR level with base (behind_by=0) is never stale and
@@ -381,6 +382,24 @@ review_decision_for_pr() {
   printf '%s' "$rd"
 }
 
+# Merge-queue entry for one PR via GraphQL: a PR sitting in the merge queue reports
+# mergeable_state `unknown` over REST (GitHub is testing it on the queue branch),
+# which otherwise reads as "indeterminate". This disambiguates that case. Prints
+# "<state> <position>" (e.g. "QUEUED 3", "AWAITING_CHECKS 1") or "NONE 0" when the
+# PR is not queued (or the repo has no merge queue — the field is then null). Cost:
+# 1 GraphQL call; only invoked for `unknown` PRs. The pull-requests token scope covers it.
+merge_queue_for_pr() {
+  local num="$1" owner repo entry
+  owner="${REPOSITORY%%/*}"; repo="${REPOSITORY##*/}"
+  # shellcheck disable=SC2016
+  entry=$(gh_api graphql \
+    -f query='query($o:String!,$r:String!,$n:Int!){repository(owner:$o,name:$r){pullRequest(number:$n){mergeQueueEntry{state position}}}}' \
+    -f o="$owner" -f r="$repo" -F n="$num" \
+    --jq '.data.repository.pullRequest.mergeQueueEntry | if . == null then "NONE 0" else "\(.state) \(.position // 0)" end' 2>/dev/null || echo "NONE 0")
+  { [ -z "$entry" ] || [ "$entry" = "null" ]; } && entry="NONE 0"
+  printf '%s' "$entry"
+}
+
 # Human-readable reason a fresh PR gets no rerun ($1 = context prefix): a
 # no-candidate PR is often just mid-CI, not failing. Reads RERUN_BUDGET,
 # checks_in_progress, failing_required_count (globals).
@@ -431,6 +450,7 @@ compute_blockers() {
       fi
       ;;
     unknown)  parts+=("mergeability not yet computed") ;;
+    queued)   parts+=("in merge queue") ;;
     blocked)
       [ "$failing_required_count" -gt 0 ] && parts+=("failing required check")
       [ "$checks_in_progress" = "true" ] && parts+=("required check pending")
@@ -620,9 +640,19 @@ classify_one_pr() {
         action="none"; reason="fresh & green"
       fi ;;
     *)
-      # unknown: GitHub hadn't finished (re)computing mergeability (base likely
-      # moved mid-run). Acting would be a guess, so defer to the next run.
-      action="none"; reason="indeterminate mergeable_state ('${ms}'); deferring to next run" ;;
+      # unknown: either GitHub hadn't finished (re)computing mergeability (base
+      # likely moved mid-run), or the PR is in the merge queue (REST reports
+      # `unknown` while GitHub tests it on the queue branch). Disambiguate via the
+      # merge-queue entry so a healthy queued PR isn't mislabeled indeterminate.
+      local mq mq_state mq_pos
+      mq=$(merge_queue_for_pr "$num")
+      mq_state="${mq%% *}"; mq_pos="${mq##* }"
+      if [ "$mq_state" != "NONE" ]; then
+        ms="queued"
+        action="none"; reason="in merge queue (${mq_state}, position ${mq_pos}); GitHub owns the merge — no maintainer action"
+      else
+        action="none"; reason="indeterminate mergeable_state ('${ms}'); deferring to next run"
+      fi ;;
   esac
 
   compute_blockers
@@ -698,7 +728,8 @@ if [ "$REQUIRE_UP_TO_DATE_STRATEGY" = "automerge-optimized" ]; then
     def parts: (.blockers // "") | if . == "" then [] else split("; ") end;
     def merge_progressing:
       .automerge == true and (
-        (.action == "rebase" or .action == "pending")
+        .state == "queued"
+        or (.action == "rebase" or .action == "pending")
         or (.behind_by == 0 and (parts == [] or parts == ["required check pending"]))
       );
     def is_candidate:
