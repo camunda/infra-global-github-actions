@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.9 (2026-06-29)
+
+## What's Changed
+* chore(deps): update actions/checkout action to v7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/723
+* chore: adds workflow_ref value for new column to build_status_v2 table by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/725
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/724
+* feat(renovate-pr-maintainer): surface processed PRs as a structured output by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/727
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.244.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/729
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.245.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/732
+* chore(deps): update actions/cache action to v6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/730
+* chore(deps): update dcarbone/install-jq-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/731
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/preview-env-1.0.8...preview-env-1.0.9
+
 ## 1.0.8 (2026-06-20)
 
 ## What's Changed
