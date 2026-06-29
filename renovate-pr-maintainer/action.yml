@@ -111,8 +111,8 @@ outputs:
       JSON array describing every in-scope Renovate PR the run processed, each
       `{number, base, state, action, behind_by, age_hours, blockers, automerge}`
       (the same per-PR facts as the step summary). `behind_by` is `null` only when
-      not measured (an indeterminate `unknown` mergeable_state, deferred to the next
-      run). Empty array (`[]`) when there are none.
+      not measured (an indeterminate `unknown` mergeable_state or a `queued` PR in the
+      merge queue, both deferred to the next run). Empty array (`[]`) when there are none.
     value: ${{ steps.classify.outputs.processed-prs }}
 
 runs:

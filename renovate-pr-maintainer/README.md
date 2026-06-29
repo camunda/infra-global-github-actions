@@ -101,7 +101,7 @@ stateDiagram-v2
 
     classify --> pending: carries rebase label
     classify --> skip: dirty (merge conflict)
-    classify --> none: unknown (mergeability undecided)
+    classify --> none: unknown (mergeability undecided) / queued (in merge queue)
     classify --> owned: behind / blocked / unstable / clean
 
     owned --> skip: head edited by a human
@@ -141,9 +141,9 @@ stateDiagram-v2
 - **no action** — the PR is left untouched this run; three states share that outcome but differ by reason and what comes next:
   - **`skip`** — merge conflict (Renovate rebases it itself) or a human-edited head (a rebase would discard manual commits); stays skipped until that changes.
   - **`pending`** — already carries the `rebase` label, so a rebase is queued; clears once Renovate acts on it.
-  - **`none`** — fresh & green, or mergeability not yet known; re-evaluated next run.
+  - **`none`** — fresh & green, mergeability not yet known, or the PR is in GitHub's merge queue (state `queued`, surfaced so it doesn't read as indeterminate); re-evaluated next run.
 
-Every PR in the step-summary plan also shows its **blockers** — why GitHub won't merge it right now (failing/pending required check, awaiting required review, changes requested, merge conflict, behind base). Because `mergeable_state: blocked` hides whether the gate is a check or a missing approval, `blocked` PRs are disambiguated with the check-runs API plus GitHub's GraphQL `reviewDecision`. Blockers are independent of the action: a PR `awaiting required review` shows action `—`, since the maintainer can't approve it — only a human can.
+Every PR in the step-summary plan also shows its **blockers** — why GitHub won't merge it right now (failing/pending required check, awaiting required review, changes requested, merge conflict, behind base, in merge queue). Because `mergeable_state: blocked` hides whether the gate is a check or a missing approval, `blocked` PRs are disambiguated with the check-runs API plus GitHub's GraphQL `reviewDecision`; likewise a PR the merge queue is testing reports `mergeable_state: unknown`, so it is disambiguated via the GraphQL `mergeQueueEntry` and surfaced as `queued` rather than indeterminate. Blockers are independent of the action: a PR `awaiting required review` shows action `—`, since the maintainer can't approve it — only a human can.
 
 ## Inputs
 
@@ -167,4 +167,4 @@ Every PR in the step-summary plan also shows its **blockers** — why GitHub won
 
 | Output | Description |
 |:-------|:------------|
-| `processed-prs` | JSON array describing every in-scope Renovate PR the run processed, each `{number, base, state, action, behind_by, age_hours, blockers, automerge}` (the same per-PR facts as the step summary); `[]` when none. `behind_by` is `null` only when not measured (an indeterminate `unknown` mergeable_state, deferred to the next run). |
+| `processed-prs` | JSON array describing every in-scope Renovate PR the run processed, each `{number, base, state, action, behind_by, age_hours, blockers, automerge}` (the same per-PR facts as the step summary); `[]` when none. `behind_by` is `null` only when not measured (an indeterminate `unknown` mergeable_state or a `queued` PR in the merge queue, both deferred to the next run). |
