@@ -70,4 +70,22 @@ if [ -f "$PID_FILE" ]; then
   fi
 fi
 
+# ── Network bytes: cumulative tx/rx summed across non-loopback interfaces. ──
+# Runner pods are ephemeral (one job per pod), so the counters span the job;
+# on long-lived runners they are cumulative since interface-up.
+TX_BYTES=""; RX_BYTES=""
+if [ -r /proc/net/dev ]; then
+  read -r TX_BYTES RX_BYTES < <(
+    awk -F'[: ]+' '
+      NR > 2 && $2 != "lo" { rx += $3 + 0; tx += $11 + 0 }
+      END { printf "%.0f %.0f\n", tx, rx }
+    ' /proc/net/dev
+  ) || true
+  if [ -n "$TX_BYTES" ]; then
+    echo "Network: egress=${TX_BYTES}B, ingress=${RX_BYTES}B"
+    MONITOR_FIELDS=$(printf '%s, "network_egress_bytes": %s, "network_ingress_bytes": %s' \
+      "$MONITOR_FIELDS" "$TX_BYTES" "$RX_BYTES")
+  fi
+fi
+
 printf 'monitor_fields=%s\n' "$MONITOR_FIELDS" >> "$OUTPUT_FILE"

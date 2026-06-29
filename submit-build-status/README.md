@@ -42,6 +42,8 @@ All data submitted by this action is stored as one record in the Big Query table
 | runner_name      | STRING     | NULLABLE   | Lowercase name of the runner executing the GHA workflow job |
 | runner_arch      | STRING     | NULLABLE   | Lowercase name of the runner's CPU architecture executing the GHA workflow job |
 | runner_os        | STRING     | NULLABLE   | Lowercase name of the runner's operating system executing the GHA workflow job |
+| network_egress_bytes  | INTEGER | NULLABLE | Cumulative bytes transmitted across non-loopback interfaces at job end; per-job on ephemeral runners, cumulative since interface-up on long-lived ones (Linux only) |
+| network_ingress_bytes | INTEGER | NULLABLE | Cumulative bytes received across non-loopback interfaces at job end (Linux only) |
 | user_reason      | STRING     | NULLABLE   | Based on user input |
 | user_description | STRING     | NULLABLE   | Based on user input |
 
