@@ -76,6 +76,7 @@ A few common situations and the action it takes (with the defaults: rebase once 
 | Up to date with base, even with an old head | Nothing — not behind, so no rebase (its checks are re-run if they fail) |
 | Green and fresh (few commits behind, recent head) | Nothing — leaves it alone |
 | Has a merge conflict | Nothing — Renovate rebases conflicts itself³ |
+| Has a merge conflict **and** human-pushed commits | Nothing — left for the human (Renovate won't auto-rebase an edited branch)⁴ |
 | Failing required check, fresh head¹ | Re-runs the failed jobs in place (no new SHA) |
 | Already carries the `rebase` label | Nothing — a rebase is already queued³ |
 | Branch has human-pushed commits | Nothing — leaves it for the human |
@@ -86,6 +87,8 @@ A few common situations and the action it takes (with the defaults: rebase once 
 ² With `require-up-to-date-strategy: automerge`, every behind auto-merging PR is rebased; with `automerge-optimized`, only one least-behind **mergeable** auto-merging PR per base branch is (blocked ones excluded).
 
 ³ Still left for Renovate to handle; its head age is recorded in the [`processed-prs`](#outputs) output so a **caller** can flag a PR stuck `dirty`/awaiting a rebase for too long — a sign Renovate is not processing the repo.
+
+⁴ A conflicted PR whose head carries human-pushed commits is the one case Renovate won't auto-rebase, so the conflict won't clear on its own; it is surfaced as stuck for a human rather than implying Renovate will recover it.
 
 See the [decision model](#decision-model) below for the exact rules.
 
@@ -139,7 +142,7 @@ stateDiagram-v2
 - **rebase** — add the Renovate `rebase` label; Renovate does the real rebase (regenerates lockfiles, pushes a fresh SHA). This action never pushes commits. With `require-up-to-date-strategy: all` every behind PR is rebased immediately; with `automerge`, every behind auto-merging PR is; with `automerge-optimized`, just one least-behind mergeable auto-merging PR per base branch is (see the note above).
 - **rerun** — re-run the failed required workflow run(s) in place, no new SHA; budget derives from `run_attempt`.
 - **no action** — the PR is left untouched this run; three states share that outcome but differ by reason and what comes next:
-  - **`skip`** — merge conflict (Renovate rebases it itself) or a human-edited head (a rebase would discard manual commits); stays skipped until that changes.
+  - **`skip`** — merge conflict (Renovate rebases it itself) or a human-edited head (a rebase would discard manual commits); a conflicted **and** human-edited PR is both at once — Renovate won't auto-rebase it, so it stays skipped until a human resolves the conflict.
   - **`pending`** — already carries the `rebase` label, so a rebase is queued; clears once Renovate acts on it.
   - **`none`** — fresh & green, mergeability not yet known, or the PR is in GitHub's merge queue (state `queued`, surfaced so it doesn't read as indeterminate); re-evaluated next run.
 

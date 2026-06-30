@@ -8,7 +8,9 @@
 # Decision model (first match wins; a human-edited head always downgrades an
 # actionable state to skip, since Renovate won't auto-rebase it):
 #   rebase label present  -> pending (rebase already queued; report only, no fetch)
-#   dirty (conflict)      -> skip    (Renovate rebases conflicts itself)
+#   dirty (conflict)      -> skip    (Renovate rebases conflicts itself, unless the
+#                            head is human-edited: then Renovate won't, so it is
+#                            surfaced as stuck for a human)
 #   behind                -> rebase now if require-up-to-date-strategy=all, or =automerge and
 #                            the PR auto-merges; else treat like blocked
 #   blocked / unstable    -> rebase if stale, else rerun a failing required run, else none
@@ -542,8 +544,16 @@ classify_one_pr() {
       # Renovate owns the conflict rebase; we only READ staleness (head age +
       # behind_by) so a caller can flag a PR that has stayed conflicted too long /
       # far behind (Renovate not processing it). We never act on it ourselves.
+      # compute_staleness also sets head_modified: a human-edited head is the one
+      # case Renovate will NOT auto-rebase, so the "Renovate owns the rebase"
+      # assurance is false there — the conflict is stuck until a human resolves it.
       compute_staleness "$base" "$head_sha"
-      action="skip"; reason="merge conflict; Renovate owns the rebase" ;;
+      action="skip"
+      if [ "$head_modified" = "true" ]; then
+        reason="merge conflict on branch edited by non-Renovate author; leave for human (Renovate won't auto-rebase it)"
+      else
+        reason="merge conflict; Renovate owns the rebase"
+      fi ;;
     behind)
       # Rebase a behind PR immediately when require-up-to-date-strategy demands it: `all`
       # covers every PR, `automerge` only the auto-merging ones (so Renovate can
