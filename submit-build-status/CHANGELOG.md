@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.3.0 (2026-07-04)
+
+## What's Changed
+* feat(renovate-pr-maintainer): surface processed PRs as a structured output by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/727
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.244.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/729
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.245.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/732
+* chore(deps): update actions/cache action to v6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/730
+* chore(deps): update dcarbone/install-jq-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/731
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/728
+* feat(renovate-pr-maintainer): surface merge-queue state instead of unknown by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/734
+* fix(renovate-pr-maintainer): flag conflicted human-edited PRs as stuck by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/736
+* feat: capture per-job network egress/ingress bytes by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/733
+* chore(deps): update dependency fossas/fossa-cli to v3.17.12 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/737
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.251.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/738
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/submit-build-status-1.2.1...submit-build-status-1.3.0
+
 ## 1.2.1 (2026-06-24)
 
 ## What's Changed
