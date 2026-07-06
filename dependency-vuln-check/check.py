@@ -20,10 +20,20 @@ raw ``base.sha`` is unsafe: the snapshot workflow is path-filtered, so a code-on
 base commit has no snapshot, leaving the base side of the compare empty and
 flagging the *entire* head tree as "added" (pre-existing deps surface as new).
 
-The gate FAILS CLOSED when it cannot verify a PR (no snapshotted ancestor, or a
-GitHub API failure that survives retries). A human may bypass a genuinely
-un-checkable PR by adding the override label (read live, not from the stale event
-payload). The label never bypasses a real finding.
+Stacked PR fallback
+-------------------
+When the PR targets a branch that has no snapshots (e.g. a feature branch used as
+the base for a stacked PR), the gate falls back to the configured
+``FALLBACK_BASE_REF`` (default: ``main``).  The diff ``effective_base...head`` then
+covers both the stacked branch's changes and the PR's own changes — conservative
+but avoids a hard fail-closed on a normally-safe pattern.  A notice is posted to
+the PR comment so engineers understand why the effective base differs from the
+branch they targeted.
+
+The gate FAILS CLOSED when it cannot verify a PR (no snapshotted ancestor on
+either ``base_ref`` or the fallback, or a GitHub API failure that survives retries).
+A human may bypass a genuinely un-checkable PR by adding the override label (read
+live, not from the stale event payload). The label never bypasses a real finding.
 """
 import json
 import os
@@ -425,9 +435,13 @@ def _upsert_comment(repository: str, pr_number: int, token: str, body: str) -> N
 
 
 def post_pr_comment(
-    repository: str, pr_number: int, blocking: list, allowed: list, scope_excluded: list, token: str
+    repository: str, pr_number: int, blocking: list, allowed: list, scope_excluded: list, token: str,
+    note: str | None = None,
 ) -> None:
     sections = []
+
+    if note:
+        sections += [f"> **ℹ️ Note:** {note}", ""]
 
     if blocking:
         sections += [
@@ -558,6 +572,9 @@ def main() -> None:
         print(f"::notice::Config file {config_file} not found — proceeding with empty allow-ghsas list")
         allowed_ghsas = set()
 
+    fallback_ref = os.environ.get("FALLBACK_BASE_REF", "main")
+    stacked_pr_fallback = False
+
     # ── Resolve the effective base to a snapshotted ancestor (Workstream D) ──
     print(f"::notice::Resolving base {base_sha} on '{base_ref}' to the nearest snapshotted ancestor")
     try:
@@ -571,11 +588,38 @@ def main() -> None:
         )
         return  # unreachable: fail_closed exits
 
+    # ── Stacked PR fallback: base_ref has no snapshots — try the default branch ──
+    if effective_base is None and base_ref != fallback_ref:
+        print(
+            f"::notice::No snapshot on '{base_ref}' — stacked PR detected; "
+            f"falling back to '{fallback_ref}' snapshots"
+        )
+        try:
+            effective_base, run_id, scanned = latest_snapshotted_ancestor(
+                repository, fallback_ref, base_sha, snapshot_workflow, token, lookback
+            )
+        except ApiError as e:
+            fail_closed(
+                repository, pr_number, token, override_label,
+                f"could not resolve base snapshot on fallback '{fallback_ref}' ({e.reason})",
+                summary_path,
+            )
+            return
+        if effective_base is not None:
+            stacked_pr_fallback = True
+            print(
+                f"::notice::Fallback resolved: {effective_base} on '{fallback_ref}' "
+                f"(scanned {scanned} run(s))"
+            )
+
     if effective_base is None:
+        refs_tried = f"'{base_ref}'"
+        if base_ref != fallback_ref:
+            refs_tried += f" or fallback '{fallback_ref}'"
         fail_closed(
             repository, pr_number, token, override_label,
             f"no snapshotted ancestor of {base_sha} found within the last {scanned} "
-            f"snapshot run(s) on '{base_ref}'",
+            f"snapshot run(s) on {refs_tried}",
             summary_path,
         )
         return
@@ -610,9 +654,16 @@ def main() -> None:
     for d in scope_excluded:
         print(f"::notice::Non-gated dep: {d['ghsa']} in {d['package']} (severity: {d['severity']}, rule: {d['rule']}) — excluded (scope: {d['scope']})")
 
+    stacked_note = (
+        f"Stacked PR — `{base_ref}` has no dependency snapshots; compared from "
+        f"`{fallback_ref}` snapshot `{effective_base}` (diff includes stacked branch changes)."
+    ) if stacked_pr_fallback else None
+
     # ── Always-on run summary trail ──
     base_line = f"`{effective_base}`"
-    if effective_base != base_sha:
+    if stacked_pr_fallback:
+        base_line += f" (stacked PR fallback from `{fallback_ref}`, scanned {scanned} run(s))"
+    elif effective_base != base_sha:
         base_line += f" (resolved from `{base_sha}`, scanned {scanned} run(s))"
     summary = [
         "## Dependency Vulnerability Gate",
@@ -622,6 +673,8 @@ def main() -> None:
         f"- **Head:** `{head_sha}`",
         "",
     ]
+    if stacked_note:
+        summary += [f"> **ℹ️ Note:** {stacked_note}", ""]
     if blocking:
         summary += [f"**Verdict:** 🚨 {len(blocking)} blocking issue(s)", "", _table(blocking)]
     else:
@@ -632,8 +685,8 @@ def main() -> None:
         summary += ["", "### Non-gated scope (not blocking)", _table(scope_excluded)]
     _write_summary(summary_path, "\n".join(summary))
 
-    if pr_number and (blocking or allowed or scope_excluded):
-        post_pr_comment(repository, pr_number, blocking, allowed, scope_excluded, token)
+    if pr_number and (blocking or allowed or scope_excluded or stacked_note):
+        post_pr_comment(repository, pr_number, blocking, allowed, scope_excluded, token, note=stacked_note)
     elif not pr_number and (blocking or allowed or scope_excluded):
         print("::warning::Could not determine PR number from event payload — skipping PR comment")
 

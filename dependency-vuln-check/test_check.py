@@ -387,3 +387,58 @@ def test_main_fail_closed_when_no_ancestor(monkeypatch):
     with pytest.raises(SystemExit) as ei:
         check.main()
     assert ei.value.code == 1
+
+
+def test_stacked_pr_falls_back_to_default_branch(monkeypatch):
+    # base_ref targets a feature branch (no snapshots); fallback_ref (main) resolves.
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("BASE_REF", "refactor/some-feature")
+    monkeypatch.setenv("FALLBACK_BASE_REF", "main")
+    calls = []
+
+    def fake_ancestor(repo, ref, sha, wf, tok, lookback):
+        calls.append(ref)
+        if ref == "refactor/some-feature":
+            return None, None, 0  # no snapshots on feature branch
+        return "eff-main", 42, 1  # main has a snapshot
+
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", fake_ancestor)
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: [])  # no dep changes
+    monkeypatch.setattr(check, "_pr_number", lambda: 42)
+    comment_calls = []
+    monkeypatch.setattr(check, "post_pr_comment", lambda *a, **k: comment_calls.append(k))
+    check.main()  # must not exit 1
+    assert calls == ["refactor/some-feature", "main"]
+    # post_pr_comment called with stacked-PR note
+    assert comment_calls and "Stacked PR" in (comment_calls[0].get("note") or "")
+
+
+def test_stacked_pr_fallback_also_empty_fails_closed(monkeypatch):
+    # Neither base_ref nor fallback_ref has snapshots → fail closed.
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("BASE_REF", "refactor/some-feature")
+    monkeypatch.setenv("FALLBACK_BASE_REF", "main")
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: (None, None, 0))
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: False)
+    with pytest.raises(SystemExit) as ei:
+        check.main()
+    assert ei.value.code == 1
+
+
+def test_no_fallback_when_base_ref_equals_fallback_ref(monkeypatch):
+    # base_ref == fallback_ref → no second attempt; fail closed on first miss.
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("BASE_REF", "main")
+    monkeypatch.setenv("FALLBACK_BASE_REF", "main")
+    calls = []
+
+    def fake_ancestor(repo, ref, sha, wf, tok, lookback):
+        calls.append(ref)
+        return None, None, 5
+
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", fake_ancestor)
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: False)
+    with pytest.raises(SystemExit) as ei:
+        check.main()
+    assert ei.value.code == 1
+    assert calls == ["main"]  # called only once — no fallback to itself
