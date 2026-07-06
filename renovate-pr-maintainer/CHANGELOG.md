@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.2.0 (2026-07-04)
+
+## What's Changed
+* feat(renovate-pr-maintainer): surface merge-queue state instead of unknown by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/734
+* fix(renovate-pr-maintainer): flag conflicted human-edited PRs as stuck by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/736
+* feat: capture per-job network egress/ingress bytes by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/733
+* chore(deps): update dependency fossas/fossa-cli to v3.17.12 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/737
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.251.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/738
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/renovate-pr-maintainer-1.1.0...renovate-pr-maintainer-1.2.0
+
 ## 1.1.0 (2026-06-29)
 
 ## What's Changed
