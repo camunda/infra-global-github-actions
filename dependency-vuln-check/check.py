@@ -203,9 +203,12 @@ def latest_snapshotted_ancestor(
     accepts the first whose status is `identical` (same commit) or `ahead`
     (base_sha is ahead → the run commit is an ancestor).
 
-    Returns (effective_base_sha, run_id, scanned_count); (None, None, scanned) if
-    no ancestor is found within the window. Raises ApiError on API failure so the
-    caller can fail closed.
+    Returns (effective_base_sha, run_id, scanned_count, latest_on_branch); the first
+    three are (None, None, scanned) if no ancestor is found within the window.
+    `latest_on_branch` is the head_sha of the most recent successful run on
+    `base_ref` (the very first run examined), regardless of ancestry — used by the
+    caller as the "current tip" of the branch for the pre-existing dep filter.
+    Raises ApiError on API failure so the caller can fail closed.
 
     `lookback` is honored even beyond the API's 100-per-page cap by following
     pagination, so a large lookback never silently scans fewer runs than asked.
@@ -217,6 +220,7 @@ def latest_snapshotted_ancestor(
         f"&status=success&event=push&per_page={per_page}"
     )
     scanned = 0
+    latest_on_branch: str | None = None
     while url and scanned < lookback:
         payload, headers = _http_get_json(url, token)
         runs = payload.get("workflow_runs", []) if isinstance(payload, dict) else []
@@ -226,15 +230,60 @@ def latest_snapshotted_ancestor(
             run_sha = run.get("head_sha")
             if not run_sha:
                 continue
+            if latest_on_branch is None:
+                latest_on_branch = run_sha  # most recent snapshot on this branch
             scanned += 1
             # compare/{run_sha}...{base_sha}: "ahead" = base_sha is ahead of run_sha
             # = run_sha is an ancestor of base_sha (what we want).
             status = _compare_status(repository, run_sha, base_sha, token)
             if status in ("identical", "ahead"):
-                return run_sha, run.get("id"), scanned
+                return run_sha, run.get("id"), scanned, latest_on_branch
         match = re.search(r'<([^>]+)>;\s*rel="next"', headers.get("Link", "") or "")
         url = match.group(1) if match else None
-    return None, None, scanned
+    return None, None, scanned, latest_on_branch
+
+
+def _base_branch_pre_existing(
+    repository: str, effective_base: str, latest_on_branch: str | None, token: str
+) -> set:
+    """Return (name, version, manifest) triples the base branch added since effective_base.
+
+    Compares effective_base...latest_on_branch via the Dependency Review API to find
+    dep versions the base branch itself introduced after effective_base. Any dep at
+    (name, version, manifest) that appears as "added" in this drift compare was
+    already on the base branch before the PR was opened — the PR did not introduce it.
+
+    This suppresses Pattern A FPs: when a dep version is bumped on main (e.g. by
+    Renovate) AFTER the effective_base snapshot was taken, that version shows as
+    "added" in the PR compare even though the PR never touched it. The drift compare
+    reveals that main itself added that (name, version, manifest) — so it is
+    pre-existing, not PR-introduced.
+
+    Returns an empty set when:
+    - effective_base == latest_on_branch (no drift — nothing to filter)
+    - latest_on_branch is None (no snapshot found on branch; nothing to compare)
+    - the drift compare API call fails (fail-open: FPs may slip through, but real
+      vulns are never suppressed)
+    """
+    if not latest_on_branch or effective_base == latest_on_branch:
+        return set()
+    try:
+        drift = _api_get(
+            f"{_GITHUB_API}/repos/{repository}/dependency-graph/compare"
+            f"/{effective_base}...{latest_on_branch}",
+            token,
+        )
+        return {
+            (dep.get("name", ""), dep.get("version", ""), dep.get("manifest", ""))
+            for dep in drift
+            if dep.get("change_type") == "added"
+        }
+    except ApiError as e:
+        print(
+            f"::warning::Could not fetch base-branch drift compare ({e.reason})"
+            " — pre-existing dep filter disabled for this run"
+        )
+        return set()
 
 
 def has_override_label(repository: str, pr_number, token: str, label: str) -> bool:
@@ -329,20 +378,26 @@ def find_blocking(
     fail_sev_rank: int = SEVERITY_ORDER["high"],
     fail_fixable_rank: int = SEVERITY_ORDER["low"],
     gated_scopes: set | None = None,
-) -> tuple[list, list, list]:
-    """Return (blocking, allowed, scope_excluded).
+    pre_existing_deps: set | None = None,
+) -> tuple[list, list, list, list]:
+    """Return (blocking, allowed, scope_excluded, pre_existing).
 
     blocking       – vulns that block the PR
     allowed        – would have blocked but are in allow-ghsas
     scope_excluded – would have blocked but the dep's scope is not gated
+    pre_existing   – would have blocked but (name, version, manifest) was already
+                     on the base branch before this PR (Pattern A FP filter)
     """
     gated_scopes = gated_scopes if gated_scopes is not None else {"runtime"}
-    blocking, allowed, scope_excluded = [], [], []
+    pre_existing_deps = pre_existing_deps or set()
+    blocking, allowed, scope_excluded, pre_existing = [], [], [], []
     for dep in diff:
         if dep.get("change_type") != "added":
             continue
         scope = (dep.get("scope") or "runtime").lower()
         is_gated = scope in gated_scopes
+        dep_key = (dep.get("name", ""), dep.get("version", ""), dep.get("manifest", ""))
+        is_pre_existing = dep_key in pre_existing_deps
         for vuln in dep.get("vulnerabilities") or []:
             ids = _ghsa_ids(vuln)
             ghsa = sorted(ids)[0] if ids else "unknown"
@@ -364,13 +419,15 @@ def find_blocking(
                 "rule": "fixable" if fixable else "no-fix/high-severity",
                 "scope": scope,
             }
-            if not is_gated:
+            if is_pre_existing:
+                pre_existing.append(entry)
+            elif not is_gated:
                 scope_excluded.append(entry)
             elif {i.upper() for i in ids} & allowed_ghsas:
                 allowed.append(entry)
             else:
                 blocking.append(entry)
-    return blocking, allowed, scope_excluded
+    return blocking, allowed, scope_excluded, pre_existing
 
 
 def _advisory_cell(b: dict) -> str:
@@ -437,6 +494,7 @@ def _upsert_comment(repository: str, pr_number: int, token: str, body: str) -> N
 def post_pr_comment(
     repository: str, pr_number: int, blocking: list, allowed: list, scope_excluded: list, token: str,
     note: str | None = None,
+    pre_existing: list | None = None,
 ) -> None:
     sections = []
 
@@ -476,6 +534,23 @@ def post_pr_comment(
             "and are excluded from blocking. Consider upgrading if a fix is available.",
             "",
             _table(scope_excluded),
+        ]
+
+    if pre_existing:
+        sections += [
+            "",
+            f"### ℹ️ {len(pre_existing)} finding(s) pre-existing on the base branch — not blocking",
+            "",
+            "> These vulnerabilities exist in dependencies that were **already on the base branch "
+            "before this PR was opened** — this PR did not introduce them.",
+            ">",
+            "> The gate compares from the nearest snapshotted ancestor of your base commit. When a "
+            "dep version is bumped on the base branch (e.g. by Renovate) after that snapshot was "
+            "taken, it can appear as `added` even though the PR is unrelated.",
+            ">",
+            "> To resolve: upgrade the affected dependency in a dedicated PR, or wait for Renovate.",
+            "",
+            _table(pre_existing),
         ]
 
     _upsert_comment(repository, pr_number, token, "\n".join(sections))
@@ -578,7 +653,7 @@ def main() -> None:
     # ── Resolve the effective base to a snapshotted ancestor (Workstream D) ──
     print(f"::notice::Resolving base {base_sha} on '{base_ref}' to the nearest snapshotted ancestor")
     try:
-        effective_base, run_id, scanned = latest_snapshotted_ancestor(
+        effective_base, run_id, scanned, latest_on_branch = latest_snapshotted_ancestor(
             repository, base_ref, base_sha, snapshot_workflow, token, lookback
         )
     except ApiError as e:
@@ -595,7 +670,7 @@ def main() -> None:
             f"falling back to '{fallback_ref}' snapshots"
         )
         try:
-            effective_base, run_id, scanned = latest_snapshotted_ancestor(
+            effective_base, run_id, scanned, latest_on_branch = latest_snapshotted_ancestor(
                 repository, fallback_ref, base_sha, snapshot_workflow, token, lookback
             )
         except ApiError as e:
@@ -645,12 +720,22 @@ def main() -> None:
         )
         return
 
-    blocking, allowed, scope_excluded = find_blocking(
-        diff, allowed_ghsas, token, fail_sev_rank, fail_fixable_rank, gated_scopes
+    # ── Pre-existing dep filter: suppress Pattern A FPs (Workstream F) ──
+    # Compare effective_base...latest_on_branch to find deps the base branch added
+    # after our snapshot — those are pre-existing on the branch, not PR-introduced.
+    pre_existing_deps = _base_branch_pre_existing(repository, effective_base, latest_on_branch, token)
+    if pre_existing_deps:
+        print(f"::notice::Pre-existing dep filter: {len(pre_existing_deps)} (name, version, manifest) triple(s) found on base branch since effective_base — will not block")
+
+    blocking, allowed, scope_excluded, pre_existing = find_blocking(
+        diff, allowed_ghsas, token, fail_sev_rank, fail_fixable_rank, gated_scopes,
+        pre_existing_deps=pre_existing_deps,
     )
 
     for a in allowed:
         print(f"::notice::Allowed exception: {a['ghsa']} in {a['package']} (severity: {a['severity']}, rule: {a['rule']}) — covered by allow-ghsas")
+    for p in pre_existing:
+        print(f"::notice::Pre-existing on base branch: {p['ghsa']} in {p['package']} ({p['manifest']}) — not blocking")
     for d in scope_excluded:
         print(f"::notice::Non-gated dep: {d['ghsa']} in {d['package']} (severity: {d['severity']}, rule: {d['rule']}) — excluded (scope: {d['scope']})")
 
@@ -683,11 +768,16 @@ def main() -> None:
         summary += ["", "### Allowed exceptions (allow-ghsas)", _table(allowed)]
     if scope_excluded:
         summary += ["", "### Non-gated scope (not blocking)", _table(scope_excluded)]
+    if pre_existing:
+        summary += ["", "### Pre-existing on base branch — not blocking (Pattern A filter)", _table(pre_existing)]
     _write_summary(summary_path, "\n".join(summary))
 
-    if pr_number and (blocking or allowed or scope_excluded or stacked_note):
-        post_pr_comment(repository, pr_number, blocking, allowed, scope_excluded, token, note=stacked_note)
-    elif not pr_number and (blocking or allowed or scope_excluded):
+    if pr_number and (blocking or allowed or scope_excluded or pre_existing or stacked_note):
+        post_pr_comment(
+            repository, pr_number, blocking, allowed, scope_excluded, token,
+            note=stacked_note, pre_existing=pre_existing,
+        )
+    elif not pr_number and (blocking or allowed or scope_excluded or pre_existing):
         print("::warning::Could not determine PR number from event payload — skipping PR comment")
 
     if blocking:
