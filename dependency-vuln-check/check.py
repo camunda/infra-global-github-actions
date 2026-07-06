@@ -664,10 +664,10 @@ def main() -> None:
         return  # unreachable: fail_closed exits
 
     # ── Stacked PR fallback: base_ref has no snapshots — try the default branch ──
+    scanned_base = scanned
     if effective_base is None and base_ref != fallback_ref:
         print(
-            f"::notice::No snapshot on '{base_ref}' — stacked PR detected; "
-            f"falling back to '{fallback_ref}' snapshots"
+            f"::notice::No snapshot found on '{base_ref}' — falling back to '{fallback_ref}' snapshots"
         )
         try:
             effective_base, run_id, scanned, latest_on_branch = latest_snapshotted_ancestor(
@@ -688,13 +688,12 @@ def main() -> None:
             )
 
     if effective_base is None:
-        refs_tried = f"'{base_ref}'"
+        refs_tried = f"'{base_ref}' (scanned {scanned_base} run(s))"
         if base_ref != fallback_ref:
-            refs_tried += f" or fallback '{fallback_ref}'"
+            refs_tried += f" or fallback '{fallback_ref}' (scanned {scanned} run(s))"
         fail_closed(
             repository, pr_number, token, override_label,
-            f"no snapshotted ancestor of {base_sha} found within the last {scanned} "
-            f"snapshot run(s) on {refs_tried}",
+            f"no snapshotted ancestor of {base_sha} found on {refs_tried}",
             summary_path,
         )
         return
@@ -747,7 +746,7 @@ def main() -> None:
     # ── Always-on run summary trail ──
     base_line = f"`{effective_base}`"
     if stacked_pr_fallback:
-        base_line += f" (stacked PR fallback from `{fallback_ref}`, scanned {scanned} run(s))"
+        base_line += f" (stacked PR fallback to `{fallback_ref}`, scanned {scanned} run(s))"
     elif effective_base != base_sha:
         base_line += f" (resolved from `{base_sha}`, scanned {scanned} run(s))"
     summary = [
