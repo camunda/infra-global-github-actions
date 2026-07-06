@@ -509,3 +509,59 @@ def test_base_branch_pre_existing_api_error_returns_empty(monkeypatch):
     ))
     result = check._base_branch_pre_existing("o/r", "base-sha", "latest-sha", "tok")
     assert result == set()
+
+
+# --- bucket-ordering correctness (fix 3) --------------------------------------
+
+def test_pre_existing_non_gated_scope_wins_over_pre_existing(monkeypatch):
+    # A development-scoped dep that is also pre_existing → scope_excluded wins.
+    # scope exclusion is a stronger/more informative signal than pre-existing.
+    monkeypatch.setattr(check, "_lookup_patch", lambda *a, **k: None)
+    dep = _dep(scope="development", name="foo", version="1.0", manifest="pom.xml", fix="2.0")
+    pre_existing_set = {("foo", "1.0", "pom.xml")}
+    blocking, allowed, scope_excluded, pre_existing = find_blocking(
+        [dep], set(), token="", gated_scopes={"runtime"}, pre_existing_deps=pre_existing_set
+    )
+    assert blocking == []
+    assert pre_existing == []
+    assert len(scope_excluded) == 1
+
+
+def test_pre_existing_allow_listed_ghsa_wins_over_pre_existing(monkeypatch):
+    # A dep that is both pre_existing and in allowed_ghsas → allowed wins.
+    # The allow-list audit trail should reflect the explicit exemption.
+    monkeypatch.setattr(check, "_lookup_patch", lambda *a, **k: None)
+    dep = _dep(name="bar", version="2.0", manifest="pom.xml", fix="3.0", ghsas=("GHSA-aaaa-bbbb-cccc",))
+    pre_existing_set = {("bar", "2.0", "pom.xml")}
+    blocking, allowed, scope_excluded, pre_existing = find_blocking(
+        [dep], {"GHSA-AAAA-BBBB-CCCC"}, token="", pre_existing_deps=pre_existing_set
+    )
+    assert blocking == []
+    assert pre_existing == []
+    assert len(allowed) == 1
+
+
+# --- elif stacked_note warning (fix 4) ----------------------------------------
+
+def test_stacked_pr_fallback_prints_warning_when_no_pr_number(monkeypatch):
+    # When pr_number is None but stacked_note is truthy (and all finding lists empty),
+    # a warning should still be printed (stacked_note was missing from elif condition).
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("BASE_REF", "refactor/some-feature")
+    monkeypatch.setenv("FALLBACK_BASE_REF", "main")
+    monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
+
+    def fake_ancestor(repo, ref, sha, wf, tok, lookback):
+        if ref == "refactor/some-feature":
+            return None, None, 0, None
+        return "eff-main", 42, 1, "latest-main"
+
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", fake_ancestor)
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: [])
+    monkeypatch.setattr(check, "_pr_number", lambda: None)  # no PR number
+    monkeypatch.setattr(check, "_base_branch_pre_existing", lambda *a, **k: set())
+    printed = []
+    monkeypatch.setattr("builtins.print", lambda *a, **k: printed.append(" ".join(str(x) for x in a)))
+    check.main()
+    warning_lines = [l for l in printed if "Could not determine PR number" in l]
+    assert warning_lines, "expected warning about missing PR number when stacked_note is active"

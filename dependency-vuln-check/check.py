@@ -208,6 +208,10 @@ def latest_snapshotted_ancestor(
     `latest_on_branch` is the head_sha of the most recent successful run on
     `base_ref` (the very first run examined), regardless of ancestry — used by the
     caller as the "current tip" of the branch for the pre-existing dep filter.
+    NOTE: this is the latest *snapshotted* commit, not the actual branch HEAD. If
+    the most recent push was path-filtered (e.g. docs-only) and no snapshot was
+    submitted, deps merged in that gap are invisible to the pre-existing filter and
+    may surface as false-positive blocks on unrelated PRs.
     Raises ApiError on API failure so the caller can fail closed.
 
     `lookback` is honored even beyond the API's 100-per-page cap by following
@@ -258,6 +262,17 @@ def _base_branch_pre_existing(
     "added" in the PR compare even though the PR never touched it. The drift compare
     reveals that main itself added that (name, version, manifest) — so it is
     pre-existing, not PR-introduced.
+
+    Known limitation — concurrent-bump false negative: if a PR independently
+    introduces the same (name, version, manifest) that the base branch also added
+    after effective_base (e.g. Renovate and the PR both pin the same dep version),
+    the filter cannot distinguish the two and suppresses the PR's finding. This is
+    an inherent consequence of triple-level matching without PR authorship data.
+
+    Per-dep advisory coverage: when a dep triple is pre-existing, ALL its
+    advisories (including ones published after the snapshot) are suppressed. This
+    is intentional — the PR did not introduce the dep version, so it is not
+    responsible for any of its advisories regardless of when they were discovered.
 
     Returns an empty set when:
     - effective_base == latest_on_branch (no drift — nothing to filter)
@@ -419,12 +434,12 @@ def find_blocking(
                 "rule": "fixable" if fixable else "no-fix/high-severity",
                 "scope": scope,
             }
-            if is_pre_existing:
-                pre_existing.append(entry)
-            elif not is_gated:
+            if not is_gated:
                 scope_excluded.append(entry)
             elif {i.upper() for i in ids} & allowed_ghsas:
                 allowed.append(entry)
+            elif is_pre_existing:
+                pre_existing.append(entry)
             else:
                 blocking.append(entry)
     return blocking, allowed, scope_excluded, pre_existing
@@ -776,7 +791,7 @@ def main() -> None:
             repository, pr_number, blocking, allowed, scope_excluded, token,
             note=stacked_note, pre_existing=pre_existing,
         )
-    elif not pr_number and (blocking or allowed or scope_excluded or pre_existing):
+    elif not pr_number and (blocking or allowed or scope_excluded or pre_existing or stacked_note):
         print("::warning::Could not determine PR number from event payload — skipping PR comment")
 
     if blocking:
