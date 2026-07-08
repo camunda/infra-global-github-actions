@@ -141,6 +141,12 @@ trigger the Maven snapshot workflow — so the latest snapshot commit can be stu
 `base-sha` reflects the true branch tip regardless of ecosystem and recovers it. Neither
 reference alone covers all ecosystems; the union covers both.
 
+On the **stacked-PR fallback** path (`base-ref` had no snapshots, so the base was resolved on
+`fallback-base-ref`), `base-sha` points at the *feature* branch — a different branch than the
+resolved base — so it is **not** used as a reference; only the snapshotted reference applies.
+Diffing against the feature-branch tip would otherwise suppress dependencies the parent branch
+introduced, which the stacked PR should still be gated on.
+
 Properties:
 
 - **Manifest-level matching** — a triple is only filtered where the base branch already has

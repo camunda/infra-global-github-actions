@@ -250,6 +250,16 @@ def latest_snapshotted_ancestor(
     return None, None, scanned, latest_on_branch
 
 
+def _dep_triple(dep: dict) -> tuple:
+    """Identity of a dependency for pre-existing matching: (name, version, manifest).
+
+    Shared by the base-branch drift filter and find_blocking so the two always agree
+    on what "the same dependency" means — if they diverge, the pre-existing set stops
+    matching find_blocking's keys and suppression silently breaks.
+    """
+    return (dep.get("name", ""), dep.get("version", ""), dep.get("manifest", ""))
+
+
 def _base_branch_pre_existing(
     repository: str, effective_base: str, snapshot_tip: str | None,
     base_tip: str | None, token: str,
@@ -282,6 +292,14 @@ def _base_branch_pre_existing(
     Unioning both covers Maven (via snapshot_tip) and native ecosystems (via
     base_tip); neither alone is sufficient.
 
+    IMPORTANT — both references must live on the SAME branch as effective_base.
+    `base_tip` is only meaningful when effective_base was resolved on the PR's own
+    base branch. On the stacked-PR fallback path effective_base is resolved on the
+    default branch while base-sha is the (different) feature-branch tip, so diffing
+    effective_base...base-sha would fold the entire feature branch's dependency delta
+    into the pre-existing set and suppress vulns the PR legitimately surfaces. The
+    caller passes base_tip=None in that case.
+
     Known limitation — concurrent-bump false negative: if a PR independently
     introduces the same (name, version, manifest) that the base branch also added
     after effective_base (e.g. Renovate and the PR both pin the same dep version),
@@ -299,12 +317,21 @@ def _base_branch_pre_existing(
     effective_base or falsy is skipped (no drift to compute); duplicate references
     are compared once.
     """
+    # Unique references worth comparing: drop falsy tips and any equal to
+    # effective_base (no drift window), preserving order and de-duplicating.
+    tips = list(dict.fromkeys(
+        tip for tip in (snapshot_tip, base_tip) if tip and tip != effective_base
+    ))
+    if not tips:
+        print(
+            "::notice::Pre-existing dep filter: base is itself snapshotted "
+            "(no drift window between effective_base and either reference) — "
+            "no base-branch filtering applied"
+        )
+        return set()
+
     result: set = set()
-    seen: set = set()
-    for tip in (snapshot_tip, base_tip):
-        if not tip or tip == effective_base or tip in seen:
-            continue
-        seen.add(tip)
+    for tip in tips:
         try:
             drift = _api_get(
                 f"{_GITHUB_API}/repos/{repository}/dependency-graph/compare"
@@ -318,9 +345,7 @@ def _base_branch_pre_existing(
             )
             continue
         result |= {
-            (dep.get("name", ""), dep.get("version", ""), dep.get("manifest", ""))
-            for dep in drift
-            if dep.get("change_type") == "added"
+            _dep_triple(dep) for dep in drift if dep.get("change_type") == "added"
         }
     return result
 
@@ -435,7 +460,7 @@ def find_blocking(
             continue
         scope = (dep.get("scope") or "runtime").lower()
         is_gated = scope in gated_scopes
-        dep_key = (dep.get("name", ""), dep.get("version", ""), dep.get("manifest", ""))
+        dep_key = _dep_triple(dep)
         is_pre_existing = dep_key in pre_existing_deps
         for vuln in dep.get("vulnerabilities") or []:
             ids = _ghsa_ids(vuln)
@@ -758,7 +783,7 @@ def main() -> None:
         )
         return
 
-    # ── Pre-existing dep filter: suppress Pattern A FPs (Workstream F) ──
+    # ── Pre-existing dep filter: suppress base-branch-added deps (Workstream F) ──
     # Find deps the base branch itself added after our snapshot — those are
     # pre-existing on the branch, not PR-introduced. We diff effective_base against
     # BOTH the latest snapshot commit (latest_on_branch — the only reference that
@@ -767,8 +792,17 @@ def main() -> None:
     # and npm, which never trigger the Maven snapshot so latest_on_branch can be
     # stuck at effective_base). Unioning both is required; neither alone covers all
     # ecosystems.
+    #
+    # On the stacked-PR fallback path effective_base + latest_on_branch are resolved
+    # on fallback_ref (main) while base_sha is the *feature* branch tip — a different
+    # branch. Diffing effective_base(main)...base_sha(feature) would fold the whole
+    # feature branch's dependency delta into the pre-existing set and suppress vulns
+    # the stacked PR legitimately surfaces (the parent branch is not independently
+    # gated). So base_sha is only a valid native-ecosystem reference when we did NOT
+    # fall back; otherwise pass None and rely on the snapshot reference alone.
+    native_tip = None if stacked_pr_fallback else base_sha
     pre_existing_deps = _base_branch_pre_existing(
-        repository, effective_base, latest_on_branch, base_sha, token
+        repository, effective_base, latest_on_branch, native_tip, token
     )
     if pre_existing_deps:
         print(f"::notice::Pre-existing dep filter: {len(pre_existing_deps)} (name, version, manifest) triple(s) found on base branch since effective_base — will not block")

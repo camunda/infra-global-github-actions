@@ -590,6 +590,53 @@ def test_main_filter_keys_on_both_snapshot_and_base_sha(monkeypatch):
     assert captured["base_tip"] == "B"          # base_sha (native side)
 
 
+def test_stacked_fallback_does_not_pass_base_sha_as_native_tip(monkeypatch):
+    # Regression: on the stacked-PR fallback, base_sha is the *feature* branch tip
+    # while effective_base + latest_on_branch resolve on main. Passing base_sha as
+    # base_tip would diff effective_base(main)...tip_of_feature and fold the whole
+    # feature branch's dep delta into pre_existing — suppressing vulns the stacked PR
+    # legitimately surfaces. main() must pass base_tip=None on the fallback path.
+    _set_main_env(monkeypatch)  # BASE_SHA = "B" (the feature branch tip)
+    monkeypatch.setenv("BASE_REF", "refactor/some-feature")
+    monkeypatch.setenv("FALLBACK_BASE_REF", "main")
+
+    def fake_ancestor(repo, ref, sha, wf, tok, lookback):
+        if ref == "refactor/some-feature":
+            return None, None, 0, None          # feature branch has no snapshots
+        return "eff-main", 42, 1, "main-tip"    # fallback resolves on main
+
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", fake_ancestor)
+    monkeypatch.setattr(check, "_lookup_patch", lambda *a, **k: None)
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    captured = {}
+
+    def fake_filter(repository, effective_base, snapshot_tip, base_tip, token):
+        captured["snapshot_tip"] = snapshot_tip
+        captured["base_tip"] = base_tip
+        return set()
+
+    monkeypatch.setattr(check, "_base_branch_pre_existing", fake_filter)
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: [])  # no PR-diff findings
+    check.main()  # must not exit 1
+    assert captured["snapshot_tip"] == "main-tip"  # Maven reference still applied
+    assert captured["base_tip"] is None            # base_sha NOT used on fallback
+
+
+def test_base_branch_pre_existing_no_refs_logs_notice(capsys):
+    # When both references collapse to effective_base, the filter is a no-op — it
+    # must emit a notice so an operator can tell it ran and found nothing.
+    result = check._base_branch_pre_existing("o/r", "eff", "eff", "eff", "tok")
+    assert result == set()
+    assert "no base-branch filtering applied" in capsys.readouterr().out
+
+
+def test_dep_triple_matches_find_blocking_key():
+    # The shared identity helper must produce the (name, version, manifest) triple
+    # both the drift filter and find_blocking key on.
+    dep = {"name": "acme", "version": "1.2.3", "manifest": "pom.xml", "extra": "ignored"}
+    assert check._dep_triple(dep) == ("acme", "1.2.3", "pom.xml")
+
+
 # --- bucket-ordering correctness (fix 3) --------------------------------------
 
 def test_pre_existing_non_gated_scope_wins_over_pre_existing(monkeypatch):
