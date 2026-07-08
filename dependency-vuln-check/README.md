@@ -107,19 +107,25 @@ The gate **fails closed** when it cannot verify a PR:
 Every run writes a summary trail (resolved base, runs scanned, verdict). Failure reasons are
 named explicitly in the log (rate-limit vs 5xx vs timeout vs permissions vs not-found).
 
-### Ancestor-staleness filter (Pattern A false-positive prevention)
+### Ignoring dependencies the base branch itself added
 
-The head diff is `effective_base...head`, but `effective_base` is only the nearest
-*snapshotted* ancestor — it can lag behind what the base branch actually contains by the
-time the PR runs. When the base branch adds a dependency version **after** that snapshot
-(e.g. a Renovate bump lands on `main` while the PR is open), that version shows up as
-`added` in the PR diff even though the PR never touched it — a false positive.
+**What this prevents:** a PR being blocked for a vulnerable dependency it never touched,
+because the base branch (e.g. `main`) added that dependency after the gate's reference point
+was taken.
 
-To suppress this, after resolving `effective_base` the gate computes the set of
-`(name, version, manifest)` triples the base branch itself introduced since
-`effective_base`, and moves any matching finding to an informational section of the PR
-comment instead of blocking. The drift is computed by diffing `effective_base` against
-**two** reference points and unioning the `added` triples:
+**Why it happens:** the gate diffs the PR against `effective_base` — the nearest *snapshotted*
+ancestor, not the live tip of the base branch. Between that snapshot and the PR running, the
+base branch keeps moving: a Renovate bump (or any merge) can add a dependency version on
+`main` while the PR is open. Because the PR sits on top of that newer `main`, the dependency
+appears as `added` when compared to the older `effective_base` — so the gate would blame the
+PR for something `main` introduced. Example: `golang.org/x/crypto@0.51.0` landing on `main`
+via an unrelated bump, then blocking three PRs that only changed Java/JS files.
+
+**How it's fixed:** before deciding what to block, the gate works out which
+`(name, version, manifest)` dependencies the *base branch itself* added since `effective_base`,
+and moves any matching finding to an informational section of the PR comment instead of
+blocking. It works this out by comparing `effective_base` against **two** reference points and
+combining (union) the dependencies each reports as `added`:
 
 | Reference | Surfaces drift in |
 |-----------|-------------------|
