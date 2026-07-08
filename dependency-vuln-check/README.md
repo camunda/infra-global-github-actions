@@ -37,6 +37,7 @@ version shows up as `added` in the diff and is evaluated normally.
     base-ref: ${{ github.event.pull_request.base.ref }}
     snapshot-workflow: maven-dependency-snapshot.yml
     # optional — defaults shown
+    fallback-base-ref: main
     max-snapshot-lookback: "30"
     override-label: ci:vuln-gate-override
     config-file: .github/dependency-review-config.json
@@ -52,6 +53,7 @@ version shows up as `added` in the diff and is evaluated normally.
 | `base-sha` | yes | — | Base commit SHA of the PR |
 | `head-sha` | yes | — | Head commit SHA of the PR |
 | `base-ref` | yes | — | Base **branch** of the PR (e.g. `main`, `stable/8.8`). Used to find the nearest snapshotted ancestor on the correct branch |
+| `fallback-base-ref` | no | `main` | Branch to fall back to when `base-ref` has no dependency snapshots (e.g. stacked PRs targeting a feature branch). The gate searches this branch for the nearest snapshotted ancestor of `base-sha` instead of failing closed, and posts a notice to the PR comment |
 | `snapshot-workflow` | yes | — | Filename of the workflow that submits the base snapshot (e.g. `maven-dependency-snapshot.yml`). Its successful push-event runs are scanned to resolve the effective base |
 | `max-snapshot-lookback` | no | `30` | How many recent successful snapshot runs to scan when resolving the effective base |
 | `override-label` | no | `ci:vuln-gate-override` | PR label that bypasses the gate **only** when it cannot verify the PR (outage / no-ancestor). Never bypasses a real finding |
@@ -97,12 +99,53 @@ The gate **fails closed** when it cannot verify a PR:
 |-----------|--------|
 | GitHub API error, transient | retried (3 attempts, exponential backoff) |
 | API error survives retries | **fail closed** (block), reason named in the log |
-| No snapshotted ancestor found within `max-snapshot-lookback` | **fail closed** (block) |
+| No snapshotted ancestor on `base-ref`; `base-ref` differs from `fallback-base-ref` | retry on `fallback-base-ref`; notice posted to PR comment |
+| No snapshotted ancestor on either branch within `max-snapshot-lookback` | **fail closed** (block) |
 | API works, real vulnerable dependency added | block (normal finding) |
 | API works, no vulnerable dependency added | pass |
 
 Every run writes a summary trail (resolved base, runs scanned, verdict). Failure reasons are
 named explicitly in the log (rate-limit vs 5xx vs timeout vs permissions vs not-found).
+
+### Ancestor-staleness filter (Pattern A false-positive prevention)
+
+The head diff is `effective_base...head`, but `effective_base` is only the nearest
+*snapshotted* ancestor — it can lag behind what the base branch actually contains by the
+time the PR runs. When the base branch adds a dependency version **after** that snapshot
+(e.g. a Renovate bump lands on `main` while the PR is open), that version shows up as
+`added` in the PR diff even though the PR never touched it — a false positive.
+
+To suppress this, after resolving `effective_base` the gate computes the set of
+`(name, version, manifest)` triples the base branch itself introduced since
+`effective_base`, and moves any matching finding to an informational section of the PR
+comment instead of blocking. The drift is computed by diffing `effective_base` against
+**two** reference points and unioning the `added` triples:
+
+| Reference | Surfaces drift in |
+|-----------|-------------------|
+| Latest **snapshotted** commit on the base branch | Maven (submitted-snapshot ecosystems) |
+| `base-sha` — the PR's raw base tip | Natively-detected ecosystems (Go modules, npm, …) |
+
+Both are required because the dependency graph mixes two data sources with different
+coverage. **Maven** deps exist in the graph *only at snapshotted commits*, so the latest
+snapshot commit is the only reference that surfaces Maven base-branch drift. **Natively
+detected** ecosystems (Go, npm) are parsed from the file tree at any commit but never
+trigger the Maven snapshot workflow — so the latest snapshot commit can be stuck at
+`effective_base` even after such a dep was added, collapsing that drift window to nothing.
+`base-sha` reflects the true branch tip regardless of ecosystem and recovers it. Neither
+reference alone covers all ecosystems; the union covers both.
+
+Properties:
+
+- **Manifest-level matching** — a triple is only filtered where the base branch already has
+  it. If the PR adds the same `(name, version)` to a **new** manifest, it still blocks.
+- **Per-reference fail-open** — if one drift compare API call fails, only that reference is
+  skipped; the other still applies. A real finding is never suppressed by an API failure.
+- **Per-dep advisory coverage** — when a dep triple is pre-existing, all of its advisories
+  are suppressed (the PR did not introduce the version, so it owns none of them).
+- **Known limitation — concurrent bump**: if the PR and the base branch independently add
+  the *same* `(name, version, manifest)`, the filter cannot tell them apart and suppresses
+  the PR's finding. Inherent to triple-level matching without PR-authorship data.
 
 ### Override label (for sustained outages)
 
