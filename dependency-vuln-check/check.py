@@ -206,12 +206,15 @@ def latest_snapshotted_ancestor(
     Returns (effective_base_sha, run_id, scanned_count, latest_on_branch); the first
     three are (None, None, scanned) if no ancestor is found within the window.
     `latest_on_branch` is the head_sha of the most recent successful run on
-    `base_ref` (the very first run examined), regardless of ancestry — used by the
-    caller as the "current tip" of the branch for the pre-existing dep filter.
-    NOTE: this is the latest *snapshotted* commit, not the actual branch HEAD. If
-    the most recent push was path-filtered (e.g. docs-only) and no snapshot was
-    submitted, deps merged in that gap are invisible to the pre-existing filter and
-    may surface as false-positive blocks on unrelated PRs.
+    `base_ref` (the very first run examined), regardless of ancestry — the latest
+    *snapshotted* tip of the branch. The pre-existing dep filter diffs against this
+    (to surface Maven base-branch drift, which is only visible at snapshotted
+    commits) unioned with the PR's base-sha (to surface natively-detected
+    ecosystems like Go/npm at the true branch tip). NOTE: because this is the latest
+    *snapshotted* commit rather than the actual branch tip, a path-filtered push
+    (e.g. a Go-only change that never triggers the Maven snapshot workflow) leaves it
+    behind the branch tip — which is exactly why the filter also needs base-sha. See
+    `_base_branch_pre_existing`.
     Raises ApiError on API failure so the caller can fail closed.
 
     `lookback` is honored even beyond the API's 100-per-page cap by following
@@ -247,21 +250,55 @@ def latest_snapshotted_ancestor(
     return None, None, scanned, latest_on_branch
 
 
+def _dep_triple(dep: dict) -> tuple:
+    """Identity of a dependency for pre-existing matching: (name, version, manifest).
+
+    Shared by the base-branch drift filter and find_blocking so the two always agree
+    on what "the same dependency" means — if they diverge, the pre-existing set stops
+    matching find_blocking's keys and suppression silently breaks.
+    """
+    return (dep.get("name", ""), dep.get("version", ""), dep.get("manifest", ""))
+
+
 def _base_branch_pre_existing(
-    repository: str, effective_base: str, latest_on_branch: str | None, token: str
+    repository: str, effective_base: str, snapshot_tip: str | None,
+    base_tip: str | None, token: str,
 ) -> set:
     """Return (name, version, manifest) triples the base branch added since effective_base.
 
-    Compares effective_base...latest_on_branch via the Dependency Review API to find
-    dep versions the base branch itself introduced after effective_base. Any dep at
-    (name, version, manifest) that appears as "added" in this drift compare was
-    already on the base branch before the PR was opened — the PR did not introduce it.
+    Compares effective_base against two reference points via the Dependency Review
+    API and unions the "added" triples from both. Any dep at (name, version,
+    manifest) that appears as "added" in either drift compare was already on the
+    base branch before the PR was opened — the PR did not introduce it.
 
     This suppresses Pattern A FPs: when a dep version is bumped on main (e.g. by
     Renovate) AFTER the effective_base snapshot was taken, that version shows as
-    "added" in the PR compare even though the PR never touched it. The drift compare
-    reveals that main itself added that (name, version, manifest) — so it is
-    pre-existing, not PR-introduced.
+    "added" in the PR's effective_base...head compare even though the PR never
+    touched it. The drift compare reveals that main itself added that
+    (name, version, manifest) — so it is pre-existing, not PR-introduced.
+
+    Two reference points are required because the dependency graph mixes two data
+    sources with different coverage:
+    - `snapshot_tip` — the latest *snapshotted* commit on the base branch (from
+      `latest_snapshotted_ancestor`). Maven deps exist in the graph only at commits
+      where a snapshot was submitted, so a snapshotted tip is the only reference
+      that surfaces Maven base-branch drift.
+    - `base_tip` — the PR's raw base-sha (the true branch tip). Natively-detected
+      ecosystems (Go modules, npm, …) are parsed from the file tree at any commit,
+      but they never trigger the Maven snapshot workflow — so `snapshot_tip` can be
+      stuck at effective_base even after such a dep was added on the branch,
+      collapsing that drift window to nothing. base-sha reflects the true tip
+      regardless of which ecosystem changed and recovers the native-ecosystem drift.
+    Unioning both covers Maven (via snapshot_tip) and native ecosystems (via
+    base_tip); neither alone is sufficient.
+
+    IMPORTANT — both references must live on the SAME branch as effective_base.
+    `base_tip` is only meaningful when effective_base was resolved on the PR's own
+    base branch. On the stacked-PR fallback path effective_base is resolved on the
+    default branch while base-sha is the (different) feature-branch tip, so diffing
+    effective_base...base-sha would fold the entire feature branch's dependency delta
+    into the pre-existing set and suppress vulns the PR legitimately surfaces. The
+    caller passes base_tip=None in that case.
 
     Known limitation — concurrent-bump false negative: if a PR independently
     introduces the same (name, version, manifest) that the base branch also added
@@ -274,31 +311,43 @@ def _base_branch_pre_existing(
     is intentional — the PR did not introduce the dep version, so it is not
     responsible for any of its advisories regardless of when they were discovered.
 
-    Returns an empty set when:
-    - effective_base == latest_on_branch (no drift — nothing to filter)
-    - latest_on_branch is None (no snapshot found on branch; nothing to compare)
-    - the drift compare API call fails (fail-open: FPs may slip through, but real
-      vulns are never suppressed)
+    Per-reference fail-open: if a drift compare API call fails, that reference is
+    skipped (its FPs may slip through) but the other reference's results still
+    apply. Real vulns are never suppressed by a failure. A reference equal to
+    effective_base or falsy is skipped (no drift to compute); duplicate references
+    are compared once.
     """
-    if not latest_on_branch or effective_base == latest_on_branch:
-        return set()
-    try:
-        drift = _api_get(
-            f"{_GITHUB_API}/repos/{repository}/dependency-graph/compare"
-            f"/{effective_base}...{latest_on_branch}",
-            token,
-        )
-        return {
-            (dep.get("name", ""), dep.get("version", ""), dep.get("manifest", ""))
-            for dep in drift
-            if dep.get("change_type") == "added"
-        }
-    except ApiError as e:
+    # Unique references worth comparing: drop falsy tips and any equal to
+    # effective_base (no drift window), preserving order and de-duplicating.
+    tips = list(dict.fromkeys(
+        tip for tip in (snapshot_tip, base_tip) if tip and tip != effective_base
+    ))
+    if not tips:
         print(
-            f"::warning::Could not fetch base-branch drift compare ({e.reason})"
-            " — pre-existing dep filter disabled for this run"
+            "::notice::Pre-existing dep filter: base is itself snapshotted "
+            "(no drift window between effective_base and either reference) — "
+            "no base-branch filtering applied"
         )
         return set()
+
+    result: set = set()
+    for tip in tips:
+        try:
+            drift = _api_get(
+                f"{_GITHUB_API}/repos/{repository}/dependency-graph/compare"
+                f"/{effective_base}...{tip}",
+                token,
+            )
+        except ApiError as e:
+            print(
+                f"::warning::Could not fetch base-branch drift compare "
+                f"({effective_base}...{tip}): {e.reason} — this reference skipped"
+            )
+            continue
+        result |= {
+            _dep_triple(dep) for dep in drift if dep.get("change_type") == "added"
+        }
+    return result
 
 
 def has_override_label(repository: str, pr_number, token: str, label: str) -> bool:
@@ -411,7 +460,7 @@ def find_blocking(
             continue
         scope = (dep.get("scope") or "runtime").lower()
         is_gated = scope in gated_scopes
-        dep_key = (dep.get("name", ""), dep.get("version", ""), dep.get("manifest", ""))
+        dep_key = _dep_triple(dep)
         is_pre_existing = dep_key in pre_existing_deps
         for vuln in dep.get("vulnerabilities") or []:
             ids = _ghsa_ids(vuln)
@@ -734,10 +783,27 @@ def main() -> None:
         )
         return
 
-    # ── Pre-existing dep filter: suppress Pattern A FPs (Workstream F) ──
-    # Compare effective_base...latest_on_branch to find deps the base branch added
-    # after our snapshot — those are pre-existing on the branch, not PR-introduced.
-    pre_existing_deps = _base_branch_pre_existing(repository, effective_base, latest_on_branch, token)
+    # ── Pre-existing dep filter: suppress base-branch-added deps (Workstream F) ──
+    # Find deps the base branch itself added after our snapshot — those are
+    # pre-existing on the branch, not PR-introduced. We diff effective_base against
+    # BOTH the latest snapshot commit (latest_on_branch — the only reference that
+    # surfaces Maven drift, since Maven deps exist only at snapshotted commits) AND
+    # base_sha (the true branch tip — recovers natively-detected ecosystems like Go
+    # and npm, which never trigger the Maven snapshot so latest_on_branch can be
+    # stuck at effective_base). Unioning both is required; neither alone covers all
+    # ecosystems.
+    #
+    # On the stacked-PR fallback path effective_base + latest_on_branch are resolved
+    # on fallback_ref (main) while base_sha is the *feature* branch tip — a different
+    # branch. Diffing effective_base(main)...base_sha(feature) would fold the whole
+    # feature branch's dependency delta into the pre-existing set and suppress vulns
+    # the stacked PR legitimately surfaces (the parent branch is not independently
+    # gated). So base_sha is only a valid native-ecosystem reference when we did NOT
+    # fall back; otherwise pass None and rely on the snapshot reference alone.
+    native_tip = None if stacked_pr_fallback else base_sha
+    pre_existing_deps = _base_branch_pre_existing(
+        repository, effective_base, latest_on_branch, native_tip, token
+    )
     if pre_existing_deps:
         print(f"::notice::Pre-existing dep filter: {len(pre_existing_deps)} (name, version, manifest) triple(s) found on base branch since effective_base — will not block")
 

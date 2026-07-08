@@ -475,19 +475,19 @@ def test_pre_existing_different_manifest_still_blocks(monkeypatch):
 
 
 def test_base_branch_pre_existing_no_drift(monkeypatch):
-    # effective_base == latest_on_branch → no drift, returns empty set without API call.
+    # Both references == effective_base → no drift, returns empty set without API call.
     api_called = []
     monkeypatch.setattr(check, "_api_get", lambda url, tok: api_called.append(url) or [])
-    result = check._base_branch_pre_existing("o/r", "sha-abc", "sha-abc", "tok")
+    result = check._base_branch_pre_existing("o/r", "sha-abc", "sha-abc", "sha-abc", "tok")
     assert result == set()
     assert api_called == []
 
 
-def test_base_branch_pre_existing_no_latest(monkeypatch):
-    # latest_on_branch is None (no snapshot on branch) → returns empty set.
+def test_base_branch_pre_existing_no_refs(monkeypatch):
+    # Both references falsy (no snapshot on branch, no base tip) → returns empty set.
     api_called = []
     monkeypatch.setattr(check, "_api_get", lambda url, tok: api_called.append(url) or [])
-    result = check._base_branch_pre_existing("o/r", "sha-abc", None, "tok")
+    result = check._base_branch_pre_existing("o/r", "sha-abc", None, None, "tok")
     assert result == set()
     assert api_called == []
 
@@ -498,17 +498,143 @@ def test_base_branch_pre_existing_returns_added_triples(monkeypatch):
         {"change_type": "removed", "name": "old-dep", "version": "1.0.0", "manifest": "pom.xml"},
     ]
     monkeypatch.setattr(check, "_api_get", lambda url, tok: drift)
-    result = check._base_branch_pre_existing("o/r", "base-sha", "latest-sha", "tok")
+    # Only a snapshot tip given (base_tip None) → single compare, Maven triple surfaced.
+    result = check._base_branch_pre_existing("o/r", "base-sha", "latest-sha", None, "tok")
     assert result == {("jackson-databind", "2.21.4", "clients/java/pom.xml")}
 
 
-def test_base_branch_pre_existing_api_error_returns_empty(monkeypatch):
-    # API error → fail-open, return empty set (don't suppress real findings).
+def test_base_branch_pre_existing_unions_both_references(monkeypatch):
+    # snapshot_tip surfaces the Maven drift; base_tip surfaces the Go drift.
+    # The result must be the UNION of both compares.
+    maven = [{"change_type": "added", "name": "jackson-databind", "version": "2.21.4", "manifest": "clients/java/pom.xml"}]
+    go = [{"change_type": "added", "name": "golang.org/x/crypto", "version": "0.51.0", "manifest": "load-tests/metrics-exporter/go.mod"}]
+    calls = []
+
+    def fake_get(url, tok):
+        calls.append(url)
+        return maven if "snap-tip" in url else go
+
+    monkeypatch.setattr(check, "_api_get", fake_get)
+    result = check._base_branch_pre_existing("o/r", "eff", "snap-tip", "base-tip", "tok")
+    assert result == {
+        ("jackson-databind", "2.21.4", "clients/java/pom.xml"),
+        ("golang.org/x/crypto", "0.51.0", "load-tests/metrics-exporter/go.mod"),
+    }
+    assert any("eff...snap-tip" in u for u in calls)
+    assert any("eff...base-tip" in u for u in calls)
+
+
+def test_base_branch_pre_existing_dedupes_equal_references(monkeypatch):
+    # snapshot_tip == base_tip → compared once, not twice.
+    calls = []
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: calls.append(url) or [])
+    check._base_branch_pre_existing("o/r", "eff", "same-tip", "same-tip", "tok")
+    assert len(calls) == 1
+
+
+def test_base_branch_pre_existing_one_ref_fails_other_still_applies(monkeypatch):
+    # Per-reference fail-open: the snapshot compare errors, the base-tip compare
+    # succeeds → its triples still apply (real vulns never suppressed by a failure,
+    # but a partial failure must not discard the working reference's results).
+    go = [{"change_type": "added", "name": "golang.org/x/crypto", "version": "0.51.0", "manifest": "load-tests/metrics-exporter/go.mod"}]
+
+    def fake_get(url, tok):
+        if "snap-tip" in url:
+            raise check.ApiError("server error", 503, retryable=True)
+        return go
+
+    monkeypatch.setattr(check, "_api_get", fake_get)
+    result = check._base_branch_pre_existing("o/r", "eff", "snap-tip", "base-tip", "tok")
+    assert result == {("golang.org/x/crypto", "0.51.0", "load-tests/metrics-exporter/go.mod")}
+
+
+def test_base_branch_pre_existing_all_refs_fail_returns_empty(monkeypatch):
+    # Every compare fails → fail-open, empty set (don't suppress real findings).
     monkeypatch.setattr(check, "_api_get", lambda url, tok: (_ for _ in ()).throw(
         check.ApiError("server error", 503, retryable=True)
     ))
-    result = check._base_branch_pre_existing("o/r", "base-sha", "latest-sha", "tok")
+    result = check._base_branch_pre_existing("o/r", "eff", "snap-tip", "base-tip", "tok")
     assert result == set()
+
+
+def test_main_filter_keys_on_both_snapshot_and_base_sha(monkeypatch):
+    # Regression: a natively-detected dep (Go) added on the base branch after the
+    # snapshot must still be filtered even when latest_on_branch == effective_base
+    # (a Go-only change never triggers the Maven snapshot). main() must pass BOTH
+    # the snapshot tip and base_sha (the true branch tip) to the pre-existing filter.
+    _set_main_env(monkeypatch)  # BASE_SHA = "B"
+    # effective_base and latest_on_branch are the SAME stale snapshot commit.
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "eff"))
+    monkeypatch.setattr(check, "_lookup_patch", lambda *a, **k: None)
+    captured = {}
+
+    def fake_filter(repository, effective_base, snapshot_tip, base_tip, token):
+        captured["effective_base"] = effective_base
+        captured["snapshot_tip"] = snapshot_tip
+        captured["base_tip"] = base_tip
+        # main added the Go dep between eff...B → report it as pre-existing.
+        return {("golang.org/x/crypto", "0.51.0", "load-tests/metrics-exporter/go.mod")}
+
+    monkeypatch.setattr(check, "_base_branch_pre_existing", fake_filter)
+    # The PR diff surfaces that same Go dep as "added" (inherited from main),
+    # critical + no fix — would block if the filter missed the true branch tip.
+    go_dep = _dep(
+        name="golang.org/x/crypto", version="0.51.0",
+        manifest="load-tests/metrics-exporter/go.mod", severity="critical", fix=None,
+    )
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: [go_dep])
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    check.main()  # must NOT exit 1 — the FP is filtered
+    assert captured["effective_base"] == "eff"
+    assert captured["snapshot_tip"] == "eff"    # latest_on_branch (Maven side)
+    assert captured["base_tip"] == "B"          # base_sha (native side)
+
+
+def test_stacked_fallback_does_not_pass_base_sha_as_native_tip(monkeypatch):
+    # Regression: on the stacked-PR fallback, base_sha is the *feature* branch tip
+    # while effective_base + latest_on_branch resolve on main. Passing base_sha as
+    # base_tip would diff effective_base(main)...tip_of_feature and fold the whole
+    # feature branch's dep delta into pre_existing — suppressing vulns the stacked PR
+    # legitimately surfaces. main() must pass base_tip=None on the fallback path.
+    _set_main_env(monkeypatch)  # BASE_SHA = "B" (the feature branch tip)
+    monkeypatch.setenv("BASE_REF", "refactor/some-feature")
+    monkeypatch.setenv("FALLBACK_BASE_REF", "main")
+
+    def fake_ancestor(repo, ref, sha, wf, tok, lookback):
+        if ref == "refactor/some-feature":
+            return None, None, 0, None          # feature branch has no snapshots
+        return "eff-main", 42, 1, "main-tip"    # fallback resolves on main
+
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", fake_ancestor)
+    monkeypatch.setattr(check, "_lookup_patch", lambda *a, **k: None)
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    captured = {}
+
+    def fake_filter(repository, effective_base, snapshot_tip, base_tip, token):
+        captured["snapshot_tip"] = snapshot_tip
+        captured["base_tip"] = base_tip
+        return set()
+
+    monkeypatch.setattr(check, "_base_branch_pre_existing", fake_filter)
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: [])  # no PR-diff findings
+    check.main()  # must not exit 1
+    assert captured["snapshot_tip"] == "main-tip"  # Maven reference still applied
+    assert captured["base_tip"] is None            # base_sha NOT used on fallback
+
+
+def test_base_branch_pre_existing_no_refs_logs_notice(capsys):
+    # When both references collapse to effective_base, the filter is a no-op — it
+    # must emit a notice so an operator can tell it ran and found nothing.
+    result = check._base_branch_pre_existing("o/r", "eff", "eff", "eff", "tok")
+    assert result == set()
+    assert "no base-branch filtering applied" in capsys.readouterr().out
+
+
+def test_dep_triple_matches_find_blocking_key():
+    # The shared identity helper must produce the (name, version, manifest) triple
+    # both the drift filter and find_blocking key on.
+    dep = {"name": "acme", "version": "1.2.3", "manifest": "pom.xml", "extra": "ignored"}
+    assert check._dep_triple(dep) == ("acme", "1.2.3", "pom.xml")
 
 
 # --- bucket-ordering correctness (fix 3) --------------------------------------
