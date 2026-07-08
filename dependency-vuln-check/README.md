@@ -37,6 +37,7 @@ version shows up as `added` in the diff and is evaluated normally.
     base-ref: ${{ github.event.pull_request.base.ref }}
     snapshot-workflow: maven-dependency-snapshot.yml
     # optional — defaults shown
+    fallback-base-ref: main
     max-snapshot-lookback: "30"
     override-label: ci:vuln-gate-override
     config-file: .github/dependency-review-config.json
@@ -52,6 +53,7 @@ version shows up as `added` in the diff and is evaluated normally.
 | `base-sha` | yes | — | Base commit SHA of the PR |
 | `head-sha` | yes | — | Head commit SHA of the PR |
 | `base-ref` | yes | — | Base **branch** of the PR (e.g. `main`, `stable/8.8`). Used to find the nearest snapshotted ancestor on the correct branch |
+| `fallback-base-ref` | no | `main` | Branch to fall back to when `base-ref` has no dependency snapshots (e.g. stacked PRs targeting a feature branch). The gate searches this branch for the nearest snapshotted ancestor of `base-sha` instead of failing closed, and posts a notice to the PR comment |
 | `snapshot-workflow` | yes | — | Filename of the workflow that submits the base snapshot (e.g. `maven-dependency-snapshot.yml`). Its successful push-event runs are scanned to resolve the effective base |
 | `max-snapshot-lookback` | no | `30` | How many recent successful snapshot runs to scan when resolving the effective base |
 | `override-label` | no | `ci:vuln-gate-override` | PR label that bypasses the gate **only** when it cannot verify the PR (outage / no-ancestor). Never bypasses a real finding |
@@ -97,12 +99,27 @@ The gate **fails closed** when it cannot verify a PR:
 |-----------|--------|
 | GitHub API error, transient | retried (3 attempts, exponential backoff) |
 | API error survives retries | **fail closed** (block), reason named in the log |
-| No snapshotted ancestor found within `max-snapshot-lookback` | **fail closed** (block) |
+| No snapshotted ancestor on `base-ref`; `base-ref` differs from `fallback-base-ref` | retry on `fallback-base-ref`; notice posted to PR comment |
+| No snapshotted ancestor on either branch within `max-snapshot-lookback` | **fail closed** (block) |
 | API works, real vulnerable dependency added | block (normal finding) |
 | API works, no vulnerable dependency added | pass |
 
 Every run writes a summary trail (resolved base, runs scanned, verdict). Failure reasons are
 named explicitly in the log (rate-limit vs 5xx vs timeout vs permissions vs not-found).
+
+### Ancestor-staleness filter (Pattern A false positive prevention)
+
+After resolving `effective_base`, the gate compares `effective_base...latest_on_base_branch`
+to find dependency versions that were bumped on the base branch *after* the snapshot was taken
+(e.g. by a Renovate commit that landed on `main` while the PR was open). Any `(name, version,
+manifest)` triple present in that drift is treated as pre-existing and moved to the
+informational section of the PR comment rather than blocking. This prevents false positives
+where a PR that never touched a given dependency is blamed for a vulnerability introduced by
+an unrelated bump on `main`.
+
+The filter is manifest-level: if the same dep version is added to a *new* manifest by the PR,
+it is still evaluated normally. Fail-open: if the drift comparison API call fails, the filter
+returns empty and no real findings are silently suppressed.
 
 ### Override label (for sustained outages)
 
