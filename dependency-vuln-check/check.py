@@ -206,14 +206,15 @@ def latest_snapshotted_ancestor(
     Returns (effective_base_sha, run_id, scanned_count, latest_on_branch); the first
     three are (None, None, scanned) if no ancestor is found within the window.
     `latest_on_branch` is the head_sha of the most recent successful run on
-    `base_ref` (the very first run examined), regardless of ancestry — retained as
-    informational context (the latest *snapshotted* tip). NOTE: the pre-existing dep
-    filter no longer keys on this value; it uses the PR's base-sha instead, precisely
-    because this is the latest *snapshotted* commit rather than the actual branch tip.
-    When a push is path-filtered (e.g. a Go-only change that never triggers the Maven
-    snapshot workflow) this stays behind the branch tip, so keying the filter on it
-    made base-branch drift in natively-detected ecosystems invisible and produced
-    false-positive blocks. See `_base_branch_pre_existing`.
+    `base_ref` (the very first run examined), regardless of ancestry — the latest
+    *snapshotted* tip of the branch. The pre-existing dep filter diffs against this
+    (to surface Maven base-branch drift, which is only visible at snapshotted
+    commits) unioned with the PR's base-sha (to surface natively-detected
+    ecosystems like Go/npm at the true branch tip). NOTE: because this is the latest
+    *snapshotted* commit rather than the actual branch tip, a path-filtered push
+    (e.g. a Go-only change that never triggers the Maven snapshot workflow) leaves it
+    behind the branch tip — which is exactly why the filter also needs base-sha. See
+    `_base_branch_pre_existing`.
     Raises ApiError on API failure so the caller can fail closed.
 
     `lookback` is honored even beyond the API's 100-per-page cap by following
@@ -250,29 +251,36 @@ def latest_snapshotted_ancestor(
 
 
 def _base_branch_pre_existing(
-    repository: str, effective_base: str, base_tip: str | None, token: str
+    repository: str, effective_base: str, snapshot_tip: str | None,
+    base_tip: str | None, token: str,
 ) -> set:
     """Return (name, version, manifest) triples the base branch added since effective_base.
 
-    Compares effective_base...base_tip via the Dependency Review API to find dep
-    versions the base branch itself introduced after effective_base. `base_tip` is
-    the PR's actual base commit (base-sha) — the tip of the base branch the PR is
-    measured against, NOT the latest snapshot commit. Any dep at (name, version,
-    manifest) that appears as "added" in this drift compare was already on the base
-    branch before the PR was opened — the PR did not introduce it.
+    Compares effective_base against two reference points via the Dependency Review
+    API and unions the "added" triples from both. Any dep at (name, version,
+    manifest) that appears as "added" in either drift compare was already on the
+    base branch before the PR was opened — the PR did not introduce it.
 
     This suppresses Pattern A FPs: when a dep version is bumped on main (e.g. by
     Renovate) AFTER the effective_base snapshot was taken, that version shows as
-    "added" in the PR compare even though the PR never touched it. The drift compare
-    reveals that main itself added that (name, version, manifest) — so it is
-    pre-existing, not PR-introduced.
+    "added" in the PR's effective_base...head compare even though the PR never
+    touched it. The drift compare reveals that main itself added that
+    (name, version, manifest) — so it is pre-existing, not PR-introduced.
 
-    Keying on base_tip (base-sha) rather than the latest snapshot commit is what
-    makes this work for natively-detected ecosystems (Go, npm, …). Those never
-    trigger the Maven snapshot workflow, so the latest snapshot commit can equal
-    effective_base even after the branch added such a dep — collapsing the drift
-    window to nothing and letting the FP through. base-sha always reflects the true
-    branch tip regardless of which ecosystem changed.
+    Two reference points are required because the dependency graph mixes two data
+    sources with different coverage:
+    - `snapshot_tip` — the latest *snapshotted* commit on the base branch (from
+      `latest_snapshotted_ancestor`). Maven deps exist in the graph only at commits
+      where a snapshot was submitted, so a snapshotted tip is the only reference
+      that surfaces Maven base-branch drift.
+    - `base_tip` — the PR's raw base-sha (the true branch tip). Natively-detected
+      ecosystems (Go modules, npm, …) are parsed from the file tree at any commit,
+      but they never trigger the Maven snapshot workflow — so `snapshot_tip` can be
+      stuck at effective_base even after such a dep was added on the branch,
+      collapsing that drift window to nothing. base-sha reflects the true tip
+      regardless of which ecosystem changed and recovers the native-ecosystem drift.
+    Unioning both covers Maven (via snapshot_tip) and native ecosystems (via
+    base_tip); neither alone is sufficient.
 
     Known limitation — concurrent-bump false negative: if a PR independently
     introduces the same (name, version, manifest) that the base branch also added
@@ -285,31 +293,36 @@ def _base_branch_pre_existing(
     is intentional — the PR did not introduce the dep version, so it is not
     responsible for any of its advisories regardless of when they were discovered.
 
-    Returns an empty set when:
-    - effective_base == base_tip (base is itself snapshotted — no drift to filter)
-    - base_tip is falsy (nothing to compare)
-    - the drift compare API call fails (fail-open: FPs may slip through, but real
-      vulns are never suppressed)
+    Per-reference fail-open: if a drift compare API call fails, that reference is
+    skipped (its FPs may slip through) but the other reference's results still
+    apply. Real vulns are never suppressed by a failure. A reference equal to
+    effective_base or falsy is skipped (no drift to compute); duplicate references
+    are compared once.
     """
-    if not base_tip or effective_base == base_tip:
-        return set()
-    try:
-        drift = _api_get(
-            f"{_GITHUB_API}/repos/{repository}/dependency-graph/compare"
-            f"/{effective_base}...{base_tip}",
-            token,
-        )
-        return {
+    result: set = set()
+    seen: set = set()
+    for tip in (snapshot_tip, base_tip):
+        if not tip or tip == effective_base or tip in seen:
+            continue
+        seen.add(tip)
+        try:
+            drift = _api_get(
+                f"{_GITHUB_API}/repos/{repository}/dependency-graph/compare"
+                f"/{effective_base}...{tip}",
+                token,
+            )
+        except ApiError as e:
+            print(
+                f"::warning::Could not fetch base-branch drift compare "
+                f"({effective_base}...{tip}): {e.reason} — this reference skipped"
+            )
+            continue
+        result |= {
             (dep.get("name", ""), dep.get("version", ""), dep.get("manifest", ""))
             for dep in drift
             if dep.get("change_type") == "added"
         }
-    except ApiError as e:
-        print(
-            f"::warning::Could not fetch base-branch drift compare ({e.reason})"
-            " — pre-existing dep filter disabled for this run"
-        )
-        return set()
+    return result
 
 
 def has_override_label(repository: str, pr_number, token: str, label: str) -> bool:
@@ -746,14 +759,17 @@ def main() -> None:
         return
 
     # ── Pre-existing dep filter: suppress Pattern A FPs (Workstream F) ──
-    # Compare effective_base...base_sha (the PR's actual base tip) to find deps the
-    # base branch added after our snapshot — those are pre-existing on the branch,
-    # not PR-introduced. We use base_sha rather than the latest *snapshot* commit
-    # (latest_on_branch) so that natively-detected ecosystems (Go, npm, …) — which
-    # never trigger the Maven snapshot workflow — are still compared against the true
-    # branch tip. Keying on the latest snapshot left those ecosystems' base-branch
-    # drift invisible and produced false-positive blocks on unrelated PRs.
-    pre_existing_deps = _base_branch_pre_existing(repository, effective_base, base_sha, token)
+    # Find deps the base branch itself added after our snapshot — those are
+    # pre-existing on the branch, not PR-introduced. We diff effective_base against
+    # BOTH the latest snapshot commit (latest_on_branch — the only reference that
+    # surfaces Maven drift, since Maven deps exist only at snapshotted commits) AND
+    # base_sha (the true branch tip — recovers natively-detected ecosystems like Go
+    # and npm, which never trigger the Maven snapshot so latest_on_branch can be
+    # stuck at effective_base). Unioning both is required; neither alone covers all
+    # ecosystems.
+    pre_existing_deps = _base_branch_pre_existing(
+        repository, effective_base, latest_on_branch, base_sha, token
+    )
     if pre_existing_deps:
         print(f"::notice::Pre-existing dep filter: {len(pre_existing_deps)} (name, version, manifest) triple(s) found on base branch since effective_base — will not block")
 
