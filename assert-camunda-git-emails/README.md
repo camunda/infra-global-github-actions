@@ -31,6 +31,7 @@ The following email addresses are hardcoded as allowed:
 - `github-actions@github.com` (used for commits created by Github Actions runs)
 - `bot@renovateapp.com` (used for commits created by [Renovate](https://github.com/marketplace/renovate))
 - `snyk-bot@snyk.io` (used for commits created by [Snyk](https://github.com/marketplace/snyk))
+- `noreply@anthropic.com` (used for commits created by [Claude](https://www.anthropic.com/claude-code), Anthropic's coding agent)
 
 **Note: Pull Requests to extend this list are welcome when you discover edge cases!**
 
