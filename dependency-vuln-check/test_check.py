@@ -511,6 +511,49 @@ def test_base_branch_pre_existing_api_error_returns_empty(monkeypatch):
     assert result == set()
 
 
+def test_base_branch_pre_existing_compares_against_base_tip(monkeypatch):
+    # The drift compare URL must use base_tip as the head side, not the latest
+    # snapshot commit. Regression guard for the native-ecosystem FP fix.
+    captured = {}
+    monkeypatch.setattr(
+        check, "_api_get",
+        lambda url, tok: captured.update(url=url) or [],
+    )
+    check._base_branch_pre_existing("o/r", "eff-base", "base-tip-sha", "tok")
+    assert "eff-base...base-tip-sha" in captured["url"]
+
+
+def test_main_filter_keys_on_base_sha_not_latest_snapshot(monkeypatch):
+    # Regression: a natively-detected dep (Go) added on the base branch after the
+    # snapshot must still be filtered even when latest_on_branch == effective_base
+    # (a Go-only change never triggers the Maven snapshot). main() must key the
+    # pre-existing filter on base_sha — the true branch tip — not the stale snapshot.
+    _set_main_env(monkeypatch)  # BASE_SHA = "B"
+    # effective_base and latest_on_branch are the SAME stale snapshot commit.
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "eff"))
+    monkeypatch.setattr(check, "_lookup_patch", lambda *a, **k: None)
+    captured = {}
+
+    def fake_filter(repository, effective_base, base_tip, token):
+        captured["effective_base"] = effective_base
+        captured["base_tip"] = base_tip
+        # main added the Go dep between eff...B → report it as pre-existing.
+        return {("golang.org/x/crypto", "0.51.0", "load-tests/metrics-exporter/go.mod")}
+
+    monkeypatch.setattr(check, "_base_branch_pre_existing", fake_filter)
+    # The PR diff surfaces that same Go dep as "added" (inherited from main),
+    # critical + no fix — would block if the filter used the stale snapshot commit.
+    go_dep = _dep(
+        name="golang.org/x/crypto", version="0.51.0",
+        manifest="load-tests/metrics-exporter/go.mod", severity="critical", fix=None,
+    )
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: [go_dep])
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    check.main()  # must NOT exit 1 — the FP is filtered
+    assert captured["base_tip"] == "B"          # keyed on base_sha, not "eff"
+    assert captured["effective_base"] == "eff"
+
+
 # --- bucket-ordering correctness (fix 3) --------------------------------------
 
 def test_pre_existing_non_gated_scope_wins_over_pre_existing(monkeypatch):
