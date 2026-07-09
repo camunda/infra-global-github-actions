@@ -14,9 +14,20 @@ This composite GHA can be used in any repository that was set up to provide cred
 
 Please check out Camunda's [Github Actions Recipes](https://github.com/camunda/github-actions-recipes#secrets=) for how to retrieve secrets from Vault.
 
+### Permissions
+
+The calling job must grant the `GITHUB_TOKEN` `actions: read`, which is required to list the workflow run's jobs and to read their raw logs:
+
+```yaml
+permissions:
+  actions: read
+```
+
+(The previous implementation scanned job annotations and only needed `checks: read`; that permission is no longer required.)
+
 ### Behavior
 
-This action should be invoked by a GHA job which runs (via `needs`) after all other jobs in a GHA workflow. It will check all failed GHA jobs of this workflow run for problems with the underlying runner (via GHA workflow annotations). In case a job got aborted due to such problems it will not have been able to send CI Analytics data itself, so this action does it on behalf of the aborted job.
+This action should be invoked by a GHA job which runs (via `needs`) after all other jobs in a GHA workflow. It will check all failed GHA jobs of this workflow run for problems with the underlying runner by scanning their raw job logs for `The runner has received a shutdown signal.` (emitted when a preemptible self-hosted runner is reclaimed by the host). In case a job got aborted due to such a problem it will not have been able to send CI Analytics data itself, so this action does it on behalf of the aborted job.
 
 All data submitted by this action is stored as one record in the Big Query table `build_status_v2` which retains records for 90 days and has the following fields in BQ:
 
