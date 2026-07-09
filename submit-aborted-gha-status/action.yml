@@ -53,14 +53,17 @@ runs:
       gh api -X GET "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/attempts/$GITHUB_RUN_ATTEMPT/jobs?per_page=100" --jq '.jobs[] | select(.conclusion=="failure") .id' | while read job_id; do
         echo "Checking failed job $job_id for abort due to runner problem..."
 
-        job_annotations=$(gh api -X GET "/repos/$GITHUB_REPOSITORY/check-runs/$job_id/annotations" --jq '.[] | select(.message | contains("lost communication with the server") or contains("runner has received a shutdown signal"))')
+        # Stream the log through grep and keep only the matching line:
+        # this never buffers the (potentially multi-MB) download
+        # in a variable, and reading the full stream avoids the `grep -q`
+        # early-exit + pipefail SIGPIPE pitfall on large logs.
+        shutdown_signal=$(gh api -X GET "/repos/$GITHUB_REPOSITORY/actions/jobs/$job_id/logs" 2>/dev/null \
+          | grep -F "runner has received a shutdown signal" || true)
 
-        if echo "$job_annotations" | grep -q message; then
-          job_name=$(gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$job_id" --jq '.name')
-          runner_name=$(gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$job_id" --jq '.runner_name' | tr '[:upper:]' '[:lower:]')
-          if [ "$runner_name" == "" ]; then
-            runner_name=$(echo "$job_annotations" | grep -oP '(?<=The self-hosted runner: )\S+')
-          fi
+        if [ -n "$shutdown_signal" ]; then
+          job_details=$(gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$job_id")
+          job_name=$(echo "$job_details" | jq -r '.name')
+          runner_name=$(echo "$job_details" | jq -r '.runner_name // ""' | tr '[:upper:]' '[:lower:]')
 
           echo "Job $job_id got aborted due to problem with runner '$runner_name'. Sending CI Analytics data..."
 
