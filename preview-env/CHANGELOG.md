@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.10 (2026-07-11)
+
+## What's Changed
+* feat(renovate-pr-maintainer): surface merge-queue state instead of unknown by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/734
+* fix(renovate-pr-maintainer): flag conflicted human-edited PRs as stuck by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/736
+* feat: capture per-job network egress/ingress bytes by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/733
+* chore(deps): update dependency fossas/fossa-cli to v3.17.12 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/737
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.251.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/738
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/735
+* fix: fall back to default branch when base-ref has no snapshots (stacked PR support) by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/739
+* fix(assert-camunda-git-emails): allow noreply@anthropic.com in email allowlist by @claude[bot] in https://github.com/camunda/infra-global-github-actions/pull/742
+* fix: key pre-existing dep filter on base-sha, not latest snapshot by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/741
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/745
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.257.7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/746
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.258.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/747
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.259.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/748
+
+## New Contributors
+* @claude[bot] made their first contribution in https://github.com/camunda/infra-global-github-actions/pull/742
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/preview-env-1.0.9...preview-env-1.0.10
+
 ## 1.0.9 (2026-06-29)
 
 ## What's Changed

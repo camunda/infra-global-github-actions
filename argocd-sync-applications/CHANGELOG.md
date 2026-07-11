@@ -1,5 +1,36 @@
 # Changelog
 
+## 1.0.9 (2026-07-11)
+
+## What's Changed
+* chore(deps): update actions/checkout action to v7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/723
+* chore: adds workflow_ref value for new column to build_status_v2 table by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/725
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/724
+* feat(renovate-pr-maintainer): surface processed PRs as a structured output by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/727
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.244.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/729
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.245.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/732
+* chore(deps): update actions/cache action to v6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/730
+* chore(deps): update dcarbone/install-jq-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/731
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/728
+* feat(renovate-pr-maintainer): surface merge-queue state instead of unknown by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/734
+* fix(renovate-pr-maintainer): flag conflicted human-edited PRs as stuck by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/736
+* feat: capture per-job network egress/ingress bytes by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/733
+* chore(deps): update dependency fossas/fossa-cli to v3.17.12 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/737
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.251.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/738
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/735
+* fix: fall back to default branch when base-ref has no snapshots (stacked PR support) by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/739
+* fix(assert-camunda-git-emails): allow noreply@anthropic.com in email allowlist by @claude[bot] in https://github.com/camunda/infra-global-github-actions/pull/742
+* fix: key pre-existing dep filter on base-sha, not latest snapshot by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/741
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/745
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.257.7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/746
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.258.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/747
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.259.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/748
+
+## New Contributors
+* @claude[bot] made their first contribution in https://github.com/camunda/infra-global-github-actions/pull/742
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/argocd-sync-applications-1.0.8...argocd-sync-applications-1.0.9
+
 ## 1.0.8 (2026-06-20)
 
 ## What's Changed
