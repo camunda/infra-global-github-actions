@@ -30,11 +30,12 @@ inputs:
   head-snapshot-succeeded:
     description: >
       Whether the job that submits the PR head's Maven dependency snapshot
-      succeeded ('true'/'false'). Pass the result of that job (e.g.
-      needs.pr-maven-snapshot.result == 'success'). When 'false' the gate fails
-      closed, because an un-submitted head SBOM leaves the head side of the diff
-      empty and a real new vulnerability would silently pass. Leave unset to skip
-      the check (backward compatible).
+      succeeded. Pass 'true'/'success' when it did (e.g.
+      needs.pr-maven-snapshot.result == 'success'). Any OTHER value — 'false' or a
+      raw job result like 'failure'/'cancelled'/'skipped' — fails the gate closed,
+      because an un-submitted head SBOM leaves the head side of the diff empty and
+      a real new vulnerability would silently pass. Leave unset to skip the check
+      (backward compatible).
     required: false
     default: ""
   fallback-base-ref:

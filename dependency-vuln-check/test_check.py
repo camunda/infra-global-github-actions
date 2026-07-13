@@ -441,6 +441,33 @@ def test_main_head_snapshot_failed_bypassed_by_override(monkeypatch):
     assert ei.value.code == 0
 
 
+@pytest.mark.parametrize("value", ["failure", "cancelled", "skipped", "False", "oops"])
+def test_main_fail_closed_on_unexpected_head_snapshot_value(monkeypatch, value):
+    # A wiring mistake (raw job result or typo) must fail closed, not silently
+    # no-op the guard. Only 'true'/'success'/unset proceed.
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("HEAD_SNAPSHOT_SUCCEEDED", value)
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "latest"))
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: False)
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    with pytest.raises(SystemExit) as ei:
+        check.main()
+    assert ei.value.code == 1
+
+
+@pytest.mark.parametrize("value", ["success", "SUCCESS", "true"])
+def test_main_head_snapshot_recognized_ok_values_proceed(monkeypatch, value):
+    # Both the documented boolean ('true') and a raw successful result ('success')
+    # proceed; matching is case-insensitive.
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("HEAD_SNAPSHOT_SUCCEEDED", value)
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "latest"))
+    monkeypatch.setattr(check, "_base_branch_pre_existing", lambda *a, **k: set())
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: [_dep(change_type="added", severity="low", fix=None)])
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    check.main()  # clean/low → no SystemExit
+
+
 def test_main_head_snapshot_true_proceeds(monkeypatch):
     # Submission succeeded and the diff is clean → no block (main returns).
     _set_main_env(monkeypatch)

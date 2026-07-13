@@ -720,9 +720,10 @@ def main() -> None:
     base_sha = os.environ["BASE_SHA"]
     head_sha = os.environ["HEAD_SHA"]
     base_ref = os.environ["BASE_REF"]
-    # Result of the consumer's head-SBOM submission job ('true'/'false'), when
-    # reported. Empty/unset = a consumer that does not wire it → skip the check
-    # (backward compatible with existing pins).
+    # Result of the consumer's head-SBOM submission job, when reported. Empty/unset
+    # = a consumer that does not wire it → skip the check (backward compatible with
+    # existing pins). 'true'/'success' = verified. Any OTHER value fails closed
+    # (see the guard below) so a wiring mistake can't silently disable it.
     head_snapshot_ok = os.environ.get("HEAD_SNAPSHOT_SUCCEEDED", "").strip().lower()
     snapshot_workflow = os.environ["SNAPSHOT_WORKFLOW"]
     lookback = int(os.environ.get("MAX_SNAPSHOT_LOOKBACK", "30"))
@@ -804,11 +805,15 @@ def main() -> None:
     # The consumer reports the result of its head-SBOM submission job. If it did
     # not succeed, the head side of the diff is stale/absent and a genuinely new
     # vulnerable dependency would silently pass — so fail closed rather than trust
-    # an unverifiable head. 'true'/unset proceeds; only an explicit 'false' blocks.
-    if head_snapshot_ok == "false":
+    # an unverifiable head. Only 'true'/'success' (or unset, for consumers that do
+    # not wire it) proceed; ANY other value — 'false', a raw job result like
+    # 'failure'/'cancelled'/'skipped', or a typo — fails closed, so a wiring
+    # mistake cannot silently turn this guard into a no-op.
+    if head_snapshot_ok not in ("", "true", "success"):
         fail_closed(
             repository, pr_number, token, override_label,
-            "head dependency snapshot submission did not succeed — head dependencies cannot be verified",
+            f"head dependency snapshot did not succeed (submission result: '{head_snapshot_ok}') "
+            "— head dependencies cannot be verified",
             summary_path,
         )
         return
