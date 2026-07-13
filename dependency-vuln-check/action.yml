@@ -27,6 +27,16 @@ inputs:
       (e.g. maven-dependency-snapshot.yml). Its successful push-event runs are
       scanned to resolve the effective base.
     required: true
+  head-snapshot-succeeded:
+    description: >
+      Whether the job that submits the PR head's Maven dependency snapshot
+      succeeded ('true'/'false'). Pass the result of that job (e.g.
+      needs.pr-maven-snapshot.result == 'success'). When 'false' the gate fails
+      closed, because an un-submitted head SBOM leaves the head side of the diff
+      empty and a real new vulnerability would silently pass. Leave unset to skip
+      the check (backward compatible).
+    required: false
+    default: ""
   fallback-base-ref:
     description: >
       Branch to fall back to when base-ref has no dependency snapshots (e.g.
@@ -83,6 +93,7 @@ runs:
         HEAD_SHA: ${{ inputs.head-sha }}
         BASE_REF: ${{ inputs.base-ref }}
         SNAPSHOT_WORKFLOW: ${{ inputs.snapshot-workflow }}
+        HEAD_SNAPSHOT_SUCCEEDED: ${{ inputs.head-snapshot-succeeded }}
         MAX_SNAPSHOT_LOOKBACK: ${{ inputs.max-snapshot-lookback }}
         OVERRIDE_LABEL: ${{ inputs.override-label }}
         CONFIG_FILE: ${{ inputs.config-file }}
