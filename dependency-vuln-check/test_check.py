@@ -367,6 +367,7 @@ def _set_main_env(monkeypatch):
     monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
     monkeypatch.delenv("GITHUB_EVENT_PATH", raising=False)
     monkeypatch.delenv("CONFIG_FILE", raising=False)
+    monkeypatch.delenv("HEAD_SNAPSHOT_SUCCEEDED", raising=False)
 
 
 def test_main_real_vuln_blocks_even_with_override_label(monkeypatch):
@@ -389,6 +390,146 @@ def test_main_fail_closed_when_no_ancestor(monkeypatch):
     with pytest.raises(SystemExit) as ei:
         check.main()
     assert ei.value.code == 1
+
+
+# ── Head-snapshot guard: _looks_like_missing_head helper ──
+
+
+def test_looks_like_missing_head_all_removed():
+    # 0 added, some removed → head reads as empty (indexing-lag signature).
+    assert check._looks_like_missing_head([_dep(change_type="removed")]) is True
+
+
+def test_looks_like_missing_head_has_added():
+    # Any added dep means the head is populated — not the missing-head shape.
+    assert check._looks_like_missing_head(
+        [_dep(change_type="removed"), _dep(change_type="added")]
+    ) is False
+
+
+def test_looks_like_missing_head_empty_diff():
+    # A no-op PR (nothing added or removed) is not the missing-head shape.
+    assert check._looks_like_missing_head([]) is False
+
+
+# ── Head-snapshot guard: gap 1 (submission-failed → fail closed) ──
+
+
+def test_main_fail_closed_when_head_snapshot_failed(monkeypatch):
+    # Consumer reports the head-SBOM submission failed → the head side is
+    # unverifiable → fail closed (exit 1), regardless of the (empty) diff.
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("HEAD_SNAPSHOT_SUCCEEDED", "false")
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "latest"))
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: False)
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    with pytest.raises(SystemExit) as ei:
+        check.main()
+    assert ei.value.code == 1
+
+
+def test_main_head_snapshot_failed_bypassed_by_override(monkeypatch):
+    # Same as above but the override label is present → the unverifiable PR is
+    # allowed through (exit 0), consistent with the other fail-closed paths.
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("HEAD_SNAPSHOT_SUCCEEDED", "false")
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "latest"))
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: True)
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    with pytest.raises(SystemExit) as ei:
+        check.main()
+    assert ei.value.code == 0
+
+
+@pytest.mark.parametrize("value", ["failure", "cancelled", "skipped", "False", "oops"])
+def test_main_fail_closed_on_unexpected_head_snapshot_value(monkeypatch, value):
+    # A wiring mistake (raw job result or typo) must fail closed, not silently
+    # no-op the guard. Only 'true'/'success'/unset proceed.
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("HEAD_SNAPSHOT_SUCCEEDED", value)
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "latest"))
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: False)
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    with pytest.raises(SystemExit) as ei:
+        check.main()
+    assert ei.value.code == 1
+
+
+@pytest.mark.parametrize("value", ["success", "SUCCESS", "true"])
+def test_main_head_snapshot_recognized_ok_values_proceed(monkeypatch, value):
+    # Both the documented boolean ('true') and a raw successful result ('success')
+    # proceed; matching is case-insensitive.
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("HEAD_SNAPSHOT_SUCCEEDED", value)
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "latest"))
+    monkeypatch.setattr(check, "_base_branch_pre_existing", lambda *a, **k: set())
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: [_dep(change_type="added", severity="low", fix=None)])
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    check.main()  # clean/low → no SystemExit
+
+
+def test_main_head_snapshot_true_proceeds(monkeypatch):
+    # Submission succeeded and the diff is clean → no block (main returns).
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("HEAD_SNAPSHOT_SUCCEEDED", "true")
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "latest"))
+    monkeypatch.setattr(check, "_base_branch_pre_existing", lambda *a, **k: set())
+    monkeypatch.setattr(check, "_api_get", lambda url, tok: [_dep(change_type="added", severity="low", fix=None)])
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    check.main()  # low/no-fix does not block → no SystemExit
+
+
+# ── Head-snapshot guard: gap 2 (indexing-lag retry, never misfires) ──
+
+
+def test_main_retries_when_head_appears_unindexed(monkeypatch):
+    # First fetch: head looks empty (all removed) → indexing still settling.
+    # Second fetch: settled, a real fixable vuln is added → blocks on the final
+    # result. Confirms we re-fetch and trust the settled diff.
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("HEAD_SNAPSHOT_SUCCEEDED", "true")
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "latest"))
+    monkeypatch.setattr(check, "_base_branch_pre_existing", lambda *a, **k: set())
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: False)
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    sleeps = []
+    monkeypatch.setattr(check.time, "sleep", lambda s: sleeps.append(s))
+    responses = [[_dep(change_type="removed")], [_dep(severity="high", fix="2.0.0")]]
+    calls = {"n": 0}
+
+    def fake_get(url, tok):
+        i = calls["n"]
+        calls["n"] += 1
+        return responses[min(i, len(responses) - 1)]
+
+    monkeypatch.setattr(check, "_api_get", fake_get)
+    with pytest.raises(SystemExit) as ei:
+        check.main()
+    assert ei.value.code == 1     # settled diff has the real vuln
+    assert calls["n"] == 2        # re-fetched once
+    assert sleeps                 # waited for indexing
+
+
+def test_main_persistent_empty_head_never_blocks(monkeypatch):
+    # Head stays all-removed across every retry. A legitimate removal-only PR
+    # looks identical, so the gate must NOT block on this signal — it exhausts
+    # the retries and proceeds (0 blocking). Guards against a misfire FP.
+    _set_main_env(monkeypatch)
+    monkeypatch.setenv("HEAD_SNAPSHOT_SUCCEEDED", "true")
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "latest"))
+    monkeypatch.setattr(check, "_base_branch_pre_existing", lambda *a, **k: set())
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: False)
+    monkeypatch.setattr(check, "_pr_number", lambda: None)
+    monkeypatch.setattr(check.time, "sleep", lambda s: None)
+    calls = {"n": 0}
+
+    def fake_get(url, tok):
+        calls["n"] += 1
+        return [_dep(change_type="removed")]
+
+    monkeypatch.setattr(check, "_api_get", fake_get)
+    check.main()  # must NOT raise SystemExit(1)
+    assert calls["n"] == check._HEAD_INDEX_MAX_ATTEMPTS  # exhausted retries, then proceeded
 
 
 def test_stacked_pr_falls_back_to_default_branch(monkeypatch):

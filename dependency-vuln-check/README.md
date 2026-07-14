@@ -55,6 +55,7 @@ version shows up as `added` in the diff and is evaluated normally.
 | `base-ref` | yes | — | Base **branch** of the PR (e.g. `main`, `stable/8.8`). Used to find the nearest snapshotted ancestor on the correct branch |
 | `fallback-base-ref` | no | `main` | Branch to fall back to when `base-ref` has no dependency snapshots (e.g. stacked PRs targeting a feature branch). The gate searches this branch for the nearest snapshotted ancestor of `base-sha` instead of failing closed, and posts a notice to the PR comment |
 | `snapshot-workflow` | yes | — | Filename of the workflow that submits the base snapshot (e.g. `maven-dependency-snapshot.yml`). Its successful push-event runs are scanned to resolve the effective base |
+| `head-snapshot-succeeded` | no | `""` | Whether the job that submits the PR **head** snapshot succeeded. Pass `'true'`/`'success'` (e.g. `needs.pr-maven-snapshot.result == 'success'`). **Any other value** (`'false'`, or a raw result like `'failure'`/`'cancelled'`/`'skipped'`) **fails closed** — an un-submitted head SBOM leaves the head side empty → a real new vuln would silently pass, so an unverified head must block, not no-op. Unset skips the check (backward compatible) |
 | `max-snapshot-lookback` | no | `30` | How many recent successful snapshot runs to scan when resolving the effective base |
 | `override-label` | no | `ci:vuln-gate-override` | PR label that bypasses the gate **only** when it cannot verify the PR (outage / no-ancestor). Never bypasses a real finding |
 | `config-file` | no | `.github/dependency-review-config.json` | Path to the JSON config holding `allow-ghsas` |
@@ -101,11 +102,26 @@ The gate **fails closed** when it cannot verify a PR:
 | API error survives retries | **fail closed** (block), reason named in the log |
 | No snapshotted ancestor on `base-ref`; `base-ref` differs from `fallback-base-ref` | retry on `fallback-base-ref`; notice posted to PR comment |
 | No snapshotted ancestor on either branch within `max-snapshot-lookback` | **fail closed** (block) |
+| `head-snapshot-succeeded` reported as `'false'` (head SBOM submission failed) | **fail closed** (block) |
+| Head side of the diff looks empty (0 added, deps removed) — head SBOM still indexing | re-fetch (3 attempts, backoff), then trust the settled diff |
 | API works, real vulnerable dependency added | block (normal finding) |
 | API works, no vulnerable dependency added | pass |
 
 Every run writes a summary trail (resolved base, runs scanned, verdict). Failure reasons are
 named explicitly in the log (rate-limit vs 5xx vs timeout vs permissions vs not-found).
+
+### Head-side verification
+
+The base side is resolved to a verified snapshotted ancestor, but the head side of the diff is
+only as good as the head SBOM. Two guards keep an unverified head from silently passing a real
+new vulnerability (a false **negative**):
+
+- **Submission failure** — the consumer passes `head-snapshot-succeeded`. If the head-SBOM job
+  did not succeed the head tree is stale/absent, so the gate fails closed rather than trust it.
+- **Indexing lag** — a fresh head SBOM can take a few seconds to index. When the head side of
+  the diff reads as empty (0 added, deps removed) the gate re-fetches the compare a few times to
+  let the graph settle. A legitimate removal-only PR has the same shape and simply re-confirms —
+  the gate never *blocks* on this signal, it only waits out indexing lag, so it cannot misfire.
 
 ### Ignoring dependencies the base branch itself added
 
@@ -242,7 +258,9 @@ your-repo/
 - For transitive / BOM-pinned dependencies to appear in the diff, both base and head
   commits need a submitted dependency snapshot (GitHub Dependency Submission API). The
   base side is resolved automatically to the nearest snapshotted ancestor; the head side
-  must be submitted by the consuming workflow before this action runs.
+  must be submitted by the consuming workflow before this action runs. Pass
+  `head-snapshot-succeeded` so the gate fails closed if that submission failed, and it
+  re-fetches to absorb indexing lag (see [Head-side verification](#head-side-verification)).
 
 ## Tests
 

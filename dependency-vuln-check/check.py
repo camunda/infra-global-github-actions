@@ -53,6 +53,12 @@ _DEVOPS_TEAM = "@camunda/monorepo-devops-team"
 _MAX_ATTEMPTS = 3
 _BACKOFF_BASE_SECONDS = 2
 
+# Head-snapshot indexing can lag a successful submission by a few seconds. When
+# the head side of the compare looks empty we re-fetch a few times to let the
+# dependency graph settle before trusting the result (see _looks_like_missing_head).
+_HEAD_INDEX_MAX_ATTEMPTS = 3
+_HEAD_INDEX_BACKOFF_SECONDS = 5
+
 # Severity ranking used by both threshold gates. These are the only values the
 # Dependency Review API emits for `severity`.
 SEVERITY_ORDER = {"low": 0, "moderate": 1, "high": 2, "critical": 3}
@@ -258,6 +264,26 @@ def _dep_triple(dep: dict) -> tuple:
     matching find_blocking's keys and suppression silently breaks.
     """
     return (dep.get("name", ""), dep.get("version", ""), dep.get("manifest", ""))
+
+
+def _looks_like_missing_head(diff: list) -> bool:
+    """True when the diff has removed deps but zero added deps.
+
+    After a fresh head-snapshot submission, an all-removed / nothing-added diff
+    usually means the head SBOM has not finished indexing yet: the head tree
+    reads as empty against the base, so every base dep shows as ``removed`` and
+    nothing shows as ``added``. A legitimate removal-only PR has the same shape —
+    so this signal is used ONLY to wait out indexing lag (re-fetch), never to
+    block, which keeps it from misfiring on a real removal.
+    """
+    added = removed = 0
+    for dep in diff:
+        change = dep.get("change_type")
+        if change == "added":
+            added += 1
+        elif change == "removed":
+            removed += 1
+    return added == 0 and removed > 0
 
 
 def _base_branch_pre_existing(
@@ -694,6 +720,11 @@ def main() -> None:
     base_sha = os.environ["BASE_SHA"]
     head_sha = os.environ["HEAD_SHA"]
     base_ref = os.environ["BASE_REF"]
+    # Result of the consumer's head-SBOM submission job, when reported. Empty/unset
+    # = a consumer that does not wire it → skip the check (backward compatible with
+    # existing pins). 'true'/'success' = verified. Any OTHER value fails closed
+    # (see the guard below) so a wiring mistake can't silently disable it.
+    head_snapshot_ok = os.environ.get("HEAD_SNAPSHOT_SUCCEEDED", "").strip().lower()
     snapshot_workflow = os.environ["SNAPSHOT_WORKFLOW"]
     lookback = int(os.environ.get("MAX_SNAPSHOT_LOOKBACK", "30"))
     override_label = os.environ.get("OVERRIDE_LABEL", "ci:vuln-gate-override")
@@ -770,18 +801,52 @@ def main() -> None:
             f"(scanned {scanned} run(s); snapshot run {run_id})"
         )
 
-    # ── Dependency diff against the resolved base ──
-    try:
-        diff = _api_get(
-            f"{_GITHUB_API}/repos/{repository}/dependency-graph/compare/{effective_base}...{head_sha}",
-            token,
-        )
-    except ApiError as e:
+    # ── Head snapshot must have been submitted successfully ──
+    # The consumer reports the result of its head-SBOM submission job. If it did
+    # not succeed, the head side of the diff is stale/absent and a genuinely new
+    # vulnerable dependency would silently pass — so fail closed rather than trust
+    # an unverifiable head. Only 'true'/'success' (or unset, for consumers that do
+    # not wire it) proceed; ANY other value — 'false', a raw job result like
+    # 'failure'/'cancelled'/'skipped', or a typo — fails closed, so a wiring
+    # mistake cannot silently turn this guard into a no-op.
+    if head_snapshot_ok not in ("", "true", "success"):
         fail_closed(
             repository, pr_number, token, override_label,
-            f"dependency review API failed ({e.reason})", summary_path,
+            f"head dependency snapshot did not succeed (submission result: '{head_snapshot_ok}') "
+            "— head dependencies cannot be verified",
+            summary_path,
         )
         return
+
+    # ── Dependency diff against the resolved base ──
+    # The head SBOM can still be indexing for a few seconds after a successful
+    # submission. If the head side looks empty (0 added, deps removed) we re-fetch
+    # a few times to let the graph settle before trusting it. A removal-only PR
+    # shows the same shape and simply re-confirms — we never block on this signal,
+    # only wait out indexing lag, so it cannot misfire on a legitimate removal.
+    diff = None
+    for attempt in range(1, _HEAD_INDEX_MAX_ATTEMPTS + 1):
+        try:
+            diff = _api_get(
+                f"{_GITHUB_API}/repos/{repository}/dependency-graph/compare/{effective_base}...{head_sha}",
+                token,
+            )
+        except ApiError as e:
+            fail_closed(
+                repository, pr_number, token, override_label,
+                f"dependency review API failed ({e.reason})", summary_path,
+            )
+            return
+        if attempt == _HEAD_INDEX_MAX_ATTEMPTS or not _looks_like_missing_head(diff):
+            break
+        delay = _HEAD_INDEX_BACKOFF_SECONDS * attempt
+        print(
+            f"::notice::Head side of the dependency diff looks empty "
+            f"(0 added, {sum(1 for d in diff if d.get('change_type') == 'removed')} removed) — "
+            f"the head snapshot may still be indexing; re-fetching in {delay}s "
+            f"(attempt {attempt}/{_HEAD_INDEX_MAX_ATTEMPTS})"
+        )
+        time.sleep(delay)
 
     # ── Pre-existing dep filter: suppress base-branch-added deps (Workstream F) ──
     # Find deps the base branch itself added after our snapshot — those are
