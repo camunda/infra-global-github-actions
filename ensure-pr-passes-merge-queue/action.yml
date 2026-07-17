@@ -11,8 +11,20 @@ inputs:
     description: 'The pull request number to monitor'
     required: true
   app-token:
-    description: 'GitHub App installation token used for GraphQL queries and re-enabling auto-merge'
-    required: true
+    description: >
+      Pre-minted GitHub App installation token used for GraphQL queries and re-enabling
+      auto-merge. Installation tokens expire after 1 hour, so prefer app-id + private-key
+      for timeouts beyond ~50 minutes.
+    required: false
+    default: ''
+  app-id:
+    description: 'GitHub App ID; with private-key, the action mints and refreshes installation tokens itself'
+    required: false
+    default: ''
+  private-key:
+    description: 'GitHub App private key (PEM); with app-id, the action mints and refreshes installation tokens itself'
+    required: false
+    default: ''
   repository-owner:
     description: 'Repository owner (e.g. camunda)'
     required: true
@@ -38,8 +50,19 @@ inputs:
 
 outputs:
   result:
-    description: 'The outcome: "merged", "closed", "evicted", or "timeout"'
+    description: >
+      The outcome: "merged", "closed", "evicted", "timeout", or "api_failure".
+      Empty when input validation fails before monitoring starts.
     value: ${{ steps.monitor.outputs.result }}
+  queue-state:
+    description: 'Last observed merge queue entry state (e.g. AWAITING_CHECKS, MERGEABLE, NOT_IN_QUEUE, UNKNOWN)'
+    value: ${{ steps.monitor.outputs.queue-state }}
+  queue-position:
+    description: 'Last observed merge queue position, or N/A'
+    value: ${{ steps.monitor.outputs.queue-position }}
+  merge-state-status:
+    description: 'Last observed PR mergeStateStatus (e.g. CLEAN, BLOCKED, UNKNOWN)'
+    value: ${{ steps.monitor.outputs.merge-state-status }}
 
 runs:
   using: composite
@@ -49,6 +72,8 @@ runs:
       shell: bash
       env:
         GH_TOKEN: ${{ inputs.app-token }}
+        GH_APP_ID: ${{ inputs.app-id }}
+        GH_APP_PRIVATE_KEY: ${{ inputs.private-key }}
         PR_NUMBER: ${{ inputs.pr-number }}
         TIMEOUT_MINUTES: ${{ inputs.timeout-minutes }}
         MAX_EVICTIONS: ${{ inputs.max-evictions }}
