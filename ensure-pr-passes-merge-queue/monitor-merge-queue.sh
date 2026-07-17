@@ -204,8 +204,7 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
 
   if [ "$PR_STATE" = "CLOSED" ]; then
     echo "PR was closed without merging"
-    write_outputs "closed"
-    exit 1
+    conclude_not_merged "closed"
   fi
 
   if [ "$QUEUE_STATE" = "AWAITING_CHECKS" ] || [ "$QUEUE_STATE" = "QUEUED" ]; then
@@ -223,8 +222,7 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
 
     if [ $EVICTION_COUNT -ge "$MAX_EVICTIONS" ]; then
       echo "PR evicted $MAX_EVICTIONS times - giving up"
-      write_outputs "evicted"
-      exit 1
+      conclude_not_merged "evicted"
     fi
 
     if [ "$DRY_RUN" = "true" ]; then
