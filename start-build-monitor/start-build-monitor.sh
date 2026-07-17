@@ -2,8 +2,13 @@
 
 INTERVAL=5  # seconds
 # NOTE: these paths are shared with the monitor stop script(s) — if changed, update both
-LOG_FILE=/tmp/_monitor-start.log
-PID_FILE=/tmp/_monitor-start.pid
+LOG_FILE="${BUILD_MONITOR_LOG_FILE:-/tmp/_monitor-start.log}"
+PID_FILE="${BUILD_MONITOR_PID_FILE:-/tmp/_monitor-start.pid}"
+START_TIME_FILE="${BUILD_MONITOR_START_TIME_FILE:-/tmp/_monitor-start.epoch-millis}"
+
+# Remove state from a previous job before establishing this job's start time.
+rm -f "$PID_FILE" "$LOG_FILE" "$START_TIME_FILE"
+date +%s%3N > "$START_TIME_FILE"
 
 # CPU and memory cgroup controllers are independently enabled, so detect them separately.
 # Cgroup-based metrics are scoped to this container — unaffected by other pods on the node.
@@ -103,4 +108,4 @@ INTERVAL_US=$(( INTERVAL * 1000000 ))
 ) >> "$LOG_FILE" 2>&1 &
 
 echo $! > "$PID_FILE"
-echo "Resource monitor started (PID=$(cat $PID_FILE), cpu=${CPU_SOURCE}(${CPU_LIMIT_CORES} cores) mem=${MEM_SOURCE}(${MEM_TOTAL_KB}KB), interval=${INTERVAL}s)"
+echo "Resource monitor started (PID=$(cat "$PID_FILE"), cpu=${CPU_SOURCE}(${CPU_LIMIT_CORES} cores) mem=${MEM_SOURCE}(${MEM_TOTAL_KB}KB), interval=${INTERVAL}s)"
