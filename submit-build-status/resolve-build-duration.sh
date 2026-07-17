@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+EXPLICIT_BUILD_DURATION_MILLIS="${1:-}"
+MONITOR_BUILD_DURATION_MILLIS="${2:-}"
+
+if [ -n "$EXPLICIT_BUILD_DURATION_MILLIS" ]; then
+  printf '%s\n' "$EXPLICIT_BUILD_DURATION_MILLIS"
+else
+  printf '%s\n' "$MONITOR_BUILD_DURATION_MILLIS"
+fi

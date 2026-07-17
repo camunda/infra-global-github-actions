@@ -11,7 +11,7 @@ This composite GHA can be used in any repository that was set up to provide cred
 | Input name           | Description                                        |
 |----------------------|----------------------------------------------------|
 | build_status         | String representing the build status that should be submitted to CI Analytics, e.g. `"success"`, `"failed"`, `"cancelled"` |
-| build_duration_millis | Optional number (positive) that indicates the duration of the build in milliseconds |
+| build_duration_millis | Optional non-negative build duration in milliseconds. Overrides the automatic duration from `start-build-monitor`. |
 | user_reason          | Optional string (200 chars max) the user can submit to indicate the reason why a build has ended with a certain build status , e.g. `"flaky-tests"` |
 | user_description     | Optional string (1000 chars max) the user can submit to provide details on the user_reason, e.g. a list of flaky tests |
 | gcp_credentials_json | Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file |
@@ -47,6 +47,12 @@ All data submitted by this action is stored as one record in the Big Query table
 | user_reason      | STRING     | NULLABLE   | Based on user input |
 | user_description | STRING     | NULLABLE   | Based on user input |
 
+#### Build duration
+
+When [`start-build-monitor`](../start-build-monitor/) is the first step in a job, this action automatically submits the elapsed time in milliseconds. The duration starts when the monitor action runs and ends when this action collects its metrics, before Google authentication and the BigQuery request. This excludes telemetry-submission overhead.
+
+An explicit `build_duration_millis` input takes precedence over the automatic duration. Explicit values must be non-negative integers no greater than 72 hours (`259200000` milliseconds); invalid values fail the action's input validation. If the monitor did not run, its timestamp is invalid, or the calculated duration is outside that range, the duration field is omitted without failing submission.
+
 
 ### Integration
 
@@ -70,6 +76,9 @@ jobs:
   successful-job:
     runs-on: ubuntu-22.04
     steps:
+    # Must remain first to collect the automatic duration and resource metrics.
+    - uses: camunda/infra-global-github-actions/start-build-monitor@main
+
     # Needed to create a workspace so submit-build-status can store files!
     - uses: actions/checkout@v4
 
