@@ -1,5 +1,29 @@
 # Changelog
 
+## 1.0.13 (2026-07-18)
+
+## What's Changed
+* fix: fall back to default branch when base-ref has no snapshots (stacked PR support) by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/739
+* fix(assert-camunda-git-emails): allow noreply@anthropic.com in email allowlist by @claude[bot] in https://github.com/camunda/infra-global-github-actions/pull/742
+* fix: key pre-existing dep filter on base-sha, not latest snapshot by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/741
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/745
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.257.7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/746
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.258.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/747
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.259.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/748
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/743
+* feat: fail closed on unverified head snapshot in dependency-vuln-check by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/749
+* fix: detect runner aborts from raw job logs instead of annotations by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/744
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/750
+* feat: self-mint app tokens and classify failures in ensure-pr-passes-merge-queue by @bkenez in https://github.com/camunda/infra-global-github-actions/pull/754
+* chore(deps): update dependency fossas/fossa-cli to v3.17.13 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/755
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.269.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/756
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.270.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/760
+
+## New Contributors
+* @claude[bot] made their first contribution in https://github.com/camunda/infra-global-github-actions/pull/742
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.12...fossa-1.0.13
+
 ## 1.0.12 (2026-07-04)
 
 ## What's Changed
