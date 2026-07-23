@@ -1,6 +1,6 @@
 # start-build-monitor
 
-This composite GitHub Action starts a lightweight background CPU and memory monitor at the beginning of a job. When used together with [`submit-build-status`](../submit-build-status/), resource utilization metrics are automatically included at the end in the [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics) record for that job.
+This composite GitHub Action starts a lightweight background CPU and memory monitor at the beginning of a job. When used together with [`submit-build-status`](../submit-build-status/), resource utilization metrics and the job duration are automatically included at the end in the [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics) record for that job.
 
 ## Usage
 
@@ -25,11 +25,11 @@ jobs:
           gcp_credentials_json: "${{ secrets.YOUR_GCP_CREDENTIALS }}"
 ```
 
-Jobs that do **not** include `start-build-monitor` are unaffected — `submit-build-status` simply omits the resource fields, which appear as `NULL` in BigQuery like any other optional field.
+Jobs that do **not** include `start-build-monitor` are unaffected — `submit-build-status` simply omits the resource and duration fields, which appear as `NULL` in BigQuery like any other optional field.
 
 ## Behavior
 
-Starts a polling loop in the background (interval: 5s) that samples CPU and memory usage once per interval until `submit-build-status` stops it at job end.
+Starts a polling loop in the background (interval: 5s) that samples CPU and memory usage once per interval until `submit-build-status` stops it at job end. It also records the start time with millisecond precision. `submit-build-status` uses this timestamp to calculate the duration, from this action's start until resource collection begins. Keep this action as the **first job step** so the reported duration covers the entire job.
 
 ### Metric sources
 
