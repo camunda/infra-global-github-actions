@@ -16,6 +16,14 @@ jobs:
     timeout-minutes: 10
     steps:
     - uses: actions/checkout@v7
+    - name: Check ubicloud setup info file
+      if: contains(matrix.label, 'ubicloud')
+      run: |
+        if [ -f /home/runner/actions-runner/.setup_info ]; then
+            cat /home/runner/actions-runner/.setup_info
+        else
+            echo "/home/runner/actions-runner/.setup_info isn't available"
+        fi
     - name: Install if required common software tooling
       uses: ./common-tooling
     - name: Check that installed software is available
