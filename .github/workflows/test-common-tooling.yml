@@ -20,7 +20,7 @@ jobs:
       if: contains(matrix.label, 'ubicloud')
       run: |
         if [ -f /home/runner/actions-runner/.setup_info ]; then
-            cat /home/runner/actions-runner/.setup_info
+            jq -r '.[] | "\(.group):", (.detail | split("\n")[] | "  " + .), ""' /home/runner/actions-runner/.setup_info
         else
             echo "/home/runner/actions-runner/.setup_info isn't available"
         fi
