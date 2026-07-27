@@ -323,5 +323,10 @@ preview_environment_cleanup \
   "$WARNING_MESSAGE"
 
 log "\nCleaning inconsistent comments (catch-all step) ..." false
+# Best-effort, non-fatal: anything missed is swept up by the next scheduled run.
+catch_all_exit_code=0
 cleanup_inconsistent_comments \
-  "$LABELS"
+  "$LABELS" || catch_all_exit_code=$?
+if [ "$catch_all_exit_code" != 0 ]; then
+  echo "::warning::Catch-all comment cleanup failed (exit ${catch_all_exit_code}); it is best-effort and self-heals on the next scheduled run."
+fi
