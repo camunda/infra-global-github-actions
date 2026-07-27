@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.14 (2026-07-25)
+
+## What's Changed
+* chore(deps): update slackapi/slack-github-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/758
+* chore(deps): update actions/setup-node action to v7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/757
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/761
+* chore(deps): update dependency fossas/fossa-cli to v3.17.14 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/762
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.280.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/764
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.13...fossa-1.0.14
+
 ## 1.0.13 (2026-07-18)
 
 ## What's Changed
