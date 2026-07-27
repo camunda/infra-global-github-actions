@@ -68,7 +68,7 @@
     },
     // Automerge Section
     {
-      matchUpdateTypes: ["patch"],
+      matchUpdateTypes: ["minor", "patch"],
       matchPackageNames: [
         "/actionlint/",
         "/argocd/",
@@ -76,13 +76,8 @@
         "kubernetes-sigs/gateway-api",
         "public.ecr.aws/gravitational/teleport-ent-distroless",
         "fossas/fossa-cli",
+        "pre-commit",
       ],
-      addLabels: ["automerge"],
-      automerge: true,
-    },
-    {
-      matchUpdateTypes: ["minor", "patch"],
-      matchPackageNames: ["pre-commit"],
       addLabels: ["automerge"],
       automerge: true,
     },
