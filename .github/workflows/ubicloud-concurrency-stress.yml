@@ -79,6 +79,12 @@ jobs:
       # Reaching this job at all means the dispatch picked a ref that only carries
       # the stub, so no measurement happened and nothing was billed.
       - name: Explain how to run the real test
+        env:
+          RUNNER_LABEL_JSON: ${{ toJSON(inputs.runner_label) }}
+          TARGET_VCPUS_JSON: ${{ toJSON(inputs.target_vcpus) }}
+          HOLD_SECONDS_JSON: ${{ toJSON(inputs.hold_seconds) }}
+          WORKLOAD_JSON: ${{ toJSON(inputs.workload) }}
+          FAIL_ON_TARGET_MISS_JSON: ${{ toJSON(inputs.fail_on_target_miss) }}
         run: |
           set -euo pipefail
 
@@ -108,11 +114,13 @@ jobs:
             echo
             echo "You dispatched with:"
             echo
-            echo "| Input | Value |"
-            echo "| --- | --- |"
-            echo "| runner_label | \`${{ inputs.runner_label }}\` |"
-            echo "| target_vcpus | ${{ inputs.target_vcpus }} |"
-            echo "| hold_seconds | ${{ inputs.hold_seconds }} |"
-            echo "| workload | \`${{ inputs.workload }}\` |"
-            echo "| fail_on_target_miss | ${{ inputs.fail_on_target_miss }} |"
+            echo '```json'
+            printf '{\n'
+            printf '  "runner_label": %s,\n' "$RUNNER_LABEL_JSON"
+            printf '  "target_vcpus": %s,\n' "$TARGET_VCPUS_JSON"
+            printf '  "hold_seconds": %s,\n' "$HOLD_SECONDS_JSON"
+            printf '  "workload": %s,\n' "$WORKLOAD_JSON"
+            printf '  "fail_on_target_miss": %s\n' "$FAIL_ON_TARGET_MISS_JSON"
+            printf '}\n'
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
