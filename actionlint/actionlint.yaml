@@ -53,8 +53,16 @@ self-hosted-runner:
     - n2-standard-32-netssd-preempt
     - n2-standard-8-netssd-preempt
     - n2-standard-8-netssd-preempt-quick
+    - ubicloud-standard-16-arm
+    - ubicloud-standard-16
     - ubicloud-standard-2-arm
     - ubicloud-standard-2
+    - ubicloud-standard-30-arm
+    - ubicloud-standard-30
+    - ubicloud-standard-4-arm
+    - ubicloud-standard-4
+    - ubicloud-standard-8-arm
+    - ubicloud-standard-8
 
 # Configuration variables in array of strings defined in your repository or
 # organization. `null` means disabling configuration variables check.
