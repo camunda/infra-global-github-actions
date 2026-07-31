@@ -1,0 +1,118 @@
+---
+# Dispatch stub for the Ubicloud concurrency stress test.
+#
+# This stub exists purely so the workflow shows up in the Actions UI (and in
+# `gh workflow run`) — the real implementation lives on the test branch below.
+#
+#   Actions -> "Ubicloud concurrency stress test" -> Run workflow
+#             -> switch "Use workflow from" to `ubicloud-runner-tests`
+#
+#   gh workflow run ubicloud-concurrency-stress.yml \
+#     --ref ubicloud-runner-tests \
+#     -f runner_label=ubicloud-standard-2 \
+#     -f target_vcpus=300 \
+#     -f hold_seconds=180 \
+#     -f workload=cpu-burn
+#
+# The inputs below mirror the test branch definition exactly. Keep them in sync:
+# GitHub validates dispatch inputs against the workflow file, and a stub that has
+# drifted will reject inputs the real workflow accepts.
+name: Ubicloud concurrency stress test
+
+run-name: >-
+  Ubicloud stress · stub on ${{ github.ref_name }} (no runners consumed)
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner_label:
+        description: 'Ubicloud runner label to stress (vCPU per runner is derived from the label)'
+        type: choice
+        required: true
+        default: ubicloud-standard-2
+        options:
+          - ubicloud-standard-2
+          - ubicloud-standard-4
+          - ubicloud-standard-8
+          - ubicloud-standard-16
+          - ubicloud-standard-30
+          - ubicloud-standard-2-arm
+          - ubicloud-standard-4-arm
+          - ubicloud-standard-8-arm
+          - ubicloud-standard-16-arm
+          - ubicloud-standard-30-arm
+      target_vcpus:
+        description: 'Total vCPUs to demand simultaneously (advertised quota is 300; go higher to find the real ceiling)'
+        type: string
+        required: true
+        default: '300'
+      hold_seconds:
+        description: 'Seconds each runner stays occupied. Must exceed the provisioning ramp or the runners will not overlap.'
+        type: string
+        required: true
+        default: '180'
+      workload:
+        description: 'cpu-burn saturates every vCPU and exposes oversubscription via steal time; idle only holds the runner'
+        type: choice
+        required: true
+        default: cpu-burn
+        options:
+          - cpu-burn
+          - idle
+      fail_on_target_miss:
+        description: 'Fail the run when the measured peak vCPUs stays below target_vcpus'
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  explain:
+    name: explain
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TEST_BRANCH: ubicloud-runner-tests
+    steps:
+      # Reaching this job at all means the dispatch picked a ref that only carries
+      # the stub, so no measurement happened and nothing was billed.
+      - name: Explain how to run the real test
+        run: |
+          set -euo pipefail
+
+          echo "::notice::This is the dispatch stub on '${GITHUB_REF_NAME}'. Re-run it with 'Use workflow from' set to '${TEST_BRANCH}' to execute the real stress test."
+
+          {
+            echo "## Ubicloud concurrency stress — stub only"
+            echo
+            echo "Nothing was measured: \`${GITHUB_REF_NAME}\` only carries the dispatch stub."
+            echo "This file exists so GitHub lists the workflow at all — \`workflow_dispatch\`"
+            echo "workflows are only offered when the file is present on the default branch."
+            echo
+            echo "### Run the real thing"
+            echo
+            echo "In the UI, dispatch this workflow again and set **Use workflow from** to"
+            echo "\`${TEST_BRANCH}\`. Or from the CLI:"
+            echo
+            echo '```sh'
+            echo "gh workflow run ubicloud-concurrency-stress.yml \\"
+            echo "  --repo ${GITHUB_REPOSITORY} \\"
+            echo "  --ref ${TEST_BRANCH} \\"
+            echo "  -f runner_label=ubicloud-standard-2 \\"
+            echo "  -f target_vcpus=300 \\"
+            echo "  -f hold_seconds=180 \\"
+            echo "  -f workload=cpu-burn"
+            echo '```'
+            echo
+            echo "You dispatched with:"
+            echo
+            echo "| Input | Value |"
+            echo "| --- | --- |"
+            echo "| runner_label | \`${{ inputs.runner_label }}\` |"
+            echo "| target_vcpus | ${{ inputs.target_vcpus }} |"
+            echo "| hold_seconds | ${{ inputs.hold_seconds }} |"
+            echo "| workload | \`${{ inputs.workload }}\` |"
+            echo "| fail_on_target_miss | ${{ inputs.fail_on_target_miss }} |"
+          } >> "$GITHUB_STEP_SUMMARY"
