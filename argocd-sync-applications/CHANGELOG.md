@@ -1,5 +1,32 @@
 # Changelog
 
+## 1.0.10 (2026-08-01)
+
+## What's Changed
+* feat: fail closed on unverified head snapshot in dependency-vuln-check by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/749
+* fix: detect runner aborts from raw job logs instead of annotations by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/744
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/750
+* feat: self-mint app tokens and classify failures in ensure-pr-passes-merge-queue by @bkenez in https://github.com/camunda/infra-global-github-actions/pull/754
+* chore(deps): update dependency fossas/fossa-cli to v3.17.13 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/755
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.269.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/756
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.270.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/760
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/759
+* chore(deps): update slackapi/slack-github-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/758
+* chore(deps): update actions/setup-node action to v7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/757
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/761
+* chore(deps): update dependency fossas/fossa-cli to v3.17.14 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/762
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.280.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/764
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/766
+* chore(deps): update dependency pre-commit to v4.6.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/763
+* chore(deps): update actions/setup-python action to v7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/765
+* fix: make preview-env clean catch-all step best-effort by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/768
+* chore(deps): update dependency fossas/fossa-cli to v3.17.15 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/770
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/771
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/773
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/argocd-sync-applications-1.0.9...argocd-sync-applications-1.0.10
+
 ## 1.0.9 (2026-07-11)
 
 ## What's Changed
