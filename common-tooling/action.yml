@@ -321,3 +321,8 @@ runs:
       echo "python_missing=" >> "$GITHUB_ENV"
       echo "yarn_missing=" >> "$GITHUB_ENV"
       echo "build_essential_missing=" >> "$GITHUB_ENV"
+
+  - name: Test change
+    shell: bash
+    run: |
+      echo "We are testing the action here"
