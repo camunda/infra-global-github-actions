@@ -60,6 +60,11 @@ on:
         options:
           - cpu-burn
           - idle
+      runner_assignment_timeout_minutes:
+        description: 'Maximum minutes to wait for every stress job to be assigned a runner before cancelling the run'
+        type: string
+        required: true
+        default: '15'
       fail_on_target_miss:
         description: 'Fail the run when the measured peak vCPUs stays below target_vcpus'
         type: boolean
@@ -94,6 +99,7 @@ jobs:
           RUNNER_LABEL: ${{ inputs.runner_label }}
           TARGET_VCPUS: ${{ inputs.target_vcpus }}
           HOLD_SECONDS: ${{ inputs.hold_seconds }}
+          RUNNER_ASSIGNMENT_TIMEOUT_MINUTES: ${{ inputs.runner_assignment_timeout_minutes }}
           WORKLOAD: ${{ inputs.workload }}
           # A single GitHub matrix expands to at most 256 jobs.
           MAX_MATRIX_JOBS: '256'
@@ -106,6 +112,12 @@ jobs:
           fi
           if ! [[ "$HOLD_SECONDS" =~ ^[0-9]+$ ]] || [ "$HOLD_SECONDS" -lt 1 ]; then
             echo "::error::hold_seconds must be a positive integer, got '${HOLD_SECONDS}'"
+            exit 1
+          fi
+          if ! [[ "$RUNNER_ASSIGNMENT_TIMEOUT_MINUTES" =~ ^[0-9]+$ ]] \
+            || [ "$RUNNER_ASSIGNMENT_TIMEOUT_MINUTES" -lt 1 ] \
+            || [ "$RUNNER_ASSIGNMENT_TIMEOUT_MINUTES" -gt 350 ]; then
+            echo "::error::runner_assignment_timeout_minutes must be an integer from 1 to 350, got '${RUNNER_ASSIGNMENT_TIMEOUT_MINUTES}'"
             exit 1
           fi
 
@@ -150,6 +162,7 @@ jobs:
             echo "| Planned peak vCPUs | ${planned_vcpus} |"
             echo "| Hold per runner | ${HOLD_SECONDS}s |"
             echo "| Workload | \`${WORKLOAD}\` |"
+            echo "| Runner assignment timeout | ${RUNNER_ASSIGNMENT_TIMEOUT_MINUTES} min |"
             echo "| Per-job timeout | ${timeout_minutes} min |"
             if [ -n "$capped_from" ]; then
               echo
@@ -279,9 +292,70 @@ jobs:
           if-no-files-found: warn
           retention-days: 5
 
+  watchdog:
+    name: runner-assignment-watchdog
+    needs: plan
+    if: needs.plan.outputs.job_count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Cancel if runners are not assigned in time
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXPECTED_JOBS: ${{ needs.plan.outputs.job_count }}
+          MAX_WAIT_MINUTES: ${{ inputs.runner_assignment_timeout_minutes }}
+        run: |
+          set -euo pipefail
+
+          deadline=$(( $(date +%s) + MAX_WAIT_MINUTES * 60 ))
+          jobs_api="/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100"
+
+          while true; do
+            jobs_json=''
+            if jobs_json=$(gh api --paginate -q '.jobs[]' "$jobs_api" \
+              | jq -s '[.[] | select((.name // "") | startswith("burn-"))]'); then
+              visible=$(jq 'length' <<< "$jobs_json")
+              assigned=$(jq '[.[] | select((.runner_name // "") != "")] | length' <<< "$jobs_json")
+              echo "${assigned}/${EXPECTED_JOBS} stress jobs assigned (${visible} visible)"
+
+              if [ "$assigned" -ge "$EXPECTED_JOBS" ]; then
+                echo "Every stress job was assigned a runner before the timeout."
+                exit 0
+              fi
+            else
+              echo "::warning::Could not fetch workflow jobs; retrying until the assignment deadline"
+            fi
+
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              if [ -n "$jobs_json" ]; then
+                unassigned=$(jq -r '
+                  [.[] | select((.runner_name // "") == "") | .name] | join(", ")
+                ' <<< "$jobs_json")
+                echo "::error::Runner assignment timed out after ${MAX_WAIT_MINUTES} minutes. Unassigned jobs: ${unassigned:-unknown}"
+              else
+                echo "::error::Runner assignment timed out after ${MAX_WAIT_MINUTES} minutes without a successful jobs API response"
+              fi
+
+              {
+                echo "## Runner assignment timed out"
+                echo
+                echo "Not all ${EXPECTED_JOBS} stress jobs received a runner within ${MAX_WAIT_MINUTES} minutes, so the workflow was cancelled."
+              } >> "$GITHUB_STEP_SUMMARY"
+
+              gh api --method POST \
+                "/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/cancel"
+              exit 1
+            fi
+
+            sleep 10
+          done
+
   report:
     name: report
-    needs: [plan, burn]
+    needs: [plan, burn, watchdog]
     if: always() && needs.plan.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
