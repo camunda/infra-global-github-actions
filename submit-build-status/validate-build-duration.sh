@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+
+BUILD_DURATION_MILLIS="${1:-}"
+MAX_BUILD_DURATION_MILLIS=259200000  # 72 hours
+
+if [ -z "$BUILD_DURATION_MILLIS" ]; then
+  exit 0
+fi
+
+if ! [[ "$BUILD_DURATION_MILLIS" =~ ^[0-9]+$ ]]; then
+  echo "Build duration must be a non-negative integer." >&2
+  exit 1
+fi
+
+NORMALIZED_BUILD_DURATION_MILLIS="${BUILD_DURATION_MILLIS#"${BUILD_DURATION_MILLIS%%[!0]*}"}"
+NORMALIZED_BUILD_DURATION_MILLIS="${NORMALIZED_BUILD_DURATION_MILLIS:-0}"
+if [ "${#NORMALIZED_BUILD_DURATION_MILLIS}" -gt "${#MAX_BUILD_DURATION_MILLIS}" ] ||
+  { [ "${#NORMALIZED_BUILD_DURATION_MILLIS}" -eq "${#MAX_BUILD_DURATION_MILLIS}" ] &&
+    [ "$NORMALIZED_BUILD_DURATION_MILLIS" -gt "$MAX_BUILD_DURATION_MILLIS" ]; }; then
+  echo "Build duration must not exceed ${MAX_BUILD_DURATION_MILLIS} milliseconds." >&2
+  exit 1
+fi
+
+printf '%s\n' "$NORMALIZED_BUILD_DURATION_MILLIS"
