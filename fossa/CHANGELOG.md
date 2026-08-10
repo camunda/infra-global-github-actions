@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.16 (2026-08-08)
+
+## What's Changed
+* chore: create placeholder for ubicloud test by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/769
+* chore(deps): update dependency fossas/fossa-cli to v3.17.16 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/774
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.14.10 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/775
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.15...fossa-1.0.16
+
 ## 1.0.15 (2026-08-01)
 
 ## What's Changed
