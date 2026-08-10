@@ -1,26 +1,27 @@
 ---
-# Dispatch stub for the Ubicloud concurrency stress test.
+# Synthetic concurrency stress test for Ubicloud GitHub Actions runners.
 #
-# This stub exists purely so the workflow shows up in the Actions UI (and in
-# `gh workflow run`) — the real implementation lives on the test branch below.
+# Fires a burst of N identically-labelled Ubicloud runners at once, keeps every
+# one of them busy for a fixed window, then reconstructs what actually happened
+# from two independent sources:
 #
-#   Actions -> "Ubicloud concurrency stress test" -> Run workflow
-#             -> switch "Use workflow from" to `ubicloud-runner-tests`
+#   1. the GitHub jobs API   -> authoritative per-job created/started/completed
+#                               timestamps, used for the concurrency sweep
+#   2. in-job telemetry      -> nproc, RAM, CPU steal, VM uptime and identity,
+#                               collected on each runner itself
 #
-#   gh workflow run ubicloud-concurrency-stress.yml \
-#     --ref ubicloud-runner-tests \
-#     -f runner_label=ubicloud-standard-2 \
-#     -f target_vcpus=300 \
-#     -f hold_seconds=180 \
-#     -f workload=cpu-burn
+# Together those answer "does Ubicloud really hand us N vCPUs at the same time,
+# and are those vCPUs real?" -- a runner that is provisioned but oversubscribed
+# shows up as steal time, and a runner that is silently shared shows up as a
+# duplicate hostname.
 #
-# The inputs below mirror the test branch definition exactly. Keep them in sync:
-# GitHub validates dispatch inputs against the workflow file, and a stub that has
-# drifted will reject inputs the real workflow accepts.
+# This workflow lives on a test branch. Dispatch it via the placeholder of the
+# same filename on `main`, selecting this branch as the ref.
 name: Ubicloud concurrency stress test
 
 run-name: >-
-  Ubicloud stress · stub on ${{ github.ref_name }} (no runners consumed)
+  Ubicloud stress · ${{ inputs.runner_label }} · target ${{ inputs.target_vcpus }} vCPU ·
+  hold ${{ inputs.hold_seconds }}s · ${{ inputs.workload }}
 
 on:
   workflow_dispatch:
@@ -59,68 +60,612 @@ on:
         options:
           - cpu-burn
           - idle
+      runner_assignment_timeout_minutes:
+        description: 'Maximum minutes to wait for every stress job to be assigned a runner before cancelling the run'
+        type: string
+        required: true
+        default: '15'
       fail_on_target_miss:
         description: 'Fail the run when the measured peak vCPUs stays below target_vcpus'
         type: boolean
         required: false
         default: false
 
+# Two overlapping stress runs would compete for the same Ubicloud vCPU quota and
+# make both sets of measurements meaningless, so queue them instead.
+concurrency:
+  group: ubicloud-concurrency-stress
+  cancel-in-progress: false
+
 permissions:
+  actions: read # the report job reads this run's own job timings
   contents: read
 
 jobs:
-  explain:
-    name: explain
+  plan:
+    name: plan
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    env:
-      TEST_BRANCH: ubicloud-runner-tests
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      job_count: ${{ steps.plan.outputs.job_count }}
+      vcpu_per_runner: ${{ steps.plan.outputs.vcpu_per_runner }}
+      planned_vcpus: ${{ steps.plan.outputs.planned_vcpus }}
+      timeout_minutes: ${{ steps.plan.outputs.timeout_minutes }}
     steps:
-      # Reaching this job at all means the dispatch picked a ref that only carries
-      # the stub, so no measurement happened and nothing was billed.
-      - name: Explain how to run the real test
+      - name: Size the burst
+        id: plan
         env:
-          RUNNER_LABEL_JSON: ${{ toJSON(inputs.runner_label) }}
-          TARGET_VCPUS_JSON: ${{ toJSON(inputs.target_vcpus) }}
-          HOLD_SECONDS_JSON: ${{ toJSON(inputs.hold_seconds) }}
-          WORKLOAD_JSON: ${{ toJSON(inputs.workload) }}
-          FAIL_ON_TARGET_MISS_JSON: ${{ toJSON(inputs.fail_on_target_miss) }}
+          RUNNER_LABEL: ${{ inputs.runner_label }}
+          TARGET_VCPUS: ${{ inputs.target_vcpus }}
+          HOLD_SECONDS: ${{ inputs.hold_seconds }}
+          RUNNER_ASSIGNMENT_TIMEOUT_MINUTES: ${{ inputs.runner_assignment_timeout_minutes }}
+          WORKLOAD: ${{ inputs.workload }}
+          # A single GitHub matrix expands to at most 256 jobs.
+          MAX_MATRIX_JOBS: '256'
         run: |
           set -euo pipefail
 
-          echo "::notice::This is the dispatch stub on '${GITHUB_REF_NAME}'. Re-run it with 'Use workflow from' set to '${TEST_BRANCH}' to execute the real stress test."
+          if ! [[ "$TARGET_VCPUS" =~ ^[0-9]+$ ]] || [ "$TARGET_VCPUS" -lt 1 ]; then
+            echo "::error::target_vcpus must be a positive integer, got '${TARGET_VCPUS}'"
+            exit 1
+          fi
+          if ! [[ "$HOLD_SECONDS" =~ ^[0-9]+$ ]] || [ "$HOLD_SECONDS" -lt 1 ]; then
+            echo "::error::hold_seconds must be a positive integer, got '${HOLD_SECONDS}'"
+            exit 1
+          fi
+          if ! [[ "$RUNNER_ASSIGNMENT_TIMEOUT_MINUTES" =~ ^[0-9]+$ ]] \
+            || [ "$RUNNER_ASSIGNMENT_TIMEOUT_MINUTES" -lt 1 ] \
+            || [ "$RUNNER_ASSIGNMENT_TIMEOUT_MINUTES" -gt 350 ]; then
+            echo "::error::runner_assignment_timeout_minutes must be an integer from 1 to 350, got '${RUNNER_ASSIGNMENT_TIMEOUT_MINUTES}'"
+            exit 1
+          fi
+
+          # Every Ubicloud label encodes its vCPU count: ubicloud-standard-<N>[-arm].
+          vcpu="${RUNNER_LABEL#ubicloud-standard-}"
+          vcpu="${vcpu%-arm}"
+          if ! [[ "$vcpu" =~ ^[0-9]+$ ]] || [ "$vcpu" -lt 1 ]; then
+            echo "::error::cannot derive a vCPU count from runner label '${RUNNER_LABEL}'"
+            exit 1
+          fi
+
+          job_count=$(( (TARGET_VCPUS + vcpu - 1) / vcpu ))
+          capped_from=''
+          if [ "$job_count" -gt "$MAX_MATRIX_JOBS" ]; then
+            capped_from="$job_count"
+            job_count="$MAX_MATRIX_JOBS"
+            echo "::warning::${TARGET_VCPUS} vCPU needs ${capped_from} × ${RUNNER_LABEL}, but a GitHub matrix caps at ${MAX_MATRIX_JOBS} jobs. Capping to ${job_count} jobs = $(( job_count * vcpu )) vCPU — pick a larger runner label to reach the target."
+          fi
+
+          planned_vcpus=$(( job_count * vcpu ))
+          # Hold window, plus headroom for provisioning, artifact upload and teardown.
+          timeout_minutes=$(( (HOLD_SECONDS + 59) / 60 + 15 ))
+          matrix=$(jq -nc --argjson n "$job_count" '[range(1; $n + 1)]')
 
           {
-            echo "## Ubicloud concurrency stress — stub only"
+            echo "matrix=${matrix}"
+            echo "job_count=${job_count}"
+            echo "vcpu_per_runner=${vcpu}"
+            echo "planned_vcpus=${planned_vcpus}"
+            echo "timeout_minutes=${timeout_minutes}"
+          } >> "$GITHUB_OUTPUT"
+
+          {
+            echo "## Ubicloud concurrency stress — plan"
             echo
-            echo "Nothing was measured: \`${GITHUB_REF_NAME}\` only carries the dispatch stub."
-            echo "This file exists so GitHub lists the workflow at all — \`workflow_dispatch\`"
-            echo "workflows are only offered when the file is present on the default branch."
-            echo
-            echo "### Run the real thing"
-            echo
-            echo "In the UI, dispatch this workflow again and set **Use workflow from** to"
-            echo "\`${TEST_BRANCH}\`. Or from the CLI:"
-            echo
-            echo '```sh'
-            echo "gh workflow run ubicloud-concurrency-stress.yml \\"
-            echo "  --repo ${GITHUB_REPOSITORY} \\"
-            echo "  --ref ${TEST_BRANCH} \\"
-            echo "  -f runner_label=ubicloud-standard-2 \\"
-            echo "  -f target_vcpus=300 \\"
-            echo "  -f hold_seconds=180 \\"
-            echo "  -f workload=cpu-burn"
-            echo '```'
-            echo
-            echo "You dispatched with:"
-            echo
-            echo '```json'
-            printf '{\n'
-            printf '  "runner_label": %s,\n' "$RUNNER_LABEL_JSON"
-            printf '  "target_vcpus": %s,\n' "$TARGET_VCPUS_JSON"
-            printf '  "hold_seconds": %s,\n' "$HOLD_SECONDS_JSON"
-            printf '  "workload": %s,\n' "$WORKLOAD_JSON"
-            printf '  "fail_on_target_miss": %s\n' "$FAIL_ON_TARGET_MISS_JSON"
-            printf '}\n'
-            echo '```'
+            echo "| Setting | Value |"
+            echo "| --- | --- |"
+            echo "| Runner label | \`${RUNNER_LABEL}\` |"
+            echo "| vCPU per runner | ${vcpu} |"
+            echo "| Target vCPUs | ${TARGET_VCPUS} |"
+            echo "| Jobs dispatched | ${job_count} |"
+            echo "| Planned peak vCPUs | ${planned_vcpus} |"
+            echo "| Hold per runner | ${HOLD_SECONDS}s |"
+            echo "| Workload | \`${WORKLOAD}\` |"
+            echo "| Runner assignment timeout | ${RUNNER_ASSIGNMENT_TIMEOUT_MINUTES} min |"
+            echo "| Per-job timeout | ${timeout_minutes} min |"
+            if [ -n "$capped_from" ]; then
+              echo
+              echo "> :warning: Requested ${capped_from} jobs, capped to ${job_count} by the 256-job matrix limit."
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
+
+  burn:
+    name: burn-${{ matrix.index }}
+    needs: plan
+    if: needs.plan.outputs.job_count != '0'
+    runs-on: ${{ inputs.runner_label }}
+    timeout-minutes: ${{ fromJSON(needs.plan.outputs.timeout_minutes) }}
+    strategy:
+      fail-fast: false
+      # No max-parallel: the whole point is to let GitHub and Ubicloud start
+      # every job at once and see how far they get.
+      matrix:
+        index: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - name: Occupy the runner and measure it
+        env:
+          MATRIX_INDEX: ${{ matrix.index }}
+          RUNNER_LABEL: ${{ inputs.runner_label }}
+          HOLD_SECONDS: ${{ inputs.hold_seconds }}
+          WORKLOAD: ${{ inputs.workload }}
+          EXPECTED_VCPU: ${{ needs.plan.outputs.vcpu_per_runner }}
+        run: |
+          set -euo pipefail
+
+          metrics_dir="${RUNNER_TEMP}/metrics"
+          mkdir -p "$metrics_dir"
+
+          nproc_count=$(nproc)
+          mem_total_kb=$(awk '/^MemTotal:/{print $2; exit}' /proc/meminfo)
+          uptime_s=$(awk '{printf "%.2f", $1}' /proc/uptime)
+
+          # Ubicloud stamps the real VM identity here — authoritative for "which
+          # physical host/pool/datacenter did this job land on", unlike the Linux
+          # hostname, which a guest image could in principle set independently.
+          setup_info=/home/runner/actions-runner/.setup_info
+          ubi_detail=""
+          if [ -f "$setup_info" ]; then
+            ubi_detail=$(jq -r '.[] | select(.group == "Ubicloud Managed Runner") | .detail' \
+              "$setup_info" 2>/dev/null || true)
+          fi
+          get_ubi_field() { printf '%s\n' "$ubi_detail" | grep "^$1: " | sed "s/^$1: //" | head -1; }
+          vm_name=$(get_ubi_field "Name"); vm_name=${vm_name:-unknown}
+          vm_host=$(get_ubi_field "VM Host"); vm_host=${vm_host:-unknown}
+          vm_pool=$(get_ubi_field "VM Pool"); vm_pool=${vm_pool:-unknown}
+          vm_datacenter=$(get_ubi_field "Datacenter"); vm_datacenter=${vm_datacenter:-unknown}
+
+          echo "::group::Runner facts"
+          printf 'runner_name = %s\n' "${RUNNER_NAME:-unknown}"
+          printf 'nproc       = %s (label promises %s)\n' "$nproc_count" "$EXPECTED_VCPU"
+          printf 'ubicloud vm = name=%s host=%s pool=%s datacenter=%s\n' \
+            "$vm_name" "$vm_host" "$vm_pool" "$vm_datacenter"
+          echo "::endgroup::"
+
+          # A runner that hands out fewer cores than its label promises breaks the
+          # whole vCPU accounting, so surface it rather than averaging it away.
+          vcpu_match=true
+          if [ "$nproc_count" -ne "$EXPECTED_VCPU" ]; then
+            vcpu_match=false
+            echo "::warning::label ${RUNNER_LABEL} promises ${EXPECTED_VCPU} vCPU but nproc reports ${nproc_count}"
+          fi
+
+          stat_before=$(awk '/^cpu /{print; exit}' /proc/stat)
+
+          if [ "$WORKLOAD" = "cpu-burn" ]; then
+            echo "Saturating ${nproc_count} vCPU for ${HOLD_SECONDS}s"
+            pids=()
+            for _ in $(seq 1 "$nproc_count"); do
+              timeout "$HOLD_SECONDS" sha256sum /dev/zero >/dev/null 2>&1 &
+              pids+=("$!")
+            done
+            # timeout kills the workers with SIGTERM, so a non-zero wait is expected.
+            wait "${pids[@]}" || true
+          else
+            echo "Holding the runner idle for ${HOLD_SECONDS}s"
+            sleep "$HOLD_SECONDS"
+          fi
+
+          stat_after=$(awk '/^cpu /{print; exit}' /proc/stat)
+
+          # /proc/stat aggregate line: cpu user nice system idle iowait irq softirq steal ...
+          # Steal is the signal that matters here: on a correctly provisioned VM it
+          # stays near zero even while every vCPU is pinned.
+          cpu_pcts=$(awk -v b="$stat_before" -v a="$stat_after" 'BEGIN {
+            nb = split(b, B, " "); na = split(a, A, " ");
+            n = (nb < na) ? nb : na;
+            tb = 0; ta = 0;
+            for (i = 2; i <= n; i++) { tb += B[i]; ta += A[i] }
+            dt = ta - tb;
+            if (dt <= 0) { print "0 0"; exit }
+            printf "%.3f %.3f\n", 100 * (A[9] - B[9]) / dt, 100 * (dt - (A[5] - B[5])) / dt
+          }')
+          read -r steal_pct busy_pct <<< "$cpu_pcts"
+          printf 'cpu during load: busy=%s%% steal=%s%%\n' "$busy_pct" "$steal_pct"
+
+          if awk -v s="$steal_pct" 'BEGIN { exit !(s > 5) }'; then
+            echo "::warning::CPU steal ${steal_pct}% on ${RUNNER_NAME:-unknown} — the host looks oversubscribed"
+          fi
+
+          jq -n \
+            --argjson index "$MATRIX_INDEX" \
+            --arg runner_name "${RUNNER_NAME:-unknown}" \
+            --arg hostname "$(hostname)" \
+            --arg vm_name "$vm_name" \
+            --arg vm_host "$vm_host" \
+            --arg vm_pool "$vm_pool" \
+            --arg vm_datacenter "$vm_datacenter" \
+            --argjson nproc "$nproc_count" \
+            --argjson vcpu_match "$vcpu_match" \
+            --argjson mem_total_kb "$mem_total_kb" \
+            --argjson uptime_s "$uptime_s" \
+            --argjson steal_pct "$steal_pct" \
+            --argjson busy_pct "$busy_pct" \
+            '$ARGS.named' > "${metrics_dir}/runner-${MATRIX_INDEX}.json"
+
+      - name: Upload runner metrics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: metrics-${{ matrix.index }}
+          path: ${{ runner.temp }}/metrics/
+          if-no-files-found: warn
+          retention-days: 5
+
+  watchdog:
+    name: runner-assignment-watchdog
+    needs: plan
+    if: needs.plan.outputs.job_count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Cancel if runners are not assigned in time
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXPECTED_JOBS: ${{ needs.plan.outputs.job_count }}
+          MAX_WAIT_MINUTES: ${{ inputs.runner_assignment_timeout_minutes }}
+        run: |
+          set -euo pipefail
+
+          deadline=$(( $(date +%s) + MAX_WAIT_MINUTES * 60 ))
+          jobs_api="/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100"
+
+          while true; do
+            jobs_json=''
+            if jobs_json=$(gh api --paginate -q '.jobs[]' "$jobs_api" \
+              | jq -s '[.[] | select((.name // "") | startswith("burn-"))]'); then
+              visible=$(jq 'length' <<< "$jobs_json")
+              assigned=$(jq '[.[] | select((.runner_name // "") != "")] | length' <<< "$jobs_json")
+              echo "${assigned}/${EXPECTED_JOBS} stress jobs assigned (${visible} visible)"
+
+              if [ "$assigned" -ge "$EXPECTED_JOBS" ]; then
+                echo "Every stress job was assigned a runner before the timeout."
+                exit 0
+              fi
+            else
+              echo "::warning::Could not fetch workflow jobs; retrying until the assignment deadline"
+            fi
+
+            if [ "$(date +%s)" -ge "$deadline" ]; then
+              if [ -n "$jobs_json" ]; then
+                unassigned=$(jq -r '
+                  [.[] | select((.runner_name // "") == "") | .name] | join(", ")
+                ' <<< "$jobs_json")
+                echo "::error::Runner assignment timed out after ${MAX_WAIT_MINUTES} minutes. Unassigned jobs: ${unassigned:-unknown}"
+              else
+                echo "::error::Runner assignment timed out after ${MAX_WAIT_MINUTES} minutes without a successful jobs API response"
+              fi
+
+              {
+                echo "## Runner assignment timed out"
+                echo
+                echo "Not all ${EXPECTED_JOBS} stress jobs received a runner within ${MAX_WAIT_MINUTES} minutes, so the workflow was cancelled."
+              } >> "$GITHUB_STEP_SUMMARY"
+
+              gh api --method POST \
+                "/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/cancel"
+              exit 1
+            fi
+
+            sleep 10
+          done
+
+  report:
+    name: report
+    needs: [plan, burn, watchdog]
+    if: always() && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download per-runner metrics
+        id: download
+        continue-on-error: true # a partial collection still yields a useful report
+        uses: actions/download-artifact@v8
+        with:
+          path: metrics
+          pattern: metrics-*
+          merge-multiple: true
+
+      - name: Fetch this run's job timings
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Scoped to this attempt so re-runs do not mix old and new timings.
+          gh api --paginate -q '.jobs[]' \
+            "/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/attempts/${GITHUB_RUN_ATTEMPT}/jobs?per_page=100" \
+            | jq -s '.' > jobs.json
+          echo "collected $(jq 'length' jobs.json) job records"
+
+      - name: Analyse concurrency
+        env:
+          RUNNER_LABEL: ${{ inputs.runner_label }}
+          TARGET_VCPUS: ${{ inputs.target_vcpus }}
+          HOLD_SECONDS: ${{ inputs.hold_seconds }}
+          WORKLOAD: ${{ inputs.workload }}
+          FAIL_ON_TARGET_MISS: ${{ inputs.fail_on_target_miss }}
+          VCPU_PER_RUNNER: ${{ needs.plan.outputs.vcpu_per_runner }}
+          PLANNED_VCPUS: ${{ needs.plan.outputs.planned_vcpus }}
+          JOB_COUNT: ${{ needs.plan.outputs.job_count }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import glob
+          import json
+          import os
+          import statistics
+          from datetime import datetime
+
+
+          def env_int(name, default=0):
+              try:
+                  return int(os.environ.get(name) or default)
+              except ValueError:
+                  return default
+
+
+          LABEL = os.environ.get("RUNNER_LABEL", "?")
+          WORKLOAD = os.environ.get("WORKLOAD", "?")
+          VCPU = max(env_int("VCPU_PER_RUNNER", 1), 1)
+          TARGET = env_int("TARGET_VCPUS")
+          PLANNED = env_int("PLANNED_VCPUS")
+          JOB_COUNT = env_int("JOB_COUNT")
+          HOLD = env_int("HOLD_SECONDS")
+          FAIL_ON_MISS = os.environ.get("FAIL_ON_TARGET_MISS", "false") == "true"
+
+
+          def ts(value):
+              if not value:
+                  return None
+              return datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp()
+
+
+          def pctl(values, p):
+              if not values:
+                  return None
+              ordered = sorted(values)
+              k = (len(ordered) - 1) * p / 100.0
+              low = int(k)
+              high = min(low + 1, len(ordered) - 1)
+              return ordered[low] + (ordered[high] - ordered[low]) * (k - low)
+
+
+          def num(value, unit="", digits=1):
+              if value is None:
+                  return "n/a"
+              return "{:,.{d}f}{u}".format(value, d=digits, u=unit)
+
+
+          def spread(values, unit="", digits=1):
+              """min / median / p95 / max, the shape that matters for a stress test."""
+              if not values:
+                  return "n/a"
+              return " / ".join(
+                  num(v, unit, digits)
+                  for v in (min(values), statistics.median(values), pctl(values, 95), max(values))
+              )
+
+
+          # ------------------------------------------------------- job timings (API)
+          with open("jobs.json") as handle:
+              all_jobs = json.load(handle)
+
+          burn_jobs = [j for j in all_jobs if (j.get("name") or "").startswith("burn-")]
+
+          ran, never_started = [], []
+          for job in burn_jobs:
+              started = ts(job.get("started_at"))
+              completed = ts(job.get("completed_at"))
+              # A job cancelled while still queued carries timestamps but no step ever
+              # ran on a runner, so it must not count towards occupied concurrency.
+              touched = any(s.get("started_at") for s in (job.get("steps") or []))
+              if started and completed and completed > started and touched:
+                  ran.append((job, started, completed))
+              else:
+                  never_started.append(job)
+
+          conclusions = {}
+          for job in burn_jobs:
+              key = job.get("conclusion") or job.get("status") or "unknown"
+              conclusions[key] = conclusions.get(key, 0) + 1
+
+          peak_jobs = 0
+          peak_seconds = 0
+          sustained_seconds = 0
+          occupancy = []
+          queue_waits = []
+          durations = []
+          ramp = None
+
+          if ran:
+              created = [ts(j.get("created_at")) or s for j, s, _ in ran]
+              first_created = min(created)
+              first_start = min(s for _, s, _ in ran)
+              last_start = max(s for _, s, _ in ran)
+              last_end = max(e for _, _, e in ran)
+              ramp = last_start - first_created
+
+              for (job, started, completed), created_at in zip(ran, created):
+                  queue_waits.append(started - created_at)
+                  durations.append(completed - started)
+
+              span = int(last_end - first_start) + 1
+              occupancy = [0] * span
+              for _, started, completed in ran:
+                  lo = max(int(started - first_start), 0)
+                  hi = min(int(completed - first_start), span - 1)
+                  for k in range(lo, hi + 1):
+                      occupancy[k] += 1
+
+              peak_jobs = max(occupancy)
+              peak_seconds = sum(1 for v in occupancy if v == peak_jobs)
+              sustained_seconds = sum(1 for v in occupancy if v >= 0.9 * peak_jobs)
+
+          peak_vcpus = peak_jobs * VCPU
+          reached = peak_vcpus >= TARGET and TARGET > 0
+
+          # ------------------------------------------- in-job telemetry (artifacts)
+          records = []
+          for path in sorted(glob.glob("metrics/*.json")):
+              try:
+                  with open(path) as handle:
+                      records.append(json.load(handle))
+              except (OSError, ValueError):
+                  print("::warning::could not parse metrics file {}".format(path))
+
+
+          def column(key):
+              return [r[key] for r in records if isinstance(r.get(key), (int, float))]
+
+
+          nprocs = column("nproc")
+          steals = column("steal_pct")
+          busies = column("busy_pct")
+          uptimes = column("uptime_s")
+          mems = column("mem_total_kb")
+          hostnames = [r.get("hostname") for r in records if r.get("hostname")]
+          vcpu_mismatches = [r for r in records if r.get("vcpu_match") is False]
+
+          # Ubicloud's own VM identity (from .setup_info) is authoritative for "did
+          # two jobs actually land on the same VM" — more trustworthy than the Linux
+          # hostname, which in principle a guest image could set independently.
+          vm_names = [r.get("vm_name") for r in records if r.get("vm_name") and r["vm_name"] != "unknown"]
+          vm_hosts = [r.get("vm_host") for r in records if r.get("vm_host") and r["vm_host"] != "unknown"]
+          vm_pools = [r.get("vm_pool") for r in records if r.get("vm_pool") and r["vm_pool"] != "unknown"]
+          vm_datacenters = [r.get("vm_datacenter") for r in records if r.get("vm_datacenter") and r["vm_datacenter"] != "unknown"]
+          identity_key = "vm_name" if vm_names else "hostname"
+          identities = vm_names if vm_names else hostnames
+
+          # ------------------------------------------------------------------ verdict
+          if not ran:
+              verdict = ":x: **no job ever got a runner** — Ubicloud served none of the {} requested".format(JOB_COUNT)
+          elif reached:
+              verdict = ":white_check_mark: **reached {} concurrent vCPUs** (target {})".format(peak_vcpus, TARGET)
+          else:
+              verdict = ":warning: **peaked at {} concurrent vCPUs, short of the {} target**".format(peak_vcpus, TARGET)
+
+          out = []
+          add = out.append
+          add("## Ubicloud concurrency stress — `{}`".format(LABEL))
+          add("")
+          add(verdict)
+          add("")
+          add("| Plan | Value |")
+          add("| --- | --- |")
+          add("| Runner label | `{}` |".format(LABEL))
+          add("| vCPU per runner | {} |".format(VCPU))
+          add("| Target vCPUs | {} |".format(TARGET))
+          add("| Jobs dispatched | {} |".format(JOB_COUNT))
+          add("| Planned peak vCPUs | {} |".format(PLANNED))
+          add("| Hold per runner | {}s |".format(HOLD))
+          add("| Workload | `{}` |".format(WORKLOAD))
+          add("")
+
+          add("### Measured concurrency")
+          add("")
+          add("| Metric | Value |")
+          add("| --- | --- |")
+          add("| Peak concurrent jobs | {} of {} |".format(peak_jobs, JOB_COUNT))
+          add("| **Peak concurrent vCPUs** | **{}** |".format(peak_vcpus))
+          add("| Share of planned peak | {} |".format(
+              num(100.0 * peak_vcpus / PLANNED, "%") if PLANNED else "n/a"))
+          add("| Peak held for | {}s |".format(peak_seconds))
+          add("| Within 90% of peak for | {}s |".format(sustained_seconds))
+          add("| Provisioning ramp (first queued → last started) | {} |".format(num(ramp, "s", 0)))
+          add("| vCPU-seconds delivered | {} |".format(num(sum(durations) * VCPU, "", 0)))
+          add("| Distinct runner VMs ({}) | {} of {} reporting |".format(
+              identity_key, len(set(identities)), len(identities)))
+          if vm_datacenters:
+              add("| Placement (datacenters / pools / hosts) | {} / {} / {} |".format(
+                  len(set(vm_datacenters)), len(set(vm_pools)), len(set(vm_hosts))))
+          add("")
+          add("> Peak vCPUs is a **lower bound**: it counts runners between GitHub's "
+              "`started_at` and `completed_at`, while the underlying VM exists slightly "
+              "before and after that window. A VM host serving several runners is expected "
+              "— Ubicloud packs multiple VMs per physical host — so placement only matters "
+              "alongside CPU steal below.")
+          add("")
+
+          add("### Job outcomes")
+          add("")
+          add("| Conclusion | Jobs |")
+          add("| --- | --- |")
+          for key in sorted(conclusions):
+              add("| {} | {} |".format(key, conclusions[key]))
+          add("| never reached a runner | {} |".format(len(never_started)))
+          add("")
+          add("Runner pickup latency (`started_at − created_at`), min / median / p95 / max: **{}**".format(
+              spread(queue_waits, "s", 0)))
+          add("")
+
+          add("### Runner hardware and load ({} of {} runners reported)".format(len(records), JOB_COUNT))
+          add("")
+          if records:
+              add("| Metric | min / median / p95 / max |")
+              add("| --- | --- |")
+              add("| nproc | {} |".format(spread(nprocs, "", 0)))
+              add("| RAM | {} |".format(spread([m / 1024.0 / 1024.0 for m in mems], " GiB", 1)))
+              add("| VM uptime at job start | {} |".format(spread(uptimes, "s", 0)))
+              add("| CPU busy during load | {} |".format(spread(busies, "%", 1)))
+              add("| **CPU steal during load** | **{}** |".format(spread(steals, "%", 2)))
+              add("")
+              if vcpu_mismatches:
+                  add(":x: {} runner(s) reported fewer vCPUs than their label promises.".format(
+                      len(vcpu_mismatches)))
+                  add("")
+              if len(set(identities)) < len(identities):
+                  add(":warning: duplicate {} — some jobs shared the same VM, so they were "
+                      "not truly concurrent.".format(identity_key))
+                  add("")
+          else:
+              add("No per-runner metrics were collected.")
+              add("")
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as handle:
+              handle.write("\n".join(out) + "\n")
+          print("\n".join(out))
+
+          report = {
+              "label": LABEL,
+              "workload": WORKLOAD,
+              "vcpu_per_runner": VCPU,
+              "target_vcpus": TARGET,
+              "planned_vcpus": PLANNED,
+              "job_count": JOB_COUNT,
+              "hold_seconds": HOLD,
+              "peak_concurrent_jobs": peak_jobs,
+              "peak_concurrent_vcpus": peak_vcpus,
+              "peak_held_seconds": peak_seconds,
+              "sustained_90pct_seconds": sustained_seconds,
+              "ramp_seconds": ramp,
+              "reached_target": reached,
+              "conclusions": conclusions,
+              "never_started": len(never_started),
+              "queue_wait_seconds": queue_waits,
+              "job_duration_seconds": durations,
+              "occupancy_per_second": occupancy,
+              "runners": records,
+          }
+          with open("concurrency-report.json", "w") as handle:
+              json.dump(report, handle, indent=2, sort_keys=True)
+
+          if not ran:
+              raise SystemExit("no burn job ever reached a runner")
+          if FAIL_ON_MISS and not reached:
+              raise SystemExit(
+                  "peak of {} vCPU is below the {} vCPU target".format(peak_vcpus, TARGET))
+          PY
+
+      - name: Upload concurrency report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: concurrency-report
+          path: |
+            concurrency-report.json
+            jobs.json
+          if-no-files-found: warn
+          retention-days: 30
