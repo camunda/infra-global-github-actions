@@ -1,0 +1,53 @@
+name: Matrix outputs - read
+
+description: |
+  Collect the per-job outputs written by a matrix step and merge them into a single JSON
+  object, keyed by output name then by matrix key. Pair it with
+  cloudposse/github-action-matrix-outputs-write, which is unaffected by the issue below.
+
+inputs:
+  matrix-step-name:
+    description: |
+      Name passed as `matrix-step-name` to the matching write step. It is also the
+      artifact file name this action looks for.
+    required: true
+
+outputs:
+  result:
+    description: |
+      Merged JSON object. For a matrix writing `{"kube": "..."}` under keys `c1` and `c2`,
+      the result is `{"kube": {"c1": "...", "c2": "..."}}`.
+    value: ${{ steps.context.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+  - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+
+  # The upstream action force-installs jq 1.6 through dcarbone/install-jq-action. That
+  # step is deliberately not reproduced: the runner images already ship jq, and the two
+  # versions produce byte-identical output for this program. The install bought nothing
+  # and pulled in one of the two unpinned references this action exists to avoid.
+  - id: context
+    shell: bash
+    run: |
+      set -euo pipefail
+
+      if ! command -v jq >/dev/null 2>&1; then
+        echo "::error::jq is not available on this runner. It ships with the GitHub-hosted images; on a self-hosted runner, install it before calling this action."
+        exit 1
+      fi
+
+      # jq program kept verbatim from the upstream action, only split over several lines
+      # for readability. Single quotes are required: $matrix_key and $item are jq
+      # variables and must not be expanded by the shell, which is what SC2016 warns
+      # about and why it is disabled rather than "fixed".
+      # shellcheck disable=SC2016
+      jq_filter='map(to_entries | map(.key as $matrix_key | .value | map_values({($matrix_key): .})))
+        | flatten
+        | reduce .[] as $item ({}; . * $item)'
+
+      result="$(find . -name "$MATRIX_STEP_NAME" -maxdepth 2 -exec cat {} \; | jq -c --slurp "$jq_filter")"
+      echo "result=${result}" | tee -a "$GITHUB_OUTPUT"
+    env:
+      MATRIX_STEP_NAME: ${{ inputs.matrix-step-name }}
