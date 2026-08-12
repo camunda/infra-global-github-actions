@@ -52,7 +52,7 @@ runs:
   using: composite
   steps:
   - name: Restore cache
-    uses: actions/cache@v6
+    uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
     id: tool-cache-argocd
     with:
       path: /usr/local/bin/argocd
@@ -69,11 +69,11 @@ runs:
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server }}
   - name: Ensure that jq is available
-    uses: dcarbone/install-jq-action@v4.0.1
+    uses: dcarbone/install-jq-action@4fcb5062d7ce9bc4382d1a352d19ba3ba2c317c1 # v4.0.1
     #########################################################################
     # Create a GitHub deployment that points to the URL we're going to deploy to.
     # If a Pull Request exists, it will show the status of this deployment.
-  - uses: bobheadxi/deployments@v1.5.0
+  - uses: bobheadxi/deployments@648679e8e4915b27893bd7dbc35cb504dc915bc8 # v1.5.0
     name: Create GitHub deployment
     id: deployment
     with:
@@ -139,7 +139,7 @@ runs:
   - name: Install Teleport
     if: failure() && inputs.github_token != ''
     id: setup_teleport
-    uses: teleport-actions/setup@v1
+    uses: teleport-actions/setup@b638ff596557cc3959eb6b5287d5e58e0c8ac6a6 # v1.1.1
     with:
       proxy: camunda.teleport.sh:443
       version: auto
@@ -148,7 +148,7 @@ runs:
     id: auth_teleport
     env:
       GITHUB_TOKEN: ${{ inputs.github_token }}
-    uses: teleport-actions/auth-k8s@v2
+    uses: teleport-actions/auth-k8s@0f46164469ae4fcd4d359d40e06bab17d4be17c9 # v2.0.6
     with:
       proxy: camunda.teleport.sh:443
       token: infra-ci-prod-github-action-preview-env-infra
@@ -176,7 +176,7 @@ runs:
     # `always()` ensures that the deployment status
     # is updated regardless of previous steps failing.
     if: always()
-    uses: bobheadxi/deployments@v1.5.0
+    uses: bobheadxi/deployments@648679e8e4915b27893bd7dbc35cb504dc915bc8 # v1.5.0
     with:
       step: finish
       token: ${{ github.token }}
@@ -211,7 +211,7 @@ runs:
       echo "$template" >> $GITHUB_STEP_SUMMARY
   - name: Upload deployment status as artifact
     if: always()
-    uses: actions/upload-artifact@v7
+    uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
     with:
       name: deployment-status-${{ github.run_id }}-${{ github.run_attempt }}-${{ inputs.app_name }}
       path: status_${{ inputs.app_name }}.md

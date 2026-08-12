@@ -20,7 +20,7 @@ runs:
   steps:
     - name: Add provided labels to issue
       if: ${{ inputs.labels != '' && github.event.action == 'opened' }}
-      uses: actions/github-script@v9
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -47,14 +47,14 @@ runs:
           console.log("Added labels:", parsed);
 
     - name: Add issue to Quality Board project
-      uses: actions/add-to-project@v2
+      uses: actions/add-to-project@5afcf98fcd03f1c2f92c3c83f58ae24323cc57fd # v2.0.0
       with:
         project-url: https://github.com/orgs/${{ github.repository_owner }}/projects/${{ inputs.project-number }}
         github-token: ${{ inputs.github-token }}
 
     - name: Get project ID
       id: get-project-id
-      uses: actions/github-script@v9
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -74,7 +74,7 @@ runs:
 
     - name: Get project fields
       id: get-project-fields
-      uses: actions/github-script@v9
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -99,7 +99,7 @@ runs:
 
     - name: Get project item ID for issue
       id: get-item
-      uses: actions/github-script@v9
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -149,7 +149,7 @@ runs:
 
     - name: Update Component field
       if: steps.get-item.outputs.itemId != ''
-      uses: actions/github-script@v9
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
       with:
         github-token: ${{ inputs.github-token }}
         script: |

@@ -53,6 +53,14 @@
       matchPackageNames: ["renovatebot/pre-commit-hooks"],
       schedule: ["on Saturday"],
     },
+    // Third-party actions are SHA-pinned (see docs/github-actions-pinning.md).
+    // Renovate derives the update type from the version comment on the `uses:`
+    // line, so pins must carry the FULL version (`# v4.6.0`), never a floating
+    // major (`# v4`): a full version keeps routine upgrades as minor/patch and
+    // auto-merging here, while a major-only comment downgrades every upstream
+    // release to a `digest` update that no rule below auto-merges.
+    // Digest updates are deliberately left out, so a digest-only PR means an
+    // upstream tag moved without a release — review it, don't rubber-stamp it.
     {
       matchUpdateTypes: ["minor", "patch"],
       matchManagers: ["github-actions"],

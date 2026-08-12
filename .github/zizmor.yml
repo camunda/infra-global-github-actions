@@ -1,0 +1,91 @@
+---
+# =============================================================================
+# zizmor.yml — GitHub Actions supply-chain policy for infra-global-github-actions
+#
+# Consumed by the `zizmor` pre-commit hook (see .pre-commit-config.yaml), which
+# runs locally on `pre-commit run -a` and in CI via the pre-commit workflow.
+#
+# This repository is public and its composite actions are consumed by other
+# Camunda teams, so an unpinned third-party action here is not just our own
+# exposure — every downstream repository inherits it transitively.
+#
+# Scope: this repository currently adopts a single zizmor audit, `unpinned-uses`.
+# Every other audit that fires here is explicitly disabled below. The audits are
+# disabled rather than left on because this repo has pre-existing findings for
+# all of them; a lint gate that is red on arrival gates nothing. Each
+# `disable: true` entry is a standing invitation to fix the underlying findings
+# and drop the entry.
+#
+# Docs: https://docs.zizmor.sh/configuration/
+# =============================================================================
+
+rules:
+  unpinned-uses:
+    config:
+      # `policies` maps action-owner globs to a pinning level. Globs are matched
+      # most-specific-first, so the `*` catch-all only applies to owners that no
+      # other entry claims.
+      #
+      #   any       — no constraint; any ref (SHA, tag, branch) is accepted.
+      #   ref-pin   — must carry an explicit ref, symbolic (tag/branch) or SHA.
+      #   hash-pin  — must be a 40-character commit SHA. Tags and branches fail.
+      #
+      # Local references (`uses: ./common-tooling`) are same-repo and are skipped
+      # by this audit entirely, so they need no policy entry.
+      policies:
+        # Everything is hash-pinned, including GitHub's own actions.
+        #
+        # camunda/camunda and infra-core exempt `actions/*` and `github/*` as
+        # "same trust boundary as the runners". That reasoning does not carry
+        # over to this repository, because the binding constraint here is not
+        # our own threat model but GitHub's `Require actions to be pinned to a
+        # full-length commit SHA` setting, which several consumers already
+        # enforce. That setting grants no namespace exemptions:
+        #
+        #   "all actions must be pinned to a full-length commit SHA to be used.
+        #    This includes actions from your organization and actions authored
+        #    by GitHub. Reusable workflows can still be referenced by tag."
+        #   -- https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/enabling-features-for-your-repository/managing-github-actions-settings-for-a-repository
+        #
+        # It is evaluated over the whole dependency tree, so an `actions/foo@v1`
+        # left on a tag inside a composite action here refuses the consumer's
+        # job at `Set up job`, before any step runs, and the consumer cannot
+        # work around it by choosing a different revision of this repository.
+        # A `ref-pin` policy for `actions/*` would therefore be weaker than the
+        # policy already binding on the repositories this gate exists to
+        # protect -- green here, broken downstream.
+        "*": hash-pin
+
+        # The one exemption, and it is a deliberate trade-off rather than a
+        # trust judgement. This repository references itself at `@main`
+        # (setup-yarn-cache -> is-cache-enabled, fossa/info -> setup-gh-cli,
+        # configure-maintenance-pull-request -> configure-pull-request), which
+        # is the contract its consumers rely on: they get the current `main`
+        # without a bump PR. Hash-pinning those would make every internal
+        # change a two-step merge-then-bump.
+        #
+        # KNOWN GAP: because the GitHub setting walks the whole tree, those
+        # three `@main` self-references are still refused for a consumer that
+        # enforces it, even after this change. Closing that means giving up the
+        # `@main` contract, which is a repository-design decision and is
+        # tracked separately rather than settled here.
+        camunda/*: ref-pin
+
+  # --- audits not adopted (yet) ----------------------------------------------
+  # Findings below are pre-existing and unrelated to tag mutability. Enabling
+  # any of them means fixing its findings in the same change. The counts are
+  # from the adopting change (`zizmor 1.29.0 --offline --no-config`, 155
+  # findings across these six audits) and are recorded to show the size of each
+  # backlog, not to be kept current.
+  archived-uses:            # 2 findings — both 8398a7/action-slack, upstream is archived
+    disable: true
+  artipacked:               # 8 findings
+    disable: true
+  excessive-permissions:    # 8 findings
+    disable: true
+  github-app:               # 6 findings
+    disable: true
+  github-env:               # 6 findings
+    disable: true
+  template-injection:       # 125 findings
+    disable: true

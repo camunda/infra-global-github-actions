@@ -39,7 +39,7 @@ runs:
   using: composite
   steps:
   - name: Restore cache
-    uses: actions/cache@v6
+    uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
     id: tool-cache-argocd
     with:
       path: /usr/local/bin/argocd
@@ -64,7 +64,7 @@ runs:
       ARGOCD_OPTS: "--grpc-web"
       ARGOCD_SERVER: ${{ inputs.argocd_server  }}
 
-  - uses: bobheadxi/deployments@v1.5.0
+  - uses: bobheadxi/deployments@648679e8e4915b27893bd7dbc35cb504dc915bc8 # v1.5.0
     if: always()
     name: Deactivate GitHub Deployment environment
     with:
@@ -96,7 +96,7 @@ runs:
       fi
       echo "is-removable=$is_removable" | tee -a $GITHUB_OUTPUT
 
-  - uses: bobheadxi/deployments@v1.5.0
+  - uses: bobheadxi/deployments@648679e8e4915b27893bd7dbc35cb504dc915bc8 # v1.5.0
     if: ${{ steps.removable-environment.outputs.is-removable == 'true' }}
     name: Delete GitHub Environment
     with:
