@@ -1,0 +1,90 @@
+name: Matrix outputs - read
+
+description: |
+  Collect the per-job outputs written by a matrix step and merge them into a single JSON
+  object, keyed by output name then by matrix key. Pair it with
+  cloudposse/github-action-matrix-outputs-write, which is unaffected by the issue below.
+
+inputs:
+  matrix-step-name:
+    description: |
+      Name passed as `matrix-step-name` to the matching write step. It is also the
+      artifact file name this action looks for.
+    required: true
+
+outputs:
+  result:
+    description: |
+      Merged JSON object. For a matrix writing `{"kube": "..."}` under keys `c1` and `c2`,
+      the result is `{"kube": {"c1": "...", "c2": "..."}}`.
+    value: ${{ steps.context.outputs.result }}
+
+runs:
+  using: composite
+  steps:
+  - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+
+  # The upstream action force-installs jq 1.6 through dcarbone/install-jq-action. That
+  # step is deliberately not reproduced: the runner images already ship jq, and the two
+  # versions produce byte-identical output for this program. The install bought nothing
+  # and pulled in one of the two unpinned references this action exists to avoid.
+  - id: context
+    shell: bash
+    run: |
+      set -euo pipefail
+
+      if ! command -v jq >/dev/null 2>&1; then
+        echo "::error::jq is not available on this runner. It ships with the GitHub-hosted images; on a self-hosted runner, install it before calling this action."
+        exit 1
+      fi
+
+      # find -name treats its argument as a glob, so an unconstrained value could match
+      # far more than the intended artifact -- '*' would match every downloaded file and
+      # every directory, and -exec cat on a directory then fails. A path separator would
+      # silently never match, since -name only ever sees basenames.
+      #
+      # Each character is matched as its own quoted pattern rather than through a bracket
+      # expression: escaping [ and ] inside one is subtle enough that a reader cannot tell
+      # at a glance whether both are covered.
+      #
+      # Encoded once, up front, because every ::error:: below interpolates it. A raw newline
+      # would end the workflow command and let the remainder of the value be parsed as
+      # further workflow commands; % and CR are encoded for the same reason. The glob guard
+      # does not cover these characters, so it cannot be relied on to make the value safe.
+      safe_name="$(printf '%s' "$MATRIX_STEP_NAME" \
+        | sed -e 's/%/%25/g' -e 's/\r/%0D/g' \
+        | awk 'BEGIN { ORS = "" } NR > 1 { print "%0A" } { print }')"
+
+      case "$MATRIX_STEP_NAME" in
+        "" | *"*"* | *"?"* | *"["* | *"]"* | *"/"*)
+          echo "::error::matrix-step-name must be a plain artifact name: no '*', '?', '[', ']' or '/', and not empty. Got: ${safe_name}"
+          exit 1
+          ;;
+      esac
+
+      # jq program kept verbatim from the upstream action, only split over several lines
+      # for readability. Single quotes are required: $matrix_key and $item are jq
+      # variables and must not be expanded by the shell, which is what SC2016 warns
+      # about and why it is disabled rather than "fixed".
+      # shellcheck disable=SC2016
+      jq_filter='map(to_entries | map(.key as $matrix_key | .value | map_values({($matrix_key): .})))
+        | flatten
+        | reduce .[] as $item ({}; . * $item)'
+
+      # -maxdepth is a global option: GNU find accepts it after -name, but placing it
+      # first is the documented form and avoids relying on that leniency.
+      result="$(find . -maxdepth 2 -name "$MATRIX_STEP_NAME" -exec cat {} \; | jq -c --slurp "$jq_filter")"
+
+      # An artifact name that matches nothing is not an error to jq: the filter reduces an
+      # empty input to {}, so a typo would hand downstream jobs an empty config and fail
+      # somewhere far from the cause. Fail here instead.
+      if [ "$result" = "{}" ]; then
+        echo "::error::no artifact named '${safe_name}' was found among the downloaded artifacts. Check that matrix-step-name matches the value given to the matching write step, and that the writing jobs completed."
+        exit 1
+      fi
+
+      # Written straight to GITHUB_OUTPUT, never echoed. The merged object carries whatever
+      # the matrix jobs wrote, which in practice includes kubeconfigs and other credentials.
+      echo "result=${result}" >> "$GITHUB_OUTPUT"
+    env:
+      MATRIX_STEP_NAME: ${{ inputs.matrix-step-name }}

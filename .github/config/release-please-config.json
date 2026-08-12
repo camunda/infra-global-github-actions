@@ -79,6 +79,9 @@
     "kubernetes-image-replace": {
       "package-name": "kubernetes-image-replace"
     },
+    "matrix-outputs-read": {
+      "package-name": "matrix-outputs-read"
+    },
     "preview-env": {
       "package-name": "preview-env"
     },
