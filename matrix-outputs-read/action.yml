@@ -42,9 +42,22 @@ runs:
       # far more than the intended artifact -- '*' would match every downloaded file and
       # every directory, and -exec cat on a directory then fails. A path separator would
       # silently never match, since -name only ever sees basenames.
+      #
+      # Each character is matched as its own quoted pattern rather than through a bracket
+      # expression: escaping [ and ] inside one is subtle enough that a reader cannot tell
+      # at a glance whether both are covered.
+      #
+      # Encoded once, up front, because every ::error:: below interpolates it. A raw newline
+      # would end the workflow command and let the remainder of the value be parsed as
+      # further workflow commands; % and CR are encoded for the same reason. The glob guard
+      # does not cover these characters, so it cannot be relied on to make the value safe.
+      safe_name="$(printf '%s' "$MATRIX_STEP_NAME" \
+        | sed -e 's/%/%25/g' -e 's/\r/%0D/g' \
+        | awk 'BEGIN { ORS = "" } NR > 1 { print "%0A" } { print }')"
+
       case "$MATRIX_STEP_NAME" in
-        "" | *[\*\?\[\]/]*)
-          echo "::error::matrix-step-name must be a plain artifact name: no glob characters (* ? [ ]) and no '/'. Got: ${MATRIX_STEP_NAME}"
+        "" | *"*"* | *"?"* | *"["* | *"]"* | *"/"*)
+          echo "::error::matrix-step-name must be a plain artifact name: no '*', '?', '[', ']' or '/', and not empty. Got: ${safe_name}"
           exit 1
           ;;
       esac
@@ -61,6 +74,14 @@ runs:
       # -maxdepth is a global option: GNU find accepts it after -name, but placing it
       # first is the documented form and avoids relying on that leniency.
       result="$(find . -maxdepth 2 -name "$MATRIX_STEP_NAME" -exec cat {} \; | jq -c --slurp "$jq_filter")"
+
+      # An artifact name that matches nothing is not an error to jq: the filter reduces an
+      # empty input to {}, so a typo would hand downstream jobs an empty config and fail
+      # somewhere far from the cause. Fail here instead.
+      if [ "$result" = "{}" ]; then
+        echo "::error::no artifact named '${safe_name}' was found among the downloaded artifacts. Check that matrix-step-name matches the value given to the matching write step, and that the writing jobs completed."
+        exit 1
+      fi
 
       # Written straight to GITHUB_OUTPUT, never echoed. The merged object carries whatever
       # the matrix jobs wrote, which in practice includes kubeconfigs and other credentials.
