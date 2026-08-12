@@ -24,6 +24,53 @@ jobs:
       - run: |
           echo "::add-matcher::actionlint/actionlint-matcher.json"
 
-      - uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+      # pre-commit/action is deliberately not used: its action.yml resolves
+      # `actions/cache@v4`, an unpinned reference. GitHub evaluates "Require
+      # actions to be pinned to a full-length commit SHA" over the entire
+      # dependency tree at Set up job, so with that setting enabled this
+      # workflow -- the one enforcing the pinning policy -- would be refused
+      # before any step could run, and could not prove the gate works.
+      #
+      # Inlining also drops the `pip install pre-commit` the action performs,
+      # which installed the latest release over the version pinned in
+      # .tool-versions and already provided by the asdf step above.
+      - name: Check pre-commit matches .tool-versions
+        run: |
+          set -euo pipefail
+
+          expected="$(awk '$1 == "pre-commit" { print $2; exit }' .tool-versions)"
+          if [ -z "$expected" ]; then
+            echo "::error::.tool-versions does not pin pre-commit. Add a 'pre-commit <version>' line; the asdf step above installs it from there."
+            exit 1
+          fi
+
+          if ! command -v pre-commit >/dev/null 2>&1; then
+            echo "::error::pre-commit is not installed. The asdf step above should have provided ${expected} from .tool-versions."
+            exit 1
+          fi
+
+          # Not just a PATH check: a pre-commit shipped with the runner image would
+          # satisfy `command -v` while silently running a different version from the
+          # one this repository pins, which is the failure mode inlining is meant to
+          # remove.
+          actual="$(pre-commit --version | awk '{ print $2 }')"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::pre-commit ${actual} is on PATH but .tool-versions pins ${expected}. The asdf install did not take effect."
+            exit 1
+          fi
+          echo "pre-commit ${actual} matches .tool-versions"
+
+      - name: Cache pre-commit hook environments
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          extra_args: --all-files --verbose
+          path: ~/.cache/pre-commit
+          # pythonLocation is load-bearing: this workflow resolves Python through
+          # `actions/setup-python` with a floating `3.x`, so a Python upgrade changes
+          # the interpreter the hook environments are built against while every other
+          # component of the key stays identical. Without it an upgrade restores the
+          # stale environments on an exact key hit, pre-commit rebuilds them, and the
+          # rebuild is never saved -- reinstalling on every run, forever.
+          key: pre-commit-1|${{ runner.os }}|${{ env.pythonLocation }}|${{ hashFiles('.pre-commit-config.yaml', '.tool-versions') }}
+
+      - name: Run pre-commit
+        run: pre-commit run --show-diff-on-failure --color=always --all-files --verbose
