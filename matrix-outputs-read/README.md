@@ -45,7 +45,7 @@ jobs:
       matrix:
         cluster: [c1, c2]
     steps:
-      - uses: cloudposse/github-action-matrix-outputs-write@ed06cf3a6bf23b8dce36d1cf0d63123885bb8375 # v1
+      - uses: cloudposse/github-action-matrix-outputs-write@ed06cf3a6bf23b8dce36d1cf0d63123885bb8375 # v1.0.0
         with:
           matrix-step-name: prepare-clusters
           matrix-key: ${{ matrix.cluster }}

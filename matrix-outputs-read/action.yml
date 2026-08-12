@@ -38,6 +38,17 @@ runs:
         exit 1
       fi
 
+      # find -name treats its argument as a glob, so an unconstrained value could match
+      # far more than the intended artifact -- '*' would match every downloaded file and
+      # every directory, and -exec cat on a directory then fails. A path separator would
+      # silently never match, since -name only ever sees basenames.
+      case "$MATRIX_STEP_NAME" in
+        "" | *[\*\?\[\]/]*)
+          echo "::error::matrix-step-name must be a plain artifact name: no glob characters (* ? [ ]) and no '/'. Got: ${MATRIX_STEP_NAME}"
+          exit 1
+          ;;
+      esac
+
       # jq program kept verbatim from the upstream action, only split over several lines
       # for readability. Single quotes are required: $matrix_key and $item are jq
       # variables and must not be expanded by the shell, which is what SC2016 warns
@@ -47,7 +58,12 @@ runs:
         | flatten
         | reduce .[] as $item ({}; . * $item)'
 
-      result="$(find . -name "$MATRIX_STEP_NAME" -maxdepth 2 -exec cat {} \; | jq -c --slurp "$jq_filter")"
-      echo "result=${result}" | tee -a "$GITHUB_OUTPUT"
+      # -maxdepth is a global option: GNU find accepts it after -name, but placing it
+      # first is the documented form and avoids relying on that leniency.
+      result="$(find . -maxdepth 2 -name "$MATRIX_STEP_NAME" -exec cat {} \; | jq -c --slurp "$jq_filter")"
+
+      # Written straight to GITHUB_OUTPUT, never echoed. The merged object carries whatever
+      # the matrix jobs wrote, which in practice includes kubeconfigs and other credentials.
+      echo "result=${result}" >> "$GITHUB_OUTPUT"
     env:
       MATRIX_STEP_NAME: ${{ inputs.matrix-step-name }}
