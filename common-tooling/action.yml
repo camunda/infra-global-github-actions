@@ -211,14 +211,14 @@ runs:
   - name: Set up QEMU
     if: ${{ inputs.qemu-enabled == 'true' }}
     id: qemu
-    uses: docker/setup-qemu-action@v4
+    uses: docker/setup-qemu-action@96fe6ef7f33517b61c61be40b68a1882f3264fb8 # v4.2.0
     with:
       image: ${{ inputs.qemu-image }}
       platforms: ${{ inputs.qemu-platforms }}
   # Docker Buildx
   - name: Set up Docker Buildx
     if: ${{ inputs.buildx-enabled == 'true' && ( env.buildx_missing == 'true' || inputs.overwrite == 'true' ) }}
-    uses: docker/setup-buildx-action@v4
+    uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
     with:
       version: ${{ inputs.buildx-version }}
       driver: ${{ inputs.buildx-driver }}
@@ -243,7 +243,7 @@ runs:
       export PATH="$PATH:`yarn global bin`"
   # Install node
   - name: Install NodeJS
-    uses: actions/setup-node@v7
+    uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
     if: ${{ inputs.node-enabled == 'true' && ( env.node_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:
       always-auth: ${{ inputs.node-always-auth }}
@@ -260,7 +260,7 @@ runs:
   # Setup Maven
   - name: Setup Maven Action
     if: ${{ inputs.java-enabled == 'true' && ( env.java_missing == 'true' || inputs.overwrite == 'true' ) }}
-    uses: s4u/setup-maven-action@v1.20.0
+    uses: s4u/setup-maven-action@ba34de01b7f4ba2ab8e2860df8993a29f4477056 # v1.20.0
     with:
       checkout-enabled: false
       java-version: ${{ inputs.java-version }}
@@ -272,7 +272,7 @@ runs:
 
   # Install Python, it's absent on self-hosted runners
   - name: Install Python3 (std install)
-    uses: actions/setup-python@v7
+    uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
     # actions/setup-python doesn't yet support ARM
     if: ${{ !contains(runner.arch, 'arm') && inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:
@@ -287,7 +287,7 @@ runs:
       allow-prereleases: ${{ inputs.python-allow-prereleases }}
 
   - name: Install Python3 (arm install)
-    uses: deadsnakes/action@v3.2.0
+    uses: deadsnakes/action@e640ac8743173a67cca4d7d77cd837e514bf98e8 # v3.2.0
     # actions/setup-python doesn't yet support ARM, see https://github.com/actions/setup-python/issues/705#issuecomment-1756948951
     if: ${{ contains(runner.arch, 'arm') && inputs.python-enabled == 'true' && ( env.python_missing == 'true' || inputs.overwrite == 'true' ) }}
     with:

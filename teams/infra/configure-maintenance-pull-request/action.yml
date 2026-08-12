@@ -103,7 +103,7 @@ runs:
 
   - name: Alert Infra team medic on security Pull Requests
     if: steps.pr-event-info.outputs.action == 'opened' && steps.pr-event-info.outputs.vendor == 'snyk'
-    uses: 8398a7/action-slack@v3
+    uses: 8398a7/action-slack@77eaa4f1c608a7d68b38af4e3f739dcd8cba273e # v3.19.0
     with:
       text: ":snyk: Security Pull Request opened"
       status: failure

@@ -108,7 +108,7 @@ runs:
 
     - name: Import Secrets
       id: vault-secrets
-      uses: hashicorp/vault-action@v4.0.0
+      uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
       with:
         url: ${{ inputs.vault-addr }}
         method: ${{ inputs.vault-auth-method }}
@@ -123,7 +123,7 @@ runs:
 
     - name: Generate a GitHub token for infra-rerun camunda/infra-global-github-actions
       id: github-token
-      uses: actions/create-github-app-token@v3
+      uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
       with:
         app-id: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_ID }}
         private-key: ${{ steps.vault-secrets.outputs.RETRIGGER_APP_KEY }}
@@ -153,7 +153,7 @@ runs:
       shell: bash
 
     - name: Trigger retry-worfklow-run.yml
-      uses: codex-/return-dispatch@v3
+      uses: codex-/return-dispatch@08365b69369e9eb639ce4c4cbbd29598bc52ca3a # v3.0.3
       id: dispatch
       with:
         owner: camunda
