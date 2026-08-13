@@ -82,6 +82,9 @@
     "matrix-outputs-read": {
       "package-name": "matrix-outputs-read"
     },
+    "observe-build-status": {
+      "package-name": "observe-build-status"
+    },
     "preview-env": {
       "package-name": "preview-env"
     },

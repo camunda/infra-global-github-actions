@@ -1,0 +1,178 @@
+---
+name: Observe Build Status
+
+description: |
+  Reports a job's outcome, duration and runner resource usage to CI Analytics.
+
+  Wraps start-build-monitor and submit-build-status so a caller needs two steps instead of a
+  vendored copy of the Vault plumbing. start-build-monitor must still be the FIRST step of the
+  job: it starts the resource sampler and writes /tmp/_monitor-start.pid, whose mtime this
+  action uses as the job-start anchor. Call this action LAST, with `if: always()`, so failed
+  and cancelled jobs are reported too.
+
+  Every step is best-effort: a Vault outage, a BigQuery error or an uncomputable duration is
+  reported as a warning and never fails the job being measured.
+
+  Authenticate with either JWT/OIDC (preferred: no long-lived credential) or AppRole. Leave
+  secret_vault_address empty to disable reporting entirely, so forks and local runs are
+  unaffected.
+
+inputs:
+  build_status:
+    description: 'Outcome of the job, normally ${{ job.status }}: one of success, failure, cancelled.'
+    required: true
+  job_name:
+    description: |
+      Value recorded in the job_name column. Defaults to $GITHUB_JOB when omitted, which is
+      ambiguous for matrix jobs: pass `${{ github.job }}/${{ matrix.<key> }}` so each matrix leg
+      is distinguishable. Use `/` as the separator, since matrix values routinely contain `-`.
+    required: false
+  user_reason:
+    description: Optional string (200 chars max) categorising why the job ended this way, e.g. flaky-tests.
+    required: false
+  user_description:
+    description: Optional string (1000 chars max) detailing user_reason, e.g. the list of flaky tests.
+    required: false
+
+  ci_analytics_secret_path:
+    description: |
+      Vault path holding the CI Analytics Google service-account key under the gcloud_sa_key key.
+      Per-team by convention: secret/data/products/<product>/ci/ci-analytics. Required whenever
+      secret_vault_address is set.
+    required: true
+  secret_vault_address:
+    description: |
+      Vault server URL. It is the opt-in switch for this action: leave it empty to disable
+      reporting entirely.
+    required: false
+  secret_vault_jwt_path:
+    description: Vault JWT auth mount path. JWT/OIDC authentication, preferred over AppRole.
+    required: false
+  secret_vault_jwt_role:
+    description: |
+      Vault JWT auth role. Setting it selects JWT authentication, and together with
+      secret_vault_address it forms a complete credential set. The calling job needs
+      `permissions: id-token: write` so GitHub mints the OIDC token.
+    required: false
+  secret_vault_jwt_audience:
+    description: Vault JWT GitHub audience.
+    required: false
+  secret_vault_roleId:
+    description: |
+      Vault AppRole role ID. Used only when secret_vault_jwt_role is empty, and only together
+      with secret_vault_secretId. Prefer JWT, which stores no long-lived credential as a
+      repository secret.
+    required: false
+  secret_vault_secretId:
+    description: Vault AppRole secret ID. See secret_vault_roleId.
+    required: false
+
+runs:
+  using: composite
+  steps:
+  # Composite actions cannot read the `secrets` context, so callers pass the Vault configuration
+  # as inputs and it resolves here through `inputs.*`.
+  #
+  # `continue-on-error` on both auth steps is deliberate: a Vault outage, a missing policy or a
+  # fork PR without secrets must degrade to "no metrics", never fail the job being measured.
+  - name: Import CI Analytics secret (JWT)
+    id: secrets-jwt
+    if: ${{ inputs.secret_vault_address != '' && inputs.secret_vault_jwt_role != '' && inputs.ci_analytics_secret_path != '' }}
+    continue-on-error: true
+    uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
+    with:
+      url: ${{ inputs.secret_vault_address }}
+      method: jwt
+      path: ${{ inputs.secret_vault_jwt_path }}
+      role: ${{ inputs.secret_vault_jwt_role }}
+      jwtGithubAudience: ${{ inputs.secret_vault_jwt_audience }}
+      exportEnv: false # step outputs are enough; keep the key out of the job environment
+      secrets: |
+        ${{ inputs.ci_analytics_secret_path }} gcloud_sa_key;
+
+  # AppRole is the migration path for repositories that have not moved to OIDC yet. It is
+  # skipped as soon as a JWT role is configured, so a repository can carry both sets of inputs
+  # while it migrates. Both AppRole inputs are required: authenticating with half a credential
+  # set only produces a failure and a misleading "Vault read failed" warning.
+  - name: Import CI Analytics secret (AppRole)
+    id: secrets-approle
+    if: ${{ inputs.secret_vault_address != '' && inputs.secret_vault_jwt_role == '' && inputs.secret_vault_roleId != '' && inputs.secret_vault_secretId != '' && inputs.ci_analytics_secret_path != '' }}
+    continue-on-error: true
+    uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
+    with:
+      url: ${{ inputs.secret_vault_address }}
+      method: approle
+      roleId: ${{ inputs.secret_vault_roleId }}
+      secretId: ${{ inputs.secret_vault_secretId }}
+      exportEnv: false # step outputs are enough; keep the key out of the job environment
+      secrets: |
+        ${{ inputs.ci_analytics_secret_path }} gcloud_sa_key;
+
+  # secret_vault_address is the opt-in switch, so setting it without everything else needed is a
+  # configuration mistake rather than an opt-out. Say so explicitly: silently doing nothing here
+  # would leave a repository believing it reports metrics when it does not.
+  - name: Check CI Analytics configuration
+    if: >-
+      ${{ inputs.secret_vault_address != ''
+      && (inputs.ci_analytics_secret_path == ''
+      || (inputs.secret_vault_jwt_role == ''
+      && !(inputs.secret_vault_roleId != '' && inputs.secret_vault_secretId != ''))) }}
+    shell: bash
+    run: |
+      echo "::warning::Not sending CI health metrics: secret_vault_address is set but the configuration is incomplete. Provide ci_analytics_secret_path, plus either secret_vault_jwt_role (JWT, preferred) or both secret_vault_roleId and secret_vault_secretId (AppRole). Leave secret_vault_address empty to disable reporting on purpose."
+
+  # Only reachable once a complete configuration was supplied, so this always means a real
+  # failure: a Vault outage, or a role without a policy on ci_analytics_secret_path.
+  - name: Check CI Analytics secret availability
+    if: >-
+      ${{ inputs.secret_vault_address != ''
+      && inputs.ci_analytics_secret_path != ''
+      && (inputs.secret_vault_jwt_role != ''
+      || (inputs.secret_vault_roleId != '' && inputs.secret_vault_secretId != ''))
+      && steps.secrets-jwt.outputs.gcloud_sa_key == ''
+      && steps.secrets-approle.outputs.gcloud_sa_key == '' }}
+    shell: bash
+    run: |
+      echo "::warning::Not sending CI health metrics: could not read gcloud_sa_key from ${{ inputs.ci_analytics_secret_path }}. Check that the Vault role has a policy on that path."
+
+  - name: Get build duration in milliseconds
+    id: duration
+    if: ${{ steps.secrets-jwt.outputs.gcloud_sa_key != '' || steps.secrets-approle.outputs.gcloud_sa_key != '' }}
+    continue-on-error: true # a duration we cannot compute must not fail the job being measured
+    shell: bash
+    run: |
+      set -euo pipefail
+
+      # start-build-monitor writes this file as its first action, so its mtime is the closest
+      # available proxy for the job start. Anchoring on anything else -- $GITHUB_ACTION_PATH, the
+      # checkout -- silently under-reports by however long setup, tool installation and image
+      # pulls took, and a wrong duration is worse than a missing one in a duration dashboard.
+      if [ ! -f /tmp/_monitor-start.pid ]; then
+        echo "::warning::Not sending build duration: start-build-monitor did not create /tmp/_monitor-start.pid. Is it the first step of this job?"
+        echo "result=" >> "$GITHUB_OUTPUT"
+        exit 0
+      fi
+
+      start=$(date -r /tmp/_monitor-start.pid +'%s')
+      now=$(date +'%s')
+      duration=$(( now - start ))
+
+      # Only submit plausible durations, between 0 and 72 hours.
+      if (( duration >= 0 && duration <= 259200 )); then
+        echo "result=$(( duration * 1000 ))" >> "$GITHUB_OUTPUT"
+      else
+        echo "::warning::Not sending build duration: computed ${duration}s, outside the expected range."
+        echo "result=" >> "$GITHUB_OUTPUT"
+      fi
+
+  - name: Submit build status
+    if: ${{ always() && (steps.secrets-jwt.outputs.gcloud_sa_key != '' || steps.secrets-approle.outputs.gcloud_sa_key != '') }}
+    continue-on-error: true # BigQuery or network trouble must not fail the job being measured
+    uses: camunda/infra-global-github-actions/submit-build-status@main
+    with:
+      job_name_override: ${{ inputs.job_name }}
+      build_status: ${{ inputs.build_status }}
+      build_duration_millis: ${{ steps.duration.outputs.result }}
+      user_reason: ${{ inputs.user_reason }}
+      user_description: ${{ inputs.user_description }}
+      gcp_credentials_json: ${{ steps.secrets-jwt.outputs.gcloud_sa_key || steps.secrets-approle.outputs.gcloud_sa_key }}

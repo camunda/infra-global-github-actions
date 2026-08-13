@@ -14,6 +14,7 @@
   "is-cache-enabled": "1.0.0",
   "kubernetes-image-replace": "0.0.0",
   "matrix-outputs-read": "0.0.0",
+  "observe-build-status": "0.0.0",
   "preview-env": "1.0.11",
   "previous-version": "1.0.0",
   "renovate-pr-maintainer": "1.2.0",
