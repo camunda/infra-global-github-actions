@@ -48,16 +48,21 @@ inputs:
       reporting entirely.
     required: false
   secret_vault_jwt_path:
-    description: Vault JWT auth mount path. JWT/OIDC authentication, preferred over AppRole.
+    description: |
+      Vault JWT auth mount path. Together with secret_vault_jwt_role and secret_vault_address it
+      forms a complete JWT credential set. vault-action would fall back to its own default mount
+      if omitted, but every JWT caller in the organisation passes it explicitly, so an empty
+      value is treated as a configuration mistake rather than an implicit default.
     required: false
   secret_vault_jwt_role:
     description: |
-      Vault JWT auth role. Setting it selects JWT authentication, and together with
-      secret_vault_address it forms a complete credential set. The calling job needs
+      Vault JWT auth role. Setting it selects JWT authentication. The calling job needs
       `permissions: id-token: write` so GitHub mints the OIDC token.
     required: false
   secret_vault_jwt_audience:
-    description: Vault JWT GitHub audience.
+    description: |
+      Vault JWT GitHub audience. Optional and not part of the completeness check: vault-action
+      applies a working default, and no existing caller sets it.
     required: false
   secret_vault_roleId:
     description: |
@@ -79,7 +84,7 @@ runs:
   # fork PR without secrets must degrade to "no metrics", never fail the job being measured.
   - name: Import CI Analytics secret (JWT)
     id: secrets-jwt
-    if: ${{ inputs.secret_vault_address != '' && inputs.secret_vault_jwt_role != '' && inputs.ci_analytics_secret_path != '' }}
+    if: ${{ inputs.secret_vault_address != '' && inputs.secret_vault_jwt_role != '' && inputs.secret_vault_jwt_path != '' && inputs.ci_analytics_secret_path != '' }}
     continue-on-error: true
     uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
     with:
@@ -117,11 +122,11 @@ runs:
     if: >-
       ${{ inputs.secret_vault_address != ''
       && (inputs.ci_analytics_secret_path == ''
-      || (inputs.secret_vault_jwt_role == ''
-      && !(inputs.secret_vault_roleId != '' && inputs.secret_vault_secretId != ''))) }}
+      || !((inputs.secret_vault_jwt_role != '' && inputs.secret_vault_jwt_path != '')
+      || (inputs.secret_vault_roleId != '' && inputs.secret_vault_secretId != ''))) }}
     shell: bash
     run: |
-      echo "::warning::Not sending CI health metrics: secret_vault_address is set but the configuration is incomplete. Provide ci_analytics_secret_path, plus either secret_vault_jwt_role (JWT, preferred) or both secret_vault_roleId and secret_vault_secretId (AppRole). Leave secret_vault_address empty to disable reporting on purpose."
+      echo "::warning::Not sending CI health metrics: secret_vault_address is set but the configuration is incomplete. Provide ci_analytics_secret_path, plus either both secret_vault_jwt_path and secret_vault_jwt_role (JWT, preferred) or both secret_vault_roleId and secret_vault_secretId (AppRole). Leave secret_vault_address empty to disable reporting on purpose."
 
   # Only reachable once a complete configuration was supplied, so this always means a real
   # failure: a Vault outage, or a role without a policy on ci_analytics_secret_path.
@@ -129,7 +134,7 @@ runs:
     if: >-
       ${{ inputs.secret_vault_address != ''
       && inputs.ci_analytics_secret_path != ''
-      && (inputs.secret_vault_jwt_role != ''
+      && ((inputs.secret_vault_jwt_role != '' && inputs.secret_vault_jwt_path != '')
       || (inputs.secret_vault_roleId != '' && inputs.secret_vault_secretId != ''))
       && steps.secrets-jwt.outputs.gcloud_sa_key == ''
       && steps.secrets-approle.outputs.gcloud_sa_key == '' }}

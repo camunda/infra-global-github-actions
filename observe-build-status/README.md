@@ -71,7 +71,7 @@ For a repository still on AppRole, swap the last three inputs:
 | `user_description` | Optional string (1000 chars max) detailing `user_reason`, e.g. the list of flaky tests |
 | `ci_analytics_secret_path` | Vault path holding the CI Analytics service-account key under `gcloud_sa_key`. By convention `secret/data/products/<product>/ci/ci-analytics`. Needed whenever `secret_vault_address` is set |
 | `secret_vault_address` | Vault server URL. The opt-in switch: leave empty to disable reporting entirely |
-| `secret_vault_jwt_path` | Vault JWT auth mount path |
+| `secret_vault_jwt_path` | Vault JWT auth mount path. Part of the complete JWT set |
 | `secret_vault_jwt_role` | Vault JWT auth role. Setting it selects JWT authentication |
 | `secret_vault_jwt_audience` | Vault JWT GitHub audience |
 | `secret_vault_roleId` | Vault AppRole role ID. Used only when `secret_vault_jwt_role` is empty |
@@ -81,7 +81,9 @@ For a repository still on AppRole, swap the last three inputs:
 
 The action is a no-op when `secret_vault_address` is empty, so forks, local runs and repositories that have not opted in are unaffected — no annotations, no failed steps.
 
-When `secret_vault_address` **is** set, the configuration must be complete: `ci_analytics_secret_path`, plus either `secret_vault_jwt_role` or both AppRole inputs. An incomplete set is a configuration mistake rather than an opt-out, and produces a warning naming what is missing. Treating it as "no credentials" instead would leave a repository believing it reports metrics when it does not.
+When `secret_vault_address` **is** set, the configuration must be complete: `ci_analytics_secret_path`, plus either both `secret_vault_jwt_path` and `secret_vault_jwt_role`, or both AppRole inputs. An incomplete set is a configuration mistake rather than an opt-out, and produces a warning naming what is missing. Treating it as "no credentials" instead would leave a repository believing it reports metrics when it does not.
+
+`secret_vault_jwt_audience` is deliberately outside that check: `vault-action` applies a working default and no existing caller in the organisation sets it. `secret_vault_jwt_path` is inside it because every existing JWT caller does pass it — relying on `vault-action`'s default mount silently instead would produce an authentication failure reported as a missing Vault policy.
 
 The build duration is derived from the mtime of `/tmp/_monitor-start.pid`, written by `start-build-monitor`. If that file is absent the action warns and omits `build_duration_millis` rather than falling back to a later anchor: an under-reported duration is worse than a missing one in a duration dashboard. Durations outside 0–72h are dropped the same way.
 
