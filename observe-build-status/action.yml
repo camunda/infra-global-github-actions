@@ -37,9 +37,11 @@ inputs:
   ci_analytics_secret_path:
     description: |
       Vault path holding the CI Analytics Google service-account key under the gcloud_sa_key key.
-      Per-team by convention: secret/data/products/<product>/ci/ci-analytics. Required whenever
-      secret_vault_address is set.
-    required: true
+      Per-team by convention: secret/data/products/<product>/ci/ci-analytics. Needed whenever
+      secret_vault_address is set; omitting it there is reported as a configuration mistake.
+      Not marked required, so a caller that leaves secret_vault_address empty to disable
+      reporting does not have to pass it.
+    required: false
   secret_vault_address:
     description: |
       Vault server URL. It is the opt-in switch for this action: leave it empty to disable

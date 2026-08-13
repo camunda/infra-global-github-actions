@@ -1,6 +1,6 @@
 # observe-build-status
 
-This composite Github Action (GHA) reports a job's outcome, duration and runner resource usage to [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics).
+This composite GitHub Action (GHA) reports a job's outcome, duration and runner resource usage to [CI Analytics](https://confluence.camunda.com/display/HAN/CI+Analytics).
 
 It wraps [`start-build-monitor`](../start-build-monitor) and [`submit-build-status`](../submit-build-status) together with the Vault plumbing that fetches the CI Analytics credentials, so a repository needs two workflow steps rather than a vendored copy of that plumbing.
 
@@ -69,7 +69,7 @@ For a repository still on AppRole, swap the last three inputs:
 | `job_name` | Optional. Value recorded in the `job_name` column; defaults to `$GITHUB_JOB` |
 | `user_reason` | Optional string (200 chars max) categorising why the job ended this way, e.g. `flaky-tests` |
 | `user_description` | Optional string (1000 chars max) detailing `user_reason`, e.g. the list of flaky tests |
-| `ci_analytics_secret_path` | Vault path holding the CI Analytics service-account key under `gcloud_sa_key`. By convention `secret/data/products/<product>/ci/ci-analytics` |
+| `ci_analytics_secret_path` | Vault path holding the CI Analytics service-account key under `gcloud_sa_key`. By convention `secret/data/products/<product>/ci/ci-analytics`. Needed whenever `secret_vault_address` is set |
 | `secret_vault_address` | Vault server URL. The opt-in switch: leave empty to disable reporting entirely |
 | `secret_vault_jwt_path` | Vault JWT auth mount path |
 | `secret_vault_jwt_role` | Vault JWT auth role. Setting it selects JWT authentication |
