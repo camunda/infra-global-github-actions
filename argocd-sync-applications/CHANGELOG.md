@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.11 (2026-08-15)
+
+## What's Changed
+* chore: create placeholder for ubicloud test by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/769
+* chore(deps): update dependency fossas/fossa-cli to v3.17.16 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/774
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.14.10 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/775
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/777
+* fix: pin vault-action and create-github-app-token to full-length SHAs by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/779
+* ci: pin every GitHub Action to a commit SHA and enforce it with zizmor by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/781
+* ci: inline pre-commit so the pinning gate can run by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/783
+* feat: add matrix-outputs-read by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/784
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.30.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/787
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/argocd-sync-applications-1.0.10...argocd-sync-applications-1.0.11
+
 ## 1.0.10 (2026-08-01)
 
 ## What's Changed

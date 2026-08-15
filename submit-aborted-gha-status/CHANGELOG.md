@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.0.4 (2026-08-15)
+
+## What's Changed
+* feat: self-mint app tokens and classify failures in ensure-pr-passes-merge-queue by @bkenez in https://github.com/camunda/infra-global-github-actions/pull/754
+* chore(deps): update dependency fossas/fossa-cli to v3.17.13 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/755
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.269.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/756
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.270.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/760
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/759
+* chore(deps): update slackapi/slack-github-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/758
+* chore(deps): update actions/setup-node action to v7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/757
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/761
+* chore(deps): update dependency fossas/fossa-cli to v3.17.14 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/762
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.280.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/764
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/766
+* chore(deps): update dependency pre-commit to v4.6.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/763
+* chore(deps): update actions/setup-python action to v7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/765
+* fix: make preview-env clean catch-all step best-effort by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/768
+* chore(deps): update dependency fossas/fossa-cli to v3.17.15 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/770
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/771
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/773
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/767
+* chore: create placeholder for ubicloud test by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/769
+* chore(deps): update dependency fossas/fossa-cli to v3.17.16 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/774
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.14.10 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/775
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/777
+* fix: pin vault-action and create-github-app-token to full-length SHAs by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/779
+* ci: pin every GitHub Action to a commit SHA and enforce it with zizmor by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/781
+* ci: inline pre-commit so the pinning gate can run by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/783
+* feat: add matrix-outputs-read by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/784
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.30.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/787
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/submit-aborted-gha-status-1.0.3...submit-aborted-gha-status-1.0.4
+
 ## 1.0.3 (2026-07-14)
 
 ## What's Changed
