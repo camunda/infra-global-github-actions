@@ -1,5 +1,81 @@
 # Changelog
 
+## 1.0.4 (2026-08-15)
+
+## What's Changed
+* feat: add dependency-vuln-check action by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/704
+* chore(deps): update pre-commit hooks to v43.218.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/711
+* chore(deps): update pre-commit hooks to v43.220.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/713
+* chore(deps): update actions/setup-python action to v6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/712
+* feat: add renovate-pr-maintainer action by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/710
+* feat: resolve vuln-gate base to nearest snapshotted ancestor by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/715
+* feat(renovate-pr-maintainer): faster, safer, and tunable PR maintenance by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/714
+* ci: make renovate-pr-maintainer releasable by release-please by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/716
+* feat(renovate-pr-maintainer): link PRs and report per-run outcome in summary by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/718
+* feat(renovate-pr-maintainer): add require-up-to-date-strategy and surface merge blockers by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/719
+* chore(deps): update dependency fossas/fossa-cli to v3.17.11 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/720
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/721
+* chore(deps): update pre-commit hooks to v43.227.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/722
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/717
+* chore(deps): update actions/checkout action to v7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/723
+* chore: adds workflow_ref value for new column to build_status_v2 table by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/725
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/724
+* feat(renovate-pr-maintainer): surface processed PRs as a structured output by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/727
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.244.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/729
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.245.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/732
+* chore(deps): update actions/cache action to v6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/730
+* chore(deps): update dcarbone/install-jq-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/731
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/728
+* feat(renovate-pr-maintainer): surface merge-queue state instead of unknown by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/734
+* fix(renovate-pr-maintainer): flag conflicted human-edited PRs as stuck by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/736
+* feat: capture per-job network egress/ingress bytes by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/733
+* chore(deps): update dependency fossas/fossa-cli to v3.17.12 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/737
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.251.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/738
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/735
+* fix: fall back to default branch when base-ref has no snapshots (stacked PR support) by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/739
+* fix(assert-camunda-git-emails): allow noreply@anthropic.com in email allowlist by @claude[bot] in https://github.com/camunda/infra-global-github-actions/pull/742
+* fix: key pre-existing dep filter on base-sha, not latest snapshot by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/741
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/745
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.257.7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/746
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.258.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/747
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.259.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/748
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/743
+* feat: fail closed on unverified head snapshot in dependency-vuln-check by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/749
+* fix: detect runner aborts from raw job logs instead of annotations by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/744
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/750
+* feat: self-mint app tokens and classify failures in ensure-pr-passes-merge-queue by @bkenez in https://github.com/camunda/infra-global-github-actions/pull/754
+* chore(deps): update dependency fossas/fossa-cli to v3.17.13 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/755
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.269.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/756
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.270.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/760
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/759
+* chore(deps): update slackapi/slack-github-action action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/758
+* chore(deps): update actions/setup-node action to v7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/757
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/761
+* chore(deps): update dependency fossas/fossa-cli to v3.17.14 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/762
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v43.280.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/764
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/766
+* chore(deps): update dependency pre-commit to v4.6.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/763
+* chore(deps): update actions/setup-python action to v7 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/765
+* fix: make preview-env clean catch-all step best-effort by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/768
+* chore(deps): update dependency fossas/fossa-cli to v3.17.15 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/770
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.4.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/771
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/773
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/767
+* chore: create placeholder for ubicloud test by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/769
+* chore(deps): update dependency fossas/fossa-cli to v3.17.16 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/774
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.14.10 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/775
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/777
+* fix: pin vault-action and create-github-app-token to full-length SHAs by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/779
+* ci: pin every GitHub Action to a commit SHA and enforce it with zizmor by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/781
+* ci: inline pre-commit so the pinning gate can run by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/783
+* feat: add matrix-outputs-read by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/784
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.30.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/787
+
+## New Contributors
+* @claude[bot] made their first contribution in https://github.com/camunda/infra-global-github-actions/pull/742
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/yq-yaml-processor-1.0.3...yq-yaml-processor-1.0.4
+
 ## 1.0.3 (2026-06-06)
 
 ## What's Changed
