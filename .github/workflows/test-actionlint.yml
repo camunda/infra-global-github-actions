@@ -1,0 +1,61 @@
+---
+name: Test actionlint
+
+on:
+  pull_request:
+    paths:
+    - 'actionlint/**'
+    - '.github/workflows/test-actionlint.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  # Exercises the install on both architectures the org runs on: the action
+  # resolves the release asset from `uname`, so amd64 and arm64 take different
+  # branches and only a real run on each proves them.
+  test-actionlint:
+    strategy:
+      fail-fast: false
+      matrix:
+        label: ["ubuntu-latest", "aws-arm-core-2-default"]
+    runs-on: ${{ matrix.label }}
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Lint this repository with the action
+      uses: ./actionlint
+      with:
+        # The apostrophe is the point. This value used to be pasted into a
+        # command string that was then eval'd, where it terminated the quoting
+        # and produced a shell syntax error; it now has to survive as a plain
+        # regular expression that happens to match nothing.
+        ignore: |-
+          it's not a pattern that matches anything
+
+  # The installer used to pipe whatever the download URL returned into bash, so
+  # an HTTP error page was executed and the job carried on. A release that does
+  # not exist must now stop the step.
+  test-actionlint-rejects-unknown-version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Ask for a release that does not exist
+      id: missing-version
+      continue-on-error: true
+      uses: ./actionlint
+      with:
+        version: "0.0.0"
+
+    - name: The failed download must have failed the step
+      env:
+        OUTCOME: ${{ steps.missing-version.outcome }}
+      run: |
+        if [[ "${OUTCOME}" != "failure" ]]; then
+          echo "expected the action to fail for a non-existent release, got: ${OUTCOME}" >&2
+          exit 1
+        fi
+      shell: bash
