@@ -110,16 +110,20 @@ runs:
 
         # Ignore error messages
         if [[ -n "$IGNORE_MESSAGES" ]]; then
-          # Remove empty or space-only lines from ignore messages
-          non_empty_lines=$(echo "$IGNORE_MESSAGES" | sed '/^[[:space:]]*$/d')
-          while read -r line
+          # Remove empty or space-only lines from ignore messages.
+          # printf rather than echo, and `IFS= read` rather than `read`, so a
+          # pattern reaches actionlint exactly as written: `echo` swallows a
+          # line consisting of just `-n` or `-e`, and `read` without IFS strips
+          # leading whitespace that a regular expression may depend on.
+          non_empty_lines=$(printf '%s\n' "$IGNORE_MESSAGES" | sed '/^[[:space:]]*$/d')
+          while IFS= read -r line
           do
             # Double check, if line is empty don't consider it
             if [[ -z "$line" ]]; then
               continue
             fi
             _args+=(-ignore "$line")
-          done < <(echo "$non_empty_lines")
+          done < <(printf '%s\n' "$non_empty_lines")
         fi
 
         echo "Running actionlint with these options:"
