@@ -56,11 +56,17 @@ runs:
         checksums="actionlint_${ACTIONLINT_VERSION}_checksums.txt"
         release="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}"
 
-        for file in "${asset}" "${checksums}"; do
-          curl --fail --silent --show-error --location \
-               --proto '=https' --tlsv1.2 --retry 3 \
-               --output "${workdir}/${file}" "${release}/${file}"
-        done
+        # --proto-redir matters as much as --proto: the release URL redirects to
+        # a CDN, and curl allows plain HTTP on redirect by default. Both files
+        # travel this path, so anyone able to downgrade it would serve the
+        # tarball and the checksums that match it.
+        curl --fail --silent --show-error --location \
+             --proto '=https' --proto-redir '=https' --retry 3 \
+             --output "${workdir}/${asset}" "${release}/${asset}"
+
+        curl --fail --silent --show-error --location \
+             --proto '=https' --proto-redir '=https' --retry 3 \
+             --output "${workdir}/${checksums}" "${release}/${checksums}"
 
         expected="$(awk -v a="${asset}" '$2 == a {print $1}' "${workdir}/${checksums}")"
         if [[ -z "${expected}" ]]; then
