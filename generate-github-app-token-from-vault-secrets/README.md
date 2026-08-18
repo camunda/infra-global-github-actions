@@ -53,7 +53,13 @@ still carries everything the App holds on those repositories.
 Keys are the scope names accepted by
 [`actions/create-github-app-token`](https://github.com/actions/create-github-app-token)
 with the `permission-` prefix removed, so `permission-pull-requests` is written
-`pull-requests`. Values are the usual `read`, `write` or `admin`, depending on the scope.
+`pull-requests`.
+
+Values are `read`, `write` or `admin`. Which of them a given scope accepts is narrower —
+most take `read` or `write`, four also take `admin`, and a handful take only one of the
+two — and that is enforced by the API rather than here, so an unsupported *level* for a
+supported scope fails at token creation rather than at validation. Upstream's input
+descriptions state the accepted values per scope.
 
 An unrecognised key is an error rather than a silent no-op, because a dropped scope would
 leave the caller believing the token was narrowed when it was not:

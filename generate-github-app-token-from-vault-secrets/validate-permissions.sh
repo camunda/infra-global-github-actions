@@ -120,8 +120,12 @@ fi
 
 # Values are checked here rather than left to the API, which would reject them
 # only after Vault has been read and a token requested, with an error that does
-# not name the input. Which levels a given scope accepts is upstream's business;
-# that they are one of the three, and a string, is checkable locally.
+# not name the input.
+#
+# This checks the level set, not what each individual scope accepts. Upstream
+# documents finer limits — 45 scopes take read or write, 4 also take admin, 3
+# take only write, 2 only read — but they exist as prose in its action.yml, and
+# reproducing them here would mean a second copy going stale against it.
 #
 # Plain comparisons rather than IN(), which is not in every jq old enough to
 # still be on a self-hosted runner. A jq failure here would abort under `set -e`

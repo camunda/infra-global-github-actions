@@ -110,10 +110,11 @@ check "not JSON at all"        1 'contents=read'                 "not valid JSON
 check "a JSON array"           1 '["contents"]'                  "must be a JSON object"
 check "a JSON string"          1 '"contents"'                    "must be a JSON object"
 
-# Values. Which levels a scope accepts is upstream's business; that they are one
-# of the three, and a string, is checkable here instead of after Vault has been
-# read and a token requested.
-check "write and admin"        0 '{"contents": "write", "organization-administration": "admin"}'
+# Values. This checks the level set, not what each individual scope accepts:
+# upstream documents finer limits per scope — 45 take read or write, 4 also take
+# admin, 3 take only write, 2 only read — and encoding that here would mean
+# parsing English out of upstream's action.yml on every run.
+check "write and admin"        0 '{"contents": "write", "repository-projects": "admin"}'
 check "uppercase value"        0 '{"contents": "READ"}'
 check "a misspelled value"     1 '{"contents": "raed"}'          "must be read, write or admin: contents=raed"
 check "a numeric value"        1 '{"contents": 1}'               "contents=1"
