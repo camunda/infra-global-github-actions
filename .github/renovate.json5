@@ -84,7 +84,10 @@
         "kubernetes-sigs/gateway-api",
         "public.ecr.aws/gravitational/teleport-ent-distroless",
         "fossas/fossa-cli",
-        "pre-commit",
+        // the pre-commit tool itself (.tool-versions), resolved by Renovate's
+        // asdf manager via the github-tags datasource with this packageName,
+        // not the bare "pre-commit" string
+        "pre-commit/pre-commit",
       ],
       addLabels: ["automerge"],
       automerge: true,
@@ -92,7 +95,7 @@
     {
       matchUpdateTypes: ["minor"],
       matchPackageNames: [
-        "pre-commit",
+        "pre-commit/pre-commit",
       ],
       addLabels: ["automerge"],
       automerge: true,
