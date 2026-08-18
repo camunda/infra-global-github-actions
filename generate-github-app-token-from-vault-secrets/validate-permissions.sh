@@ -111,3 +111,18 @@ if [[ -n "${unknown}" ]]; then
   printf 'Accepted scopes: %s\n' "${KNOWN_SCOPES[*]}" >&2
   exit 1
 fi
+
+# Values are checked here rather than left to the API, which would reject them
+# only after Vault has been read and a token requested, with an error that does
+# not name the input. Which levels a given scope accepts is upstream's business;
+# that they are one of the three, and a string, is checkable locally.
+bad_values="$(jq -r '
+  [to_entries[]
+   | select((.value | type) != "string" or ((.value | ascii_downcase) | IN("read", "write", "admin") | not))
+   | "\(.key)=\(.value | tostring)"]
+  | join(", ")' <<<"${PERMISSIONS}")"
+
+if [[ -n "${bad_values}" ]]; then
+  echo "::error::permission values must be read, write or admin: $(sanitize "${bad_values}")"
+  exit 1
+fi

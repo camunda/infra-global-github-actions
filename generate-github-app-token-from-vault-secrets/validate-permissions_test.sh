@@ -64,33 +64,36 @@ check "one scope"              0 '{"contents": "read"}'
 check "several scopes"         0 '{"contents": "read", "issues": "read", "pull-requests": "write"}'
 check "a dashed scope"         0 '{"organization-secrets": "read"}'
 
-# Every scope the wrapper forwards must be accepted, or the list in the script
-# has drifted from the one in the action.
-#
-# The fixture is built with jq, so it has to be checked before it is used: a
-# failed jq leaves it empty, and an empty input is a case this script expects to
-# pass, which would turn a broken fixture into a green run.
-all="$(jq -n --args '$ARGS.positional | map({(.): "read"}) | add' \
-  actions administration artifact-metadata attestations checks codespaces contents \
-  custom-properties-for-organizations dependabot-secrets deployments discussions \
-  email-addresses enterprise-custom-properties-for-organizations environments followers \
-  git-ssh-keys gpg-keys interaction-limits issues members merge-queues metadata \
-  organization-administration organization-announcement-banners \
-  organization-copilot-seat-management organization-custom-org-roles \
-  organization-custom-properties organization-custom-roles organization-events \
-  organization-hooks organization-packages organization-personal-access-token-requests \
-  organization-personal-access-tokens organization-plan organization-projects \
-  organization-secrets organization-self-hosted-runners organization-user-blocking \
-  packages pages profile pull-requests repository-custom-properties repository-hooks \
-  repository-projects secret-scanning-alerts secrets security-events single-file \
-  starring statuses team-discussions vulnerability-alerts workflows)"
+# The scopes the action forwards and the scopes the script accepts are two lists
+# that must stay equal. Both are read from the files themselves: a fixture typed
+# out here would only ever compare itself against one of them, and would go
+# green while action.yml forwarded a scope the validator rejects.
+ACTION_YML="${ACTION_YML:-$HERE/action.yml}"
+
+forwarded="$(grep -oE '^      permission-[a-z-]+:' "$ACTION_YML" | sed 's/ *permission-//; s/://' | sort)"
+accepted="$(sed -n '/^KNOWN_SCOPES=(/,/^)/p' "$SCRIPT" | grep -oE '^  [a-z-]+$' | tr -d ' ' | sort)"
+
+if [[ -z "$forwarded" || -z "$accepted" ]]; then
+  FAIL=$((FAIL + 1))
+  echo "  FAIL: scope lists — could not read them (action.yml: $(wc -w <<<"$forwarded"), script: $(wc -w <<<"$accepted"))"
+elif [[ "$forwarded" != "$accepted" ]]; then
+  FAIL=$((FAIL + 1))
+  echo "  FAIL: scope lists — action.yml and the validator disagree:"
+  diff <(echo "$forwarded") <(echo "$accepted") | sed 's/^/        /'
+else
+  PASS=$((PASS + 1))
+fi
+
+# Every scope the action forwards must be accepted, built from that same list so
+# it cannot drift from it.
+all="$(jq -Rn '[inputs] | map({(.): "read"}) | add' <<<"$forwarded")"
 all_count="$(jq -r 'length' <<<"${all:-null}" 2>/dev/null || echo 0)"
 
-if [[ "$all_count" != "54" ]]; then
+if [[ "$all_count" != "$(wc -l <<<"$forwarded" | tr -d ' ')" || "$all_count" == "0" ]]; then
   FAIL=$((FAIL + 1))
-  echo "  FAIL: all-scopes fixture — expected 54 keys, built $all_count (is jq working?)"
+  echo "  FAIL: all-scopes fixture — built $all_count keys from $(wc -l <<<"$forwarded" | tr -d ' ') scopes (is jq working?)"
 else
-  check "all 54 scopes"        0 "$all"
+  check "every forwarded scope" 0 "$all"
 fi
 
 # Rejected. The typo case is the reason this validation exists: the wrapper
@@ -102,6 +105,16 @@ check "one good one bad"       1 '{"contents": "read", "nope": "read"}' "unknown
 check "not JSON at all"        1 'contents=read'                 "not valid JSON"
 check "a JSON array"           1 '["contents"]'                  "must be a JSON object"
 check "a JSON string"          1 '"contents"'                    "must be a JSON object"
+
+# Values. Which levels a scope accepts is upstream's business; that they are one
+# of the three, and a string, is checkable here instead of after Vault has been
+# read and a token requested.
+check "write and admin"        0 '{"contents": "write", "organization-administration": "admin"}'
+check "uppercase value"        0 '{"contents": "READ"}'
+check "a misspelled value"     1 '{"contents": "raed"}'          "must be read, write or admin: contents=raed"
+check "a numeric value"        1 '{"contents": 1}'               "contents=1"
+check "a null value"           1 '{"contents": null}'            "contents=null"
+check "a nested object"        1 '{"contents": {"level": "read"}}'
 
 # jq is only reached once the input is non-empty, so a caller that does not use
 # `permissions` needs nothing new. One that does, on a runner without jq, must
