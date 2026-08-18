@@ -109,6 +109,28 @@ check "a JSON string"          1 '"contents"'                    "must be a JSON
 check_without_jq "no jq, input given"   1 '{"contents": "read"}' "needs jq"
 check_without_jq "no jq, input omitted" 0 ''                     ""
 
+# The runner reads workflow commands line by line, so anything echoed into a
+# `::error::` line must not be able to open a second one.
+check_single_annotation() { # check_single_annotation <label> <permissions>
+  local label="$1" perms="$2"
+  local out n
+  out="$("$SCRIPT" "$perms" 2>&1)"
+  n="$(grep -c '^::' <<<"$out")"
+
+  if [[ "$n" != "1" ]]; then
+    FAIL=$((FAIL + 1))
+    echo "  FAIL: $label — expected 1 workflow command, got $n"
+    echo "        output: $out"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
+check_single_annotation "a newline in a malformed input" '{"a": 1}
+::error::INJECTED'
+check_single_annotation "a newline in an unknown scope key" '{"nope\ntwo::three": "read"}'
+
 echo
 echo "passed=$PASS failed=$FAIL"
 [[ "$FAIL" == "0" ]]

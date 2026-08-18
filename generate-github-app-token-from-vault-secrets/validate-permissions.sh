@@ -81,8 +81,16 @@ KNOWN_SCOPES=(
   workflows
 )
 
+# The runner reads workflow commands line by line, so a value echoed into a
+# `::error::` line can open a second command of the caller's choosing. Flatten
+# newlines and defuse the `::` marker before interpolating anything derived from
+# the input.
+sanitize() {
+  printf '%s' "${1}" | tr '\n\r\t' '   ' | sed 's/::/;;/g' | cut -c1-200
+}
+
 if ! jq -e . >/dev/null 2>&1 <<<"${PERMISSIONS}"; then
-  echo "::error::the 'permissions' input is not valid JSON: ${PERMISSIONS}"
+  echo "::error::the 'permissions' input is not valid JSON: $(sanitize "${PERMISSIONS}")"
   exit 1
 fi
 
@@ -99,7 +107,7 @@ unknown="$(jq -r --argjson known "${known_json}" \
   '[keys[] | select(. as $k | $known | index($k) | not)] | join(", ")' <<<"${PERMISSIONS}")"
 
 if [[ -n "${unknown}" ]]; then
-  echo "::error::unknown permission scope(s): ${unknown}"
+  echo "::error::unknown permission scope(s): $(sanitize "${unknown}")"
   printf 'Accepted scopes: %s\n' "${KNOWN_SCOPES[*]}" >&2
   exit 1
 fi
