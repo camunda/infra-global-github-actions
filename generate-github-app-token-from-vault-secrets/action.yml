@@ -65,6 +65,16 @@ inputs:
     description: "Comma or newline-separated list of repositories to install the GitHub App on (defaults to current repository if owner is unset). If you want to generate a token that has access to all repositories of the owner, set this to '!all' and explicitely set an `owner`."
     required: false
     type: string
+  permissions:
+    description: >
+      JSON object narrowing what the token may do, for example
+      '{"contents": "read", "issues": "read"}'. Keys are the scope names accepted by
+      actions/create-github-app-token without the `permission-` prefix, and unknown keys
+      are rejected rather than ignored. When omitted, the token inherits every permission
+      the App holds, which is the behaviour callers had before this input existed.
+    required: false
+    default: ""
+    type: string
 
 outputs:
   token:
@@ -122,6 +132,13 @@ runs:
         echo "::error::Conflicting input(s) for vault-auth-method='${VAULT_AUTH_METHOD}': ${conflicting[*]} must not be set (provide only the inputs for the selected auth method)"
         exit 1
       fi
+
+  - name: Validate the requested permissions
+    shell: bash
+    env:
+      PERMISSIONS: ${{ inputs.permissions }}
+    run: |
+      "${{ github.action_path }}/validate-permissions.sh" "${PERMISSIONS}"
 
   - name: Import the GitHub App ID from vault
     id: app-id
@@ -193,3 +210,57 @@ runs:
       skip-token-revoke: ${{ inputs.skip-token-revoke }}
       owner: ${{ inputs.owner }}
       repositories: ${{ env.repositories }}
+      permission-actions: ${{ fromJSON(inputs.permissions || '{}')['actions'] }}
+      permission-administration: ${{ fromJSON(inputs.permissions || '{}')['administration'] }}
+      permission-artifact-metadata: ${{ fromJSON(inputs.permissions || '{}')['artifact-metadata'] }}
+      permission-attestations: ${{ fromJSON(inputs.permissions || '{}')['attestations'] }}
+      permission-checks: ${{ fromJSON(inputs.permissions || '{}')['checks'] }}
+      permission-codespaces: ${{ fromJSON(inputs.permissions || '{}')['codespaces'] }}
+      permission-contents: ${{ fromJSON(inputs.permissions || '{}')['contents'] }}
+      permission-custom-properties-for-organizations: ${{ fromJSON(inputs.permissions || '{}')['custom-properties-for-organizations'] }}
+      permission-dependabot-secrets: ${{ fromJSON(inputs.permissions || '{}')['dependabot-secrets'] }}
+      permission-deployments: ${{ fromJSON(inputs.permissions || '{}')['deployments'] }}
+      permission-discussions: ${{ fromJSON(inputs.permissions || '{}')['discussions'] }}
+      permission-email-addresses: ${{ fromJSON(inputs.permissions || '{}')['email-addresses'] }}
+      permission-enterprise-custom-properties-for-organizations: ${{ fromJSON(inputs.permissions || '{}')['enterprise-custom-properties-for-organizations'] }}
+      permission-environments: ${{ fromJSON(inputs.permissions || '{}')['environments'] }}
+      permission-followers: ${{ fromJSON(inputs.permissions || '{}')['followers'] }}
+      permission-git-ssh-keys: ${{ fromJSON(inputs.permissions || '{}')['git-ssh-keys'] }}
+      permission-gpg-keys: ${{ fromJSON(inputs.permissions || '{}')['gpg-keys'] }}
+      permission-interaction-limits: ${{ fromJSON(inputs.permissions || '{}')['interaction-limits'] }}
+      permission-issues: ${{ fromJSON(inputs.permissions || '{}')['issues'] }}
+      permission-members: ${{ fromJSON(inputs.permissions || '{}')['members'] }}
+      permission-merge-queues: ${{ fromJSON(inputs.permissions || '{}')['merge-queues'] }}
+      permission-metadata: ${{ fromJSON(inputs.permissions || '{}')['metadata'] }}
+      permission-organization-administration: ${{ fromJSON(inputs.permissions || '{}')['organization-administration'] }}
+      permission-organization-announcement-banners: ${{ fromJSON(inputs.permissions || '{}')['organization-announcement-banners'] }}
+      permission-organization-copilot-seat-management: ${{ fromJSON(inputs.permissions || '{}')['organization-copilot-seat-management'] }}
+      permission-organization-custom-org-roles: ${{ fromJSON(inputs.permissions || '{}')['organization-custom-org-roles'] }}
+      permission-organization-custom-properties: ${{ fromJSON(inputs.permissions || '{}')['organization-custom-properties'] }}
+      permission-organization-custom-roles: ${{ fromJSON(inputs.permissions || '{}')['organization-custom-roles'] }}
+      permission-organization-events: ${{ fromJSON(inputs.permissions || '{}')['organization-events'] }}
+      permission-organization-hooks: ${{ fromJSON(inputs.permissions || '{}')['organization-hooks'] }}
+      permission-organization-packages: ${{ fromJSON(inputs.permissions || '{}')['organization-packages'] }}
+      permission-organization-personal-access-token-requests: ${{ fromJSON(inputs.permissions || '{}')['organization-personal-access-token-requests'] }}
+      permission-organization-personal-access-tokens: ${{ fromJSON(inputs.permissions || '{}')['organization-personal-access-tokens'] }}
+      permission-organization-plan: ${{ fromJSON(inputs.permissions || '{}')['organization-plan'] }}
+      permission-organization-projects: ${{ fromJSON(inputs.permissions || '{}')['organization-projects'] }}
+      permission-organization-secrets: ${{ fromJSON(inputs.permissions || '{}')['organization-secrets'] }}
+      permission-organization-self-hosted-runners: ${{ fromJSON(inputs.permissions || '{}')['organization-self-hosted-runners'] }}
+      permission-organization-user-blocking: ${{ fromJSON(inputs.permissions || '{}')['organization-user-blocking'] }}
+      permission-packages: ${{ fromJSON(inputs.permissions || '{}')['packages'] }}
+      permission-pages: ${{ fromJSON(inputs.permissions || '{}')['pages'] }}
+      permission-profile: ${{ fromJSON(inputs.permissions || '{}')['profile'] }}
+      permission-pull-requests: ${{ fromJSON(inputs.permissions || '{}')['pull-requests'] }}
+      permission-repository-custom-properties: ${{ fromJSON(inputs.permissions || '{}')['repository-custom-properties'] }}
+      permission-repository-hooks: ${{ fromJSON(inputs.permissions || '{}')['repository-hooks'] }}
+      permission-repository-projects: ${{ fromJSON(inputs.permissions || '{}')['repository-projects'] }}
+      permission-secret-scanning-alerts: ${{ fromJSON(inputs.permissions || '{}')['secret-scanning-alerts'] }}
+      permission-secrets: ${{ fromJSON(inputs.permissions || '{}')['secrets'] }}
+      permission-security-events: ${{ fromJSON(inputs.permissions || '{}')['security-events'] }}
+      permission-single-file: ${{ fromJSON(inputs.permissions || '{}')['single-file'] }}
+      permission-starring: ${{ fromJSON(inputs.permissions || '{}')['starring'] }}
+      permission-statuses: ${{ fromJSON(inputs.permissions || '{}')['statuses'] }}
+      permission-team-discussions: ${{ fromJSON(inputs.permissions || '{}')['team-discussions'] }}
+      permission-vulnerability-alerts: ${{ fromJSON(inputs.permissions || '{}')['vulnerability-alerts'] }}
+      permission-workflows: ${{ fromJSON(inputs.permissions || '{}')['workflows'] }}
