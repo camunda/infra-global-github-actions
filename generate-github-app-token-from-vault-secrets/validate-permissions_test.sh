@@ -102,6 +102,10 @@ fi
 check "a misspelled scope"     1 '{"contnets": "read"}'          "unknown permission scope(s): contnets"
 check "underscores not dashes" 1 '{"pull_requests": "write"}'    "unknown permission scope(s): pull_requests"
 check "one good one bad"       1 '{"contents": "read", "nope": "read"}' "unknown permission scope(s): nope"
+# An unknown key that is the empty string joins to "", which reads as "nothing
+# unknown" if the check tests the joined string instead of counting.
+check "an empty key"           1 '{"": "read"}'                  "unknown permission scope(s): (empty)"
+check "an empty key among good ones" 1 '{"contents": "read", "": "read"}' "(empty)"
 check "not JSON at all"        1 'contents=read'                 "not valid JSON"
 check "a JSON array"           1 '["contents"]'                  "must be a JSON object"
 check "a JSON string"          1 '"contents"'                    "must be a JSON object"

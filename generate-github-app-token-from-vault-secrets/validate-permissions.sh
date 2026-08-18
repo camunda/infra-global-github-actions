@@ -103,10 +103,16 @@ known_json="$(printf '%s\n' "${KNOWN_SCOPES[@]}" | jq -Rn '[inputs]')"
 
 # A scope this action does not forward would otherwise be dropped in silence,
 # and the caller would believe the token was narrowed when it was not.
-unknown="$(jq -r --argjson known "${known_json}" \
-  '[keys[] | select(. as $k | $known | index($k) | not)] | join(", ")' <<<"${PERMISSIONS}")"
+#
+# Counted rather than tested for emptiness: an unknown key that is itself the
+# empty string joins to "", which would read as "nothing unknown" and let the
+# one case this check exists for through.
+unknown_count="$(jq --argjson known "${known_json}" \
+  '[keys[] | select(. as $k | $known | index($k) | not)] | length' <<<"${PERMISSIONS}")"
 
-if [[ -n "${unknown}" ]]; then
+if [[ "${unknown_count}" != "0" ]]; then
+  unknown="$(jq -r --argjson known "${known_json}" \
+    '[keys[] | select(. as $k | $known | index($k) | not) | if . == "" then "(empty)" else . end] | join(", ")' <<<"${PERMISSIONS}")"
   echo "::error::unknown permission scope(s): $(sanitize "${unknown}")"
   printf 'Accepted scopes: %s\n' "${KNOWN_SCOPES[*]}" >&2
   exit 1
