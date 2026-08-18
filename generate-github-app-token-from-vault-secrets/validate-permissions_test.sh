@@ -66,6 +66,10 @@ check "a dashed scope"         0 '{"organization-secrets": "read"}'
 
 # Every scope the wrapper forwards must be accepted, or the list in the script
 # has drifted from the one in the action.
+#
+# The fixture is built with jq, so it has to be checked before it is used: a
+# failed jq leaves it empty, and an empty input is a case this script expects to
+# pass, which would turn a broken fixture into a green run.
 all="$(jq -n --args '$ARGS.positional | map({(.): "read"}) | add' \
   actions administration artifact-metadata attestations checks codespaces contents \
   custom-properties-for-organizations dependabot-secrets deployments discussions \
@@ -80,7 +84,14 @@ all="$(jq -n --args '$ARGS.positional | map({(.): "read"}) | add' \
   packages pages profile pull-requests repository-custom-properties repository-hooks \
   repository-projects secret-scanning-alerts secrets security-events single-file \
   starring statuses team-discussions vulnerability-alerts workflows)"
-check "all 54 scopes"          0 "$all"
+all_count="$(jq -r 'length' <<<"${all:-null}" 2>/dev/null || echo 0)"
+
+if [[ "$all_count" != "54" ]]; then
+  FAIL=$((FAIL + 1))
+  echo "  FAIL: all-scopes fixture — expected 54 keys, built $all_count (is jq working?)"
+else
+  check "all 54 scopes"        0 "$all"
+fi
 
 # Rejected. The typo case is the reason this validation exists: the wrapper
 # cannot forward a scope it does not know, so without this it would be dropped
