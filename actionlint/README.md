@@ -11,9 +11,21 @@ You can see the list of checks supported by `actionlint` [here](https://github.c
 
 | Input Name              | Default Value | Description  |
 |-------------------------|---------------|-------------------------------------------------------------------------|
-| `version`               | "1.7.9"       | Actionlint version that will be downloaded  |
+| `version`               | "1.7.10"      | Actionlint version that will be downloaded  |
 | `ignore`                |               | Multiline field. Allow you to customized ignored errors using regular expression. One ignore pattern per line |
 | `use_shellcheck`        | "false"       | Enable actionlint to use shellcheck for all shell scripts in the repository. |
+
+## How the binary is obtained
+
+The release asset matching the runner's operating system and architecture is
+downloaded from the `rhysd/actionlint` release for `version`, and verified
+against the `SHA256` checksums published with that same release. A mismatch
+fails the step.
+
+The upstream `download-actionlint.bash` installer is deliberately not used: it
+was fetched from a mutable branch and piped into `bash`, so every workflow
+calling this action executed whatever that URL returned at that moment, and the
+script verified nothing it downloaded either.
 
 ## Customizations
 
