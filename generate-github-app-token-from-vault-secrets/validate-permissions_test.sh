@@ -30,6 +30,29 @@ check() { # check <label> <expected-rc> <permissions> [expected substring]
   PASS=$((PASS + 1))
 }
 
+check_without_jq() { # check_without_jq <label> <expected-rc> <permissions> [substring]
+  local label="$1" want="$2" perms="$3" needle="${4:-}"
+  local out rc
+  out="$(PATH="" "$SCRIPT" "$perms" 2>&1)"
+  rc=$?
+
+  if [[ "$rc" != "$want" ]]; then
+    FAIL=$((FAIL + 1))
+    echo "  FAIL: $label — expected rc=$want, got rc=$rc"
+    echo "        output: $out"
+    return
+  fi
+
+  if [[ -n "$needle" ]] && ! grep -qF "$needle" <<<"$out"; then
+    FAIL=$((FAIL + 1))
+    echo "  FAIL: $label — expected output to contain: $needle"
+    echo "        output: $out"
+    return
+  fi
+
+  PASS=$((PASS + 1))
+}
+
 echo "bash $BASH_VERSION"
 
 # Omitted or empty: the token inherits the App's permissions, as before.
@@ -68,6 +91,12 @@ check "one good one bad"       1 '{"contents": "read", "nope": "read"}' "unknown
 check "not JSON at all"        1 'contents=read'                 "not valid JSON"
 check "a JSON array"           1 '["contents"]'                  "must be a JSON object"
 check "a JSON string"          1 '"contents"'                    "must be a JSON object"
+
+# jq is only reached once the input is non-empty, so a caller that does not use
+# `permissions` needs nothing new. One that does, on a runner without jq, must
+# be told that rather than that its JSON is malformed.
+check_without_jq "no jq, input given"   1 '{"contents": "read"}' "needs jq"
+check_without_jq "no jq, input omitted" 0 ''                     ""
 
 echo
 echo "passed=$PASS failed=$FAIL"

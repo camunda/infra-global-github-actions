@@ -12,8 +12,17 @@ set -euo pipefail
 PERMISSIONS="${1:-}"
 
 # Nothing to check: the token inherits every permission the App holds, which is
-# what callers got before this input existed.
+# what callers got before this input existed. Kept above the jq dependency
+# below, so a caller that does not use `permissions` needs nothing new.
 [[ -z "${PERMISSIONS}" ]] && exit 0
+
+# Without this, a missing jq surfaces as "not valid JSON" — the check below runs
+# `jq` and reads its non-zero exit as a verdict on the input rather than as the
+# command being absent.
+if ! command -v jq >/dev/null 2>&1; then
+  echo "::error::the 'permissions' input needs jq, which is not installed on this runner"
+  exit 1
+fi
 
 KNOWN_SCOPES=(
   actions

@@ -59,11 +59,12 @@ An unrecognised key is an error rather than a silent no-op, because a dropped sc
 leave the caller believing the token was narrowed when it was not:
 
 ```
-::error::Unknown permission scope(s): contnets
+::error::unknown permission scope(s): contnets
 ```
 
 Omitting the input entirely keeps the previous behaviour: the token inherits every
-permission the App holds.
+permission the App holds — and is also why `jq`, which the validation uses, is only
+required of callers that actually pass `permissions`.
 
 ### Workflow Example
 ```yaml
