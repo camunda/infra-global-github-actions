@@ -122,9 +122,15 @@ fi
 # only after Vault has been read and a token requested, with an error that does
 # not name the input. Which levels a given scope accepts is upstream's business;
 # that they are one of the three, and a string, is checkable locally.
+#
+# Plain comparisons rather than IN(), which is not in every jq old enough to
+# still be on a self-hosted runner. A jq failure here would abort under `set -e`
+# with a compile error and no annotation.
 bad_values="$(jq -r '
   [to_entries[]
-   | select((.value | type) != "string" or ((.value | ascii_downcase) | IN("read", "write", "admin") | not))
+   | select((.value | type) != "string"
+            or ((.value | ascii_downcase) as $v
+                | $v != "read" and $v != "write" and $v != "admin"))
    | "\(.key)=\(.value | tostring)"]
   | join(", ")' <<<"${PERMISSIONS}")"
 
