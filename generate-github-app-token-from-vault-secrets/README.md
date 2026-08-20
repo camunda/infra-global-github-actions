@@ -55,6 +55,11 @@ Keys are the scope names accepted by
 with the `permission-` prefix removed, so `permission-pull-requests` is written
 `pull-requests`.
 
+The scopes this action forwards are read from its own `action.yml`, and a lint keeps that
+list in step with the `actions/create-github-app-token` revision it is pinned to
+(`check-permissions-match-upstream.sh`, run in CI). Bumping the pin without regenerating
+the block fails that check, which prints the lines to add.
+
 Values are `read`, `write` or `admin`. Which of them a given scope accepts is narrower —
 most take `read` or `write`, four also take `admin`, and a handful take only one of the
 two — and that is enforced by the API rather than here, so an unsupported *level* for a
