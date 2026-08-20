@@ -64,37 +64,73 @@ check "one scope"              0 '{"contents": "read"}'
 check "several scopes"         0 '{"contents": "read", "issues": "read", "pull-requests": "write"}'
 check "a dashed scope"         0 '{"organization-secrets": "read"}'
 
-# The scopes the action forwards and the scopes the script accepts are two lists
-# that must stay equal. Both are read from the files themselves: a fixture typed
-# out here would only ever compare itself against one of them, and would go
-# green while action.yml forwarded a scope the validator rejects.
+# The scopes come from the forwarding block in action.yml, so there is no second
+# list to keep in step — but the parsing of that block is now load-bearing, and
+# these cover it.
 ACTION_YML="${ACTION_YML:-$HERE/action.yml}"
 
-forwarded="$(grep -oE '^      permission-[a-z-]+:' "$ACTION_YML" | sed 's/ *permission-//; s/://' | sort)"
-accepted="$(sed -n '/^KNOWN_SCOPES=(/,/^)/p' "$SCRIPT" | grep -oE '^  [a-z-]+$' | tr -d ' ' | sort)"
+forwarded="$(grep -oE '^ +permission-[a-z-]+: \$\{\{' "$ACTION_YML" | sed 's/.*permission-//; s/:.*//' | sort)"
+forwarded_count="$(printf '%s\n' "$forwarded" | grep -c .)"
 
-if [[ -z "$forwarded" || -z "$accepted" ]]; then
+if [[ "$forwarded_count" -lt 10 ]]; then
   FAIL=$((FAIL + 1))
-  echo "  FAIL: scope lists — could not read them (action.yml: $(wc -w <<<"$forwarded"), script: $(wc -w <<<"$accepted"))"
-elif [[ "$forwarded" != "$accepted" ]]; then
-  FAIL=$((FAIL + 1))
-  echo "  FAIL: scope lists — action.yml and the validator disagree:"
-  diff <(echo "$forwarded") <(echo "$accepted") | sed 's/^/        /'
+  echo "  FAIL: forwarding block — found $forwarded_count scopes in $ACTION_YML"
 else
   PASS=$((PASS + 1))
 fi
 
-# Every scope the action forwards must be accepted, built from that same list so
-# it cannot drift from it.
+# Every scope the action forwards must be accepted, built from that same block
+# so the fixture cannot drift from it.
 all="$(jq -Rn '[inputs] | map({(.): "read"}) | add' <<<"$forwarded")"
 all_count="$(jq -r 'length' <<<"${all:-null}" 2>/dev/null || echo 0)"
 
-if [[ "$all_count" != "$(wc -l <<<"$forwarded" | tr -d ' ')" || "$all_count" == "0" ]]; then
+if [[ "$all_count" != "$forwarded_count" || "$all_count" == "0" ]]; then
   FAIL=$((FAIL + 1))
-  echo "  FAIL: all-scopes fixture — built $all_count keys from $(wc -l <<<"$forwarded" | tr -d ' ') scopes (is jq working?)"
+  echo "  FAIL: all-scopes fixture — built $all_count keys from $forwarded_count scopes (is jq working?)"
 else
   check "every forwarded scope" 0 "$all"
 fi
+
+# A scope added to action.yml is accepted without touching this script, which is
+# the point of reading the block rather than restating it.
+added="$(mktemp)"
+cp "$ACTION_YML" "$added"
+printf "      permission-brand-new: \${{ fromJSON(inputs.permissions || '{}')['brand-new'] }}\n" >>"$added"
+out="$(ACTION_YML="$added" "$SCRIPT" '{"brand-new": "read"}' 2>&1)"; rc=$?
+if [[ "$rc" != "0" ]]; then
+  FAIL=$((FAIL + 1))
+  echo "  FAIL: a scope added to action.yml — expected it to be accepted, got rc=$rc: $out"
+else
+  PASS=$((PASS + 1))
+fi
+out="$("$SCRIPT" '{"brand-new": "read"}' 2>&1)"; rc=$?
+if [[ "$rc" != "1" ]]; then
+  FAIL=$((FAIL + 1))
+  echo "  FAIL: that same scope against the real action.yml — expected rejection, got rc=$rc"
+else
+  PASS=$((PASS + 1))
+fi
+rm -f "$added"
+
+# The block moving or changing shape must be an error about this repository, not
+# a rejection blamed on the caller.
+empty="$(mktemp)"
+printf 'name: nothing here\n' >"$empty"
+out="$(ACTION_YML="$empty" "$SCRIPT" '{"contents": "read"}' 2>&1)"; rc=$?
+if [[ "$rc" != "1" ]] || ! grep -qF "the forwarding block has moved or changed shape" <<<"$out"; then
+  FAIL=$((FAIL + 1))
+  echo "  FAIL: a shapeless action.yml — expected a shape error, got rc=$rc: $out"
+else
+  PASS=$((PASS + 1))
+fi
+out="$(ACTION_YML="$empty/nope" "$SCRIPT" '{"contents": "read"}' 2>&1)"; rc=$?
+if [[ "$rc" != "1" ]] || ! grep -qF "cannot read" <<<"$out"; then
+  FAIL=$((FAIL + 1))
+  echo "  FAIL: an unreadable action.yml — expected a read error, got rc=$rc: $out"
+else
+  PASS=$((PASS + 1))
+fi
+rm -f "$empty"
 
 # Rejected. The typo case is the reason this validation exists: the wrapper
 # cannot forward a scope it does not know, so without this it would be dropped

@@ -24,62 +24,31 @@ if ! command -v jq >/dev/null 2>&1; then
   exit 1
 fi
 
-KNOWN_SCOPES=(
-  actions
-  administration
-  artifact-metadata
-  attestations
-  checks
-  codespaces
-  contents
-  custom-properties-for-organizations
-  dependabot-secrets
-  deployments
-  discussions
-  email-addresses
-  enterprise-custom-properties-for-organizations
-  environments
-  followers
-  git-ssh-keys
-  gpg-keys
-  interaction-limits
-  issues
-  members
-  merge-queues
-  metadata
-  organization-administration
-  organization-announcement-banners
-  organization-copilot-seat-management
-  organization-custom-org-roles
-  organization-custom-properties
-  organization-custom-roles
-  organization-events
-  organization-hooks
-  organization-packages
-  organization-personal-access-token-requests
-  organization-personal-access-tokens
-  organization-plan
-  organization-projects
-  organization-secrets
-  organization-self-hosted-runners
-  organization-user-blocking
-  packages
-  pages
-  profile
-  pull-requests
-  repository-custom-properties
-  repository-hooks
-  repository-projects
-  secret-scanning-alerts
-  secrets
-  security-events
-  single-file
-  starring
-  statuses
-  team-discussions
-  vulnerability-alerts
-  workflows
-)
+# The scopes are read from the forwarding block in action.yml rather than listed
+# again here. That block is what decides which scopes can reach
+# actions/create-github-app-token — a scope missing from it cannot be forwarded
+# whatever this script believes — so a second copy could only ever disagree with
+# it, and would do so silently on the next upstream bump.
+ACTION_YML="${ACTION_YML:-${BASH_SOURCE[0]%/*}/action.yml}"
+
+if [[ ! -r "${ACTION_YML}" ]]; then
+  echo "::error::cannot read ${ACTION_YML}, which lists the scopes this action forwards"
+  exit 1
+fi
+
+KNOWN_SCOPES=()
+while IFS= read -r scope; do
+  [[ -n "${scope}" ]] && KNOWN_SCOPES+=("${scope}")
+done < <(grep -oE '^ +permission-[a-z-]+: \$\{\{' "${ACTION_YML}" | sed 's/.*permission-//; s/:.*//')
+
+# A parse that returns nothing would make every scope unknown and reject every
+# input, which is at least safe, but the message would blame the caller for a
+# change of shape in this repository.
+if [[ ${#KNOWN_SCOPES[@]} -lt 10 ]]; then
+  echo "::error::found ${#KNOWN_SCOPES[@]} permission scope(s) in ${ACTION_YML}; the forwarding block has moved or changed shape"
+  exit 1
+fi
+
 
 # The runner reads workflow commands line by line, so a value echoed into a
 # `::error::` line can open a second command of the caller's choosing. Flatten
