@@ -137,6 +137,11 @@ runs:
     shell: bash
     env:
       PERMISSIONS: ${{ inputs.permissions }}
+      # Pinned here rather than left to the script's default: the script reads
+      # it from the environment so the tests can point it elsewhere, and without
+      # this a caller's own `env: ACTION_YML` would be inherited by this step and
+      # redirect the check at a file of their choosing.
+      ACTION_YML: ${{ github.action_path }}/action.yml
     run: |
       "${{ github.action_path }}/validate-permissions.sh" "${PERMISSIONS}"
 

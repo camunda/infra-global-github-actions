@@ -132,6 +132,20 @@ else
 fi
 rm -f "$empty"
 
+# The script takes ACTION_YML from the environment so these tests can point it
+# elsewhere, which means the action has to pin it: otherwise a caller's own
+# `env: ACTION_YML` is inherited by the step and the check reads a file of their
+# choosing, accepting scopes that the `with:` block will then drop in silence.
+# shellcheck disable=SC2016  # the ${{ }} is GitHub's, and must stay literal
+step_env="$(sed -n '/^  - name: Validate the requested permissions$/,/^  - name: /p' "$ACTION_YML" | grep -cF 'ACTION_YML: ${{ github.action_path }}/action.yml')"
+
+if [[ "$step_env" != "1" ]]; then
+  FAIL=$((FAIL + 1))
+  echo "  FAIL: the validation step must pin ACTION_YML to the action's own action.yml"
+else
+  PASS=$((PASS + 1))
+fi
+
 # Rejected. The typo case is the reason this validation exists: the wrapper
 # cannot forward a scope it does not know, so without this it would be dropped
 # and the caller would think the token was narrowed.
