@@ -23,6 +23,7 @@ This composite GHA can be used in any repository.
 | skip-token-revoke                   | If truthy, the token will not be revoked when the current job is complete (optional) |
 | owner                               | The owner of the GitHub App installation (defaults to current repository owner, optional). |
 | repositories                        | Comma or newline-separated list of repositories for which the GitHub app token will be valid for(defaults to current repository if owner is unset, optional). If you want to generate a token that has access to all repositories of the owner, set this to `!all` and explicitely set an `owner`. |
+| permissions                         | JSON object narrowing what the token may do, e.g. `{"contents": "read"}` (optional, defaults to every permission the App holds). See [Permissions](#permissions). |
 
 > (*) Supports both App Role (`vault-auth-method=approle`) and GitHub OIDC/JWT
 > (`vault-auth-method=jwt`) authentication. When using `jwt`, the calling job
@@ -34,6 +35,47 @@ This composite GHA can be used in any repository.
 | token            | The generated GitHub token        |
 | installation-id  | GitHub App installation ID        |
 | app-slug         | GitHub App slug                   |
+
+### Permissions
+
+`repositories` scopes **which repositories** the token reaches. `permissions` scopes
+**what it may do** to them. Without the second, a token minted for one narrow purpose
+still carries everything the App holds on those repositories.
+
+```yaml
+    - uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@main
+      with:
+        # ... vault inputs ...
+        repositories: infraex-common-config
+        permissions: '{"issues": "read", "actions": "write"}'
+```
+
+Keys are the scope names accepted by
+[`actions/create-github-app-token`](https://github.com/actions/create-github-app-token)
+with the `permission-` prefix removed, so `permission-pull-requests` is written
+`pull-requests`.
+
+The scopes this action forwards are read from its own `action.yml`, and a lint keeps that
+list in step with the `actions/create-github-app-token` revision it is pinned to
+(`check-permissions-match-upstream.sh`, run in CI). Bumping the pin without regenerating
+the block fails that check, which prints the lines to add.
+
+Values are `read`, `write` or `admin`. Which of them a given scope accepts is narrower —
+most take `read` or `write`, four also take `admin`, and a handful take only one of the
+two — and that is enforced by the API rather than here, so an unsupported *level* for a
+supported scope fails at token creation rather than at validation. Upstream's input
+descriptions state the accepted values per scope.
+
+An unrecognised key is an error rather than a silent no-op, because a dropped scope would
+leave the caller believing the token was narrowed when it was not:
+
+```
+::error::unknown permission scope(s): contnets
+```
+
+Omitting the input entirely keeps the previous behaviour: the token inherits every
+permission the App holds — and is also why `jq`, which the validation uses, is only
+required of callers that actually pass `permissions`.
 
 ### Workflow Example
 ```yaml
