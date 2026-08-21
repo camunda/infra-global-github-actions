@@ -153,7 +153,7 @@ runs:
       shell: bash
 
     - name: Trigger retry-worfklow-run.yml
-      uses: codex-/return-dispatch@08365b69369e9eb639ce4c4cbbd29598bc52ca3a # v3.0.3
+      uses: codex-/return-dispatch@85e564d60eaec3cc4aca885373d510cfe4bd5b19 # v4.0.1
       id: dispatch
       with:
         owner: camunda
@@ -172,7 +172,6 @@ runs:
             "attempt": "${{ github.run_attempt }}",
             "rerun-whole-workflow": "${{ inputs.rerun-whole-workflow }}"
           }
-        workflow_timeout_seconds: 120
 
     - name: Get URL of the new worfklow run dispatched, run-id=${{ steps.dispatch.outputs.run_id }}
       if: steps.dispatch.outputs.run_id != ''
