@@ -172,7 +172,6 @@ runs:
             "attempt": "${{ github.run_attempt }}",
             "rerun-whole-workflow": "${{ inputs.rerun-whole-workflow }}"
           }
-        workflow_timeout_seconds: 120
 
     - name: Get URL of the new worfklow run dispatched, run-id=${{ steps.dispatch.outputs.run_id }}
       if: steps.dispatch.outputs.run_id != ''
