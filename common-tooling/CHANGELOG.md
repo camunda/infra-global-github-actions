@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.5 (2026-08-22)
+
+## What's Changed
+* fix(actionlint): install from verified release assets instead of curl | bash by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/789
+* fix(renovate): match the actual packageName for pre-commit automerge by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/788
+* chore(deps): update dependency pre-commit to v4.6.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/786
+* chore(deps): update codex-/return-dispatch action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/772
+* chore(deps): update mikefarah/yq action to v4.53.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/793
+* chore(deps): update docker/setup-buildx-action action to v4.3.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/795
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.39.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/796
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/common-tooling-1.0.4...common-tooling-1.0.5
+
 ## 1.0.4 (2026-08-15)
 
 ## What's Changed
