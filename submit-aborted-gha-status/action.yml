@@ -57,6 +57,14 @@ runs:
         # this never buffers the (potentially multi-MB) download
         # in a variable, and reading the full stream avoids the `grep -q`
         # early-exit + pipefail SIGPIPE pitfall on large logs.
+
+        # GitHub logs a shutdown signal only for SIGTERM. Other failures, such as
+        # OOMKilled (SIGKILL) or connectivity loss, may only surface the “runner lost communication” annotation.
+
+        # OOMKilled job aborts are reconciled by the https://github.com/camunda/infra-core/blob/stage/.github/workflows/submit-runner-oom-status.yml workflow.
+        # Please note that the following filtering logic must be mutually exclusive with other mechanisms
+        # that insert rows in CI Analytics (such as above), ensuring that only one row is inserted per job.
+
         shutdown_signal=$(gh api -X GET "/repos/$GITHUB_REPOSITORY/actions/jobs/$job_id/logs" 2>/dev/null \
           | grep -F "runner has received a shutdown signal" || true)
 
