@@ -1,5 +1,31 @@
 # Changelog
 
+## 1.0.17 (2026-08-29)
+
+## What's Changed
+* fix: pin vault-action and create-github-app-token to full-length SHAs by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/779
+* ci: pin every GitHub Action to a commit SHA and enforce it with zizmor by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/781
+* ci: inline pre-commit so the pinning gate can run by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/783
+* feat: add matrix-outputs-read by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/784
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.30.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/787
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/780
+* fix(actionlint): install from verified release assets instead of curl | bash by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/789
+* fix(renovate): match the actual packageName for pre-commit automerge by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/788
+* chore(deps): update dependency pre-commit to v4.6.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/786
+* chore(deps): update codex-/return-dispatch action to v4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/772
+* chore(deps): update mikefarah/yq action to v4.53.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/793
+* chore(deps): update docker/setup-buildx-action action to v4.3.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/795
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.39.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/796
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/790
+* chore(deps): update dependency fossas/fossa-cli to v3.18.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/794
+* docs(submit-aborted-gha-status): clarify shutdown-signal filtering and OOM reconciliation by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/798
+* chore(deps): update dependency fossas/fossa-cli to v3.18.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/799
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.50.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/800
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.51.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/801
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.16...fossa-1.0.17
+
 ## 1.0.16 (2026-08-08)
 
 ## What's Changed
