@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.0.3 (2026-09-05)
+
+## What's Changed
+* chore(deps): update dependency fossas/fossa-cli to v3.18.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/794
+* docs(submit-aborted-gha-status): clarify shutdown-signal filtering and OOM reconciliation by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/798
+* chore(deps): update dependency fossas/fossa-cli to v3.18.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/799
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.50.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/800
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.51.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/801
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/797
+* chore(deps): update docker/setup-qemu-action action to v4.3.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/802
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/build-docker-image-1.0.2...build-docker-image-1.0.3
+
 ## 1.0.2 (2026-08-22)
 
 ## What's Changed
