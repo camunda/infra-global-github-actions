@@ -1,0 +1,38 @@
+// Shared preset for repositories consuming the actions in this repository.
+//
+// Releases here are per-action: release-please tags each action family separately as
+// `<family>-X.Y.Z` (e.g. `pull-request-1.1.0`, `build-docker-image-1.0.3`), and the family is
+// the last path segment of the released directory. Consumers pin a sub-action by commit SHA and
+// name the release in a trailing comment:
+//
+//   uses: camunda/infra-global-github-actions/teams/infra/pull-request/automerge@d56c1583... # pull-request-1.1.0
+//
+// Renovate's built-in github-actions manager drops the sub-action path, so every family in this
+// repository collapses into a single `camunda/infra-global-github-actions` dependency with no
+// version to compare against, and the pin goes stale silently. The custom manager below reads the
+// family from the trailing comment, giving each family its own dependency and its own release line.
+//
+// Labels and grouping are deliberately left out so this works in any repository regardless of its
+// label taxonomy. Add those in the consuming repository, matching depName
+// `/^camunda\/infra-global-github-actions\//`.
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+
+  customManagers: [
+    {
+      customType: "regex",
+      managerFilePatterns: [
+        "/^\\.github/.+\\.ya?ml$/",
+        "/(^|/)action\\.ya?ml$/",
+      ],
+      matchStrings: [
+        "uses:\\s*camunda/infra-global-github-actions/[\\w./-]+@(?<currentDigest>[a-f0-9]{40})\\s+#\\s*(?<family>[a-z0-9-]+?)-(?<currentValue>\\d+\\.\\d+\\.\\d+)\\b",
+      ],
+      depNameTemplate: "camunda/infra-global-github-actions/{{{family}}}",
+      packageNameTemplate: "camunda/infra-global-github-actions",
+      datasourceTemplate: "github-tags",
+      // Per-family extractVersion keeps each family off another family's release line.
+      extractVersionTemplate: "^{{{family}}}-(?<version>\\d+\\.\\d+\\.\\d+)$",
+    },
+  ],
+}
