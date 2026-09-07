@@ -64,8 +64,14 @@
     "configure-pull-request": {
       "package-name": "configure-pull-request"
     },
+    "dependency-vuln-check": {
+      "package-name": "dependency-vuln-check"
+    },
     "download-center-upload": {
       "package-name": "download-center-upload"
+    },
+    "ensure-pr-passes-merge-queue": {
+      "package-name": "ensure-pr-passes-merge-queue"
     },
     "fossa": {
       "package-name": "fossa"
@@ -106,6 +112,9 @@
     "setup-yarn-cache": {
       "package-name": "setup-yarn-cache"
     },
+    "start-build-monitor": {
+      "package-name": "start-build-monitor"
+    },
     "submit-aborted-gha-status": {
       "package-name": "submit-aborted-gha-status"
     },
@@ -120,6 +129,9 @@
     },
     "teams/infra/pull-request": {
       "package-name": "pull-request"
+    },
+    "wait-for-required-checks": {
+      "package-name": "wait-for-required-checks"
     },
     "workflow-run-stats": {
       "package-name": "workflow-run-stats"
