@@ -44,7 +44,11 @@ function get_pull_requests_with_preview_environments {
   # A preview environment is considered running if:
   #  - at least one deployment is not inactive (i.e. not in DESTROYED state. Can be ACTIVE,FAILURE, etc ...)
   #  - all deployments are complete (no ongoing deployments)
-  for pr in $pull_requests; do
+  # Read one compact JSON object per line. Unquoted word splitting would break
+  # any object containing a space - e.g. a "backport stable/8.10" label name -
+  # into fragments that are not valid JSON.
+  while IFS= read -r pr; do
+    [ -n "$pr" ] || continue
     # Pull request information
     pr_id=$(echo "$pr" | jq -r .id)
     pr_ref=$(echo "$pr" | jq -r .headRefName)
@@ -101,7 +105,7 @@ function get_pull_requests_with_preview_environments {
             '. += [{pullRequestId: $pr_id, pullRequestNumber: $pr_number, pullRequestActors: $pr_actors, lastDeployedAt: $updated_at, deploymentId: $deployment_id}]'
       )
     fi
-  done
+  done <<<"$pull_requests"
 
   echo "$results"
 }
@@ -135,8 +139,10 @@ function preview_environment_cleanup {
   # Count the number of preview environments that will be cleaned during this cycle.
   nb_preview_environments_cleaned=0
 
-  # Check each candidate pull request
-  for pr in $(echo "$pull_requests" | jq -c '.[]'); do
+  # Check each candidate pull request, one compact JSON object per line (see the
+  # word-splitting note in get_pull_requests_with_preview_environments).
+  while IFS= read -r pr; do
+    [ -n "$pr" ] || continue
     # Pull request information
     deployment_id=$(echo "$pr" | jq -r .deploymentId)
     pr_id=$(echo "$pr" | jq -r .pullRequestId)
@@ -238,7 +244,7 @@ function preview_environment_cleanup {
         fi
       fi
     fi
-  done
+  done <<<"$(echo "$pull_requests" | jq -c '.[]')"
 
   log "$nb_preview_environments_cleaned preview environment(s) cleaned!"
 }
