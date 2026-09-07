@@ -106,6 +106,9 @@
     "setup-yarn-cache": {
       "package-name": "setup-yarn-cache"
     },
+    "start-build-monitor": {
+      "package-name": "start-build-monitor"
+    },
     "submit-aborted-gha-status": {
       "package-name": "submit-aborted-gha-status"
     },
