@@ -6,7 +6,7 @@
   "assert-camunda-git-emails": "1.1.3",
   "build-docker-image": "1.0.3",
   "check-copilot-commits": "1.0.2",
-  "common-tooling": "1.0.6",
+  "common-tooling": "1.0.7",
   "configure-pull-request": "1.0.2",
   "download-center-upload": "1.0.1",
   "fossa": "1.0.17",
@@ -26,7 +26,7 @@
   "submit-build-status": "1.3.1",
   "submit-test-status": "1.0.2",
   "teams/infra/configure-maintenance-pull-request": "1.0.1",
-  "teams/infra/pull-request": "1.0.3",
+  "teams/infra/pull-request": "1.1.0",
   "workflow-run-stats": "1.0.0",
   "yq-yaml-processor": "1.0.5"
 }
