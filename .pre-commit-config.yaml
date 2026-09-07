@@ -41,7 +41,7 @@ repos:
   - id: renovate-config-validator
     args: ["--strict"]
     language_version: lts
-    files: '((^|/).?renovate(?:rc)?(?:\.json5?)?|^renovate-action-versions\.json5)$'
+    files: '((^|/)\.?renovate(?:rc)?(?:\.json5?)?|^renovate-action-versions\.json5)$'
 
 - repo: https://github.com/compilerla/conventional-pre-commit
   rev: v4.4.0
