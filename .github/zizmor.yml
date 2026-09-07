@@ -89,3 +89,12 @@ rules:
     disable: true
   template-injection:       # 125 findings
     disable: true
+
+  # self-repository's fix ($/...) isn't recognized by actionlint 1.7.12 yet,
+  # which would trade this failure for an actionlint one.
+  self-repository:
+    disable: true
+
+  # Out of scope per this file's stated policy: only unpinned-uses is adopted.
+  use-trusted-publishing:   # 1 finding
+    disable: true
