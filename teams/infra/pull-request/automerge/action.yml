@@ -15,6 +15,10 @@ inputs:
     description: 'Label to filter pull requests'
     required: false
     default: 'automerge'
+  author:
+    description: 'Restrict automerge to pull requests raised by this author (e.g. a bot login). Empty means no restriction.'
+    required: false
+    default: ''
 
 runs:
   using: composite
@@ -25,3 +29,4 @@ runs:
       GITHUB_TOKEN: "${{ inputs.github-token }}"
       MERGE_METHOD: "squash"
       MERGE_LABELS: "!no-merge,${{ inputs.label }}"
+      MERGE_FILTER_AUTHOR: "${{ inputs.author }}"

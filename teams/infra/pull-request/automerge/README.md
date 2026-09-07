@@ -43,4 +43,13 @@ jobs:
       uses: camunda/infra-global-github-actions/teams/infra/pull-request/automerge@main
       with:
         github-token: ${{ steps.app-token.outputs.token }}
+        author: infra-releases[bot]
 ```
+
+## Inputs
+
+| Input          | Default     | Description                                                                                    |
+| -------------- | ----------- | ------------------------------------------------------------------------------------------------ |
+| `github-token` |             | Token with permissions to modify pull requests, contents and actions.                          |
+| `label`        | `automerge` | Label a pull request must carry to be merged.                                                  |
+| `author`       | (none)      | Restricts merging to pull requests raised by this author (e.g. `infra-releases[bot]`). Any user with write access can still add the `automerge` label to a PR, so set `author` whenever this workflow is meant for release-please PRs only, otherwise it merges any labeled PR regardless of origin. |
