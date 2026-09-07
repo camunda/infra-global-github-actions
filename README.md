@@ -4,6 +4,26 @@ This repository contains Github Actions (GHA) maintained by the Infra team. Thos
 
 They are **publicly accessible** and thus must not contain any secrets.
 
+## Consuming These Actions
+
+### Keeping Version Pins Up To Date
+
+Actions here are released per family and tagged `<family>-X.Y.Z`, where the family is the last path segment of the released directory. Pin a sub-action by commit SHA and name its release in a trailing comment:
+
+```yaml
+- uses: camunda/infra-global-github-actions/teams/infra/pull-request/automerge@d56c158341637cc71ed42e34040e9db0d0026b6c # pull-request-1.1.0
+```
+
+Renovate's built-in `github-actions` manager drops the sub-action path, so every family collapses into a single `camunda/infra-global-github-actions` dependency with no version to compare against and the pin goes stale silently. Extend the preset in [`renovate-action-versions.json5`](renovate-action-versions.json5) to have Renovate track each family on its own release line:
+
+```json5
+{
+  extends: ["github>camunda/infra-global-github-actions:renovate-action-versions.json5"],
+}
+```
+
+It ships the custom manager only. Labels and grouping belong in the consuming repository, matched on depName `/^camunda\/infra-global-github-actions\//`.
+
 ## Contributing
 
 ### Pre-Commit Hooks
