@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.7 (2026-09-07)
+
+## What's Changed
+* chore(deps): update s4u/setup-maven-action action to v1.21.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/804
+* feat(automerge): add opt-in author filter by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/807
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/common-tooling-1.0.6...common-tooling-1.0.7
+
 ## 1.0.6 (2026-09-05)
 
 ## What's Changed
