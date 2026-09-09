@@ -8,21 +8,22 @@ inputs:
     # renovate: datasource=github-releases depName=fossas/fossa-cli
     default: 3.18.2
     required: true
-  arch:
-    description: Architecture of the FOSSA CLI binary (linux_amd64 or linux_arm64)
-    default: "linux_amd64"
 runs:
   using: composite
   steps:
     - name: Install FOSSA CLI
       env:
         FOSSA_CLI_VERSION: ${{ inputs.version }}
-        FOSSA_CLI_ARCH: ${{ inputs.arch }}
       run: |
-        case "${FOSSA_CLI_ARCH}" in
-          linux_amd64 | linux_arm64) ;;
+        case "${RUNNER_ARCH}" in
+          X64)
+            FOSSA_CLI_ARCH="linux_amd64"
+            ;;
+          ARM64)
+            FOSSA_CLI_ARCH="linux_arm64"
+            ;;
           *)
-            echo "::error::Unsupported FOSSA CLI architecture '${FOSSA_CLI_ARCH}'. Omit the arch input to use the default linux_amd64 binary, or set it to linux_arm64 for an ARM64 runner."
+            echo "::error::Unsupported runner architecture '${RUNNER_ARCH}'. FOSSA CLI installation supports X64 and ARM64 runners."
             exit 1
             ;;
         esac
