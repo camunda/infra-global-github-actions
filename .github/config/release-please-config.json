@@ -31,6 +31,7 @@
     }
   ],
   "changelog-type": "github",
+  "bootstrap-sha": "50d6a648396f9cf5af51212986d9baa83f8c0129",
   "extra-label": "automerge",
   "release-type": "simple",
   "bump-minor-pre-major": false,
