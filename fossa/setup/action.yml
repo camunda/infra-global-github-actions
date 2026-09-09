@@ -9,7 +9,7 @@ inputs:
     default: 3.18.2
     required: true
   arch:
-    description: Architecture of the runner
+    description: Architecture of the FOSSA CLI binary (linux_amd64 or linux_arm64)
     default: "linux_amd64"
 runs:
   using: composite
@@ -19,6 +19,14 @@ runs:
         FOSSA_CLI_VERSION: ${{ inputs.version }}
         FOSSA_CLI_ARCH: ${{ inputs.arch }}
       run: |
+        case "${FOSSA_CLI_ARCH}" in
+          linux_amd64 | linux_arm64) ;;
+          *)
+            echo "::warning::Unsupported FOSSA CLI architecture '${FOSSA_CLI_ARCH}'. Falling back to linux_amd64."
+            FOSSA_CLI_ARCH="linux_amd64"
+            ;;
+        esac
+
         if ! command -v fossa &> /dev/null
         then
           echo "FOSSA CLI not found, installing version=${FOSSA_CLI_VERSION}..."
