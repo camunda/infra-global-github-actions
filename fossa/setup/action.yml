@@ -35,6 +35,8 @@ runs:
             ;;
         esac
 
+        echo "Runner architecture '${RUNNER_ARCH}' detected; installing FOSSA CLI architecture '${FOSSA_CLI_ARCH}'."
+
         if ! command -v fossa &> /dev/null
         then
           echo "FOSSA CLI not found, installing version=${FOSSA_CLI_VERSION}..."
