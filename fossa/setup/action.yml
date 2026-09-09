@@ -22,8 +22,8 @@ runs:
         case "${FOSSA_CLI_ARCH}" in
           linux_amd64 | linux_arm64) ;;
           *)
-            echo "::warning::Unsupported FOSSA CLI architecture '${FOSSA_CLI_ARCH}'. Falling back to linux_amd64."
-            FOSSA_CLI_ARCH="linux_amd64"
+            echo "::error::Unsupported FOSSA CLI architecture '${FOSSA_CLI_ARCH}'. Omit the arch input to use the default linux_amd64 binary, or set it to linux_arm64 for an ARM64 runner."
+            exit 1
             ;;
         esac
 
