@@ -32,9 +32,9 @@ runs:
         then
           echo "FOSSA CLI not found, installing version=${FOSSA_CLI_VERSION}..."
           curl \
-            -sSL \
+            -fsSL \
             -H 'Cache-Control: no-cache' \
-            https://github.com/fossas/fossa-cli/releases/download/v${FOSSA_CLI_VERSION}/fossa_${FOSSA_CLI_VERSION}_${FOSSA_CLI_ARCH}.tar.gz | \
+            "https://github.com/fossas/fossa-cli/releases/download/v${FOSSA_CLI_VERSION}/fossa_${FOSSA_CLI_VERSION}_${FOSSA_CLI_ARCH}.tar.gz" | \
            sudo tar -xz -C /usr/local/bin
         else
           echo "FOSSA CLI is already installed"
