@@ -10,7 +10,7 @@ inputs:
     required: true
   arch:
     description: Architecture of the runner
-    default: "linux_arm64"
+    default: "linux_amd64"
 runs:
   using: composite
   steps:
