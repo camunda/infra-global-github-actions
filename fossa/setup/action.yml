@@ -15,6 +15,13 @@ runs:
       env:
         FOSSA_CLI_VERSION: ${{ inputs.version }}
       run: |
+        set -euo pipefail
+
+        if [[ "${RUNNER_OS}" != "Linux" ]]; then
+          echo "::error::Unsupported runner OS '${RUNNER_OS}'. FOSSA CLI installation currently supports Linux runners only."
+          exit 1
+        fi
+
         case "${RUNNER_ARCH}" in
           X64)
             FOSSA_CLI_ARCH="linux_amd64"
