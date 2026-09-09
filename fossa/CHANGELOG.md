@@ -1,5 +1,25 @@
 # Changelog
 
+## 1.0.18 (2026-09-09)
+
+## What's Changed
+* chore(deps): update docker/setup-qemu-action action to v4.3.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/802
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/803
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/805
+* chore(deps): update s4u/setup-maven-action action to v1.21.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/804
+* feat(automerge): add opt-in author filter by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/807
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/806
+* fix(preview-env): stop word splitting shattering PR JSON in clean job by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/808
+* feat(renovate): add preset tracking per-action release versions by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/810
+* feat(release): onboard all remaining root-level actions to release-please by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/811
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/809
+* docs: document the Renovate preset and restructure the README by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/812
+* feat: add ability to switch to ARM-based FOSSA CLI by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/813
+* chore: adds bootstrap-sha to support first release of kubernetes-image-replace and fix FOSSA release by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/814
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.17...fossa-1.0.18
+
 ## 1.0.17 (2026-08-29)
 
 ## What's Changed
