@@ -28,13 +28,13 @@ repos:
 # --offline keeps the hook deterministic and token-free; the pinning audit needs
 # no network, and zizmor's online audits are not adopted here.
 - repo: https://github.com/zizmorcore/zizmor-pre-commit
-  rev: v1.30.0
+  rev: v1.30.1
   hooks:
     - id: zizmor
       args: ["--no-progress", "--offline", "--config=.github/zizmor.yml"]
 
 - repo: https://github.com/renovatebot/pre-commit-hooks
-  rev: 44.65.5
+  rev: 44.82.0
   hooks:
     # The hook's own pattern only matches config named `renovate.json[5]`, so the published preset
     # is added explicitly: consumers extend it, and a broken edit here breaks their Renovate runs.
