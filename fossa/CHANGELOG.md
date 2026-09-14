@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.19 (2026-09-12)
+
+## What's Changed
+* chore(deps): update dependency fossas/fossa-cli to v3.18.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/816
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/817
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.18...fossa-1.0.19
+
 ## 1.0.18 (2026-09-09)
 
 ## What's Changed
