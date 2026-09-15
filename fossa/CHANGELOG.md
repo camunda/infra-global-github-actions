@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.20 (2026-09-15)
+
+## What's Changed
+* fix(fossa): survive a reset connection when downloading the FOSSA CLI by @yanavasileva in https://github.com/camunda/infra-global-github-actions/pull/819
+* docs(submit-test-status): document the test_status values producers actually send by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/821
+
+## New Contributors
+* @yanavasileva made their first contribution in https://github.com/camunda/infra-global-github-actions/pull/819
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.19...fossa-1.0.20
+
 ## 1.0.19 (2026-09-12)
 
 ## What's Changed
