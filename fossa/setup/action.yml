@@ -40,11 +40,38 @@ runs:
         if ! command -v fossa &> /dev/null
         then
           echo "FOSSA CLI not found, installing version=${FOSSA_CLI_VERSION}..."
-          curl \
-            -fsSL \
-            -H 'Cache-Control: no-cache' \
-            "https://github.com/fossas/fossa-cli/releases/download/v${FOSSA_CLI_VERSION}/fossa_${FOSSA_CLI_VERSION}_${FOSSA_CLI_ARCH}.tar.gz" | \
-           sudo tar -xz -C /usr/local/bin
+
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "${workdir}"' EXIT
+
+          asset="fossa_${FOSSA_CLI_VERSION}_${FOSSA_CLI_ARCH}.tar.gz"
+          release="https://github.com/fossas/fossa-cli/releases/download/v${FOSSA_CLI_VERSION}"
+
+          # Download to a file rather than piping into tar: a connection reset
+          # mid-transfer otherwise reaches tar as a truncated stream, which fails
+          # the job with an unrecoverable EOF that no retry can undo. Retries also
+          # need a fresh start, which a consumed pipe cannot give them.
+          # --proto-redir matters as much as --proto: the release URL redirects to
+          # a CDN, and curl allows plain HTTP on redirect by default. Both files
+          # travel this path, so anyone able to downgrade it would serve the
+          # tarball and the checksum that matches it.
+          curl --fail --silent --show-error --location \
+               --proto '=https' --proto-redir '=https' \
+               --retry 3 --retry-all-errors --retry-delay 2 \
+               -H 'Cache-Control: no-cache' \
+               --output "${workdir}/${asset}" "${release}/${asset}"
+
+          curl --fail --silent --show-error --location \
+               --proto '=https' --proto-redir '=https' \
+               --retry 3 --retry-all-errors --retry-delay 2 \
+               -H 'Cache-Control: no-cache' \
+               --output "${workdir}/${asset}.sha256" "${release}/${asset}.sha256"
+
+          # Upstream publishes "<sha256> *<asset>", which sha256sum -c reads directly.
+          # Verifying catches a silently truncated body that still exited 0.
+          (cd "${workdir}" && sha256sum --check --strict "${asset}.sha256")
+
+          sudo tar -xz -C /usr/local/bin -f "${workdir}/${asset}"
         else
           echo "FOSSA CLI is already installed"
         fi
