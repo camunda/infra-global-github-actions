@@ -42,6 +42,14 @@ Example `test_event_record`
 {"test_name":"test 9999","test_duration_milliseconds":1234,"test_class_name":"9","test_status":"flaky"}
 ```
 
+Meanings of `test_status`:
+
+* `"success"`: test case was successful since all assertions hold true
+* `"failure"`: test case failed since at least one assertion is false
+* `"skipped"`: test case was not run
+* `"error"`: an unexpected error (JVM crash, OOM, etc.) happened during the test run so not all assertions could be checked, neither success nor failure
+* `"flaky"`: test case failed at least once before succeeding on a [rerun](https://maven.apache.org/surefire/maven-surefire-plugin/examples/rerun-failing-tests.html)
+
 ### Behavior
 
 When invoking this action, it will submit the test record together with additional data like the repository URL, the current time and build ID (for uniqueness) to a central Google Big Query database maintained by the Infra team.
