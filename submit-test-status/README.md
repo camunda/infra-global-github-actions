@@ -32,13 +32,13 @@ Input details for `test_event_record`
 | test_class_name                  | STRING     | NULLABLE   | Individual (unit) test cases are usually grouped together in a container/class. This field holds the name of the container. |
 | test_class_duration_milliseconds | INTEGER    | NULLABLE   | Based on user input (time a test class needed from start to finish) |
 | test_name                        | STRING     | REQUIRED   | Name of the individual test case, can include parameters for uniqueness |
-| test_status                      | STRING     | REQUIRED   | String representing the test status, either `"success"`, `"failed"`, `"skipped"`, `"flaky"` |
+| test_status                      | STRING     | REQUIRED   | String representing the test status, either `"success"`, `"skipped"`, `"failure"`, `"error"`, `"flaky"` |
 | test_duration_milliseconds       | INTEGER    | NULLABLE   | Based on user input (time an individual test needed from start to finish) |
 
 Example `test_event_record`
 ```json
 {"test_name":"test 99","test_status":"success"}
-{"test_name":"test 999","test_status":"failed"}
+{"test_name":"test 999","test_status":"failure"}
 {"test_name":"test 9999","test_duration_milliseconds":1234,"test_class_name":"9","test_status":"flaky"}
 ```
 
@@ -57,7 +57,7 @@ All data submitted by this action is stored as one record per JSONL input line i
 | test_class_name                  | STRING     | NULLABLE   | Individual (unit) test cases are usually grouped together in a container/class. This field holds the name of the container. |
 | test_class_duration_milliseconds | INTEGER    | NULLABLE   | Based on user input (time a test class needed from start to finish) |
 | test_name                        | STRING     | REQUIRED   | Name of the individual test case, can include parameters for uniqueness |
-| test_status                      | STRING     | REQUIRED   | String representing the test status, either `"success"`, `"failed"`, `"skipped"`, `"flaky"` |
+| test_status                      | STRING     | REQUIRED   | String representing the test status, either `"success"`, `"skipped"`, `"failure"`, `"error"`, `"flaky"` |
 | test_duration_milliseconds       | INTEGER    | NULLABLE   | Based on user input (time an individual test needed from start to finish) |
 
 
@@ -87,7 +87,7 @@ jobs:
       run: |
         # Your test command that outputs results to a file
         echo '{"test_name":"test 99","test_status":"success"}' > test_results.jsonl
-        echo '{"test_name":"test 999","test_status":"failed"}' >> test_results.jsonl
+        echo '{"test_name":"test 999","test_status":"failure"}' >> test_results.jsonl
 
     - name: Upload test results to CI Analytics
       uses: camunda/infra-global-github-actions/submit-test-status@main
@@ -114,6 +114,6 @@ jobs:
         gcp_credentials_json: ${{ secrets.YOUR_GCP_CREDENTIALS }}
         test_event_record: |
           {"test_name":"test 99","test_status":"success"}
-          {"test_name":"test 999","test_status":"failed"}
+          {"test_name":"test 999","test_status":"failure"}
           {"test_name":"test 9999","test_duration_milliseconds":1234,"test_class_name":"9","test_status":"flaky"}
 ```
