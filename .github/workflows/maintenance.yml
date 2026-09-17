@@ -9,20 +9,23 @@ on:
 
 jobs:
   configure-pr:
+    permissions:
+      id-token: write  # mint GitHub OIDC token for Vault JWT auth
     name: Configure maintenance Pull Request
     runs-on: ubuntu-latest
     steps:
     - name: Generate a GitHub token
       id: github-token
-      uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@main
+      uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@67d00e9260887361a31f6446252fffbecae4a02e  # generate-github-app-token-from-vault-secrets-1.1.1
       with:
         github-app-id-vault-key: GITHUB_APP_ID
         github-app-id-vault-path: secret/data/products/infra/ci/team-infrastructure
         github-app-private-key-vault-key: GITHUB_APP_PRIVATE_KEY
         github-app-private-key-vault-path: secret/data/products/infra/ci/team-infrastructure
-        vault-auth-method: approle
-        vault-auth-role-id: ${{ secrets.VAULT_ROLE_ID }}
-        vault-auth-secret-id: ${{ secrets.VAULT_SECRET_ID}}
+        vault-auth-method: jwt
+        vault-auth-jwt-path: ${{ secrets.VAULT_JWT_PATH }}
+        vault-auth-jwt-role: ${{ secrets.VAULT_JWT_ROLE }}
+        vault-auth-jwt-audience: ${{ secrets.VAULT_JWT_AUDIENCE }}
         vault-url: ${{ secrets.VAULT_ADDR }}
     - name: Apply maintenance parameters to the Pull Request if applicable
       uses: camunda/infra-global-github-actions/teams/infra/configure-maintenance-pull-request@main
