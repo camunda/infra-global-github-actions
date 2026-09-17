@@ -17,15 +17,18 @@ on:
 jobs:
   replace-kubernetes-image:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
     - name: Import Secrets
       id: secrets
-      uses: hashicorp/vault-action@v2.5.0
+      uses: hashicorp/vault-action@v3.4.0
       with:
         url: ${{ secrets.VAULT_ADDR }}
-        method: approle
-        roleId: ${{ secrets.VAULT_ROLE_ID }}
-        secretId: ${{ secrets.VAULT_SECRET_ID }}
+        method: jwt
+        role: ${{ secrets.VAULT_JWT_ROLE }}
+        path: ${{ secrets.VAULT_JWT_PATH }}
+        jwtGithubAudience: ${{ secrets.VAULT_JWT_AUDIENCE }}
         exportEnv: false
         secrets: |
           secret/data/SOME_PATH GCP_AUTH_CREDS | GCP_CREDENTIALS;

@@ -29,31 +29,6 @@ Retriggers failed GitHub Actions workflows, with optional error message filterin
 ## Examples
 
 ### Immediate Retry
-```yaml
-- uses: camunda/infra-global-github-actions/rerun-failed-run@main
-  with:
-    run-id: ${{ github.run_id }}
-    repository: ${{ github.repository }}
-    vault-addr: ${{ secrets.VAULT_ADDR }}
-    vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
-    vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
-```
-
-### Conditional Retry
-```yaml
-- uses: camunda/infra-global-github-actions/rerun-failed-run@main
-  with:
-    error-messages: |
-      Process completed with exit code 1
-      Connection timeout
-    run-id: ${{ github.run_id }}
-    repository: ${{ github.repository }}
-    vault-addr: ${{ secrets.VAULT_ADDR }}
-    vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
-    vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
-```
-
-### Using GitHub OIDC/JWT authentication
 
 The calling job must grant `id-token: write` so GitHub can mint the OIDC token.
 
@@ -67,6 +42,34 @@ The calling job must grant `id-token: write` so GitHub can mint the OIDC token.
     vault-jwt-path: ${{ secrets.VAULT_JWT_PATH }}
     vault-jwt-role: ${{ secrets.VAULT_JWT_ROLE }}
     vault-jwt-audience: ${{ secrets.VAULT_JWT_AUDIENCE }}
+```
+
+### Conditional Retry
+```yaml
+- uses: camunda/infra-global-github-actions/rerun-failed-run@main
+  with:
+    error-messages: |
+      Process completed with exit code 1
+      Connection timeout
+    run-id: ${{ github.run_id }}
+    repository: ${{ github.repository }}
+    vault-addr: ${{ secrets.VAULT_ADDR }}
+    vault-auth-method: jwt
+    vault-jwt-path: ${{ secrets.VAULT_JWT_PATH }}
+    vault-jwt-role: ${{ secrets.VAULT_JWT_ROLE }}
+    vault-jwt-audience: ${{ secrets.VAULT_JWT_AUDIENCE }}
+```
+
+### 🚫 Legacy: AppRole authentication
+
+```yaml
+- uses: camunda/infra-global-github-actions/rerun-failed-run@main
+  with:
+    run-id: ${{ github.run_id }}
+    repository: ${{ github.repository }}
+    vault-addr: ${{ secrets.VAULT_ADDR }}
+    vault-role-id: ${{ secrets.VAULT_ROLE_ID }}
+    vault-secret-id: ${{ secrets.VAULT_SECRET_ID }}
 ```
 
 ## How It Works

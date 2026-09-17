@@ -37,15 +37,18 @@ jobs:
       - job1
     if: failure() && fromJSON(github.run_attempt) < 3 #This limits the job to only be retried two times
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
       - name: Import secrets
         id: secrets
-        uses: hashicorp/vault-action@v2.8.0
+        uses: hashicorp/vault-action@v3.4.0
         with:
           url: ${{ secrets.VAULT_ADDR }}
-          method: approle
-          roleId: ${{ secrets.VAULT_ROLE_ID }}
-          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          method: jwt
+          role: ${{ secrets.VAULT_JWT_ROLE }}
+          path: ${{ secrets.VAULT_JWT_PATH }}
+          jwtGithubAudience: ${{ secrets.VAULT_JWT_AUDIENCE }}
           secrets: |
             secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_KEY;
             secret/data/products/infra/ci/retrigger-gha-workflow RETRIGGER_APP_ID;
