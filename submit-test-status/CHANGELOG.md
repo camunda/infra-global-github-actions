@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.4 (2026-09-17)
+
+## What's Changed
+* docs(submit-test-status): document test_status meanings by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/822
+* docs: lead vault-action examples with JWT auth by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/824
+* fix: migrate Vault auth from AppRole to JWT/OIDC by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/825
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/submit-test-status-1.0.3...submit-test-status-1.0.4
+
 ## 1.0.3 (2026-09-15)
 
 ## What's Changed

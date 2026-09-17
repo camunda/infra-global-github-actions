@@ -1,5 +1,43 @@
 # Changelog
 
+## 1.1.3 (2026-09-17)
+
+## What's Changed
+* chore(deps): update dependency fossas/fossa-cli to v3.18.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/794
+* docs(submit-aborted-gha-status): clarify shutdown-signal filtering and OOM reconciliation by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/798
+* chore(deps): update dependency fossas/fossa-cli to v3.18.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/799
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.50.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/800
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.51.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/801
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/797
+* chore(deps): update docker/setup-qemu-action action to v4.3.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/802
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/803
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/805
+* chore(deps): update s4u/setup-maven-action action to v1.21.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/804
+* feat(automerge): add opt-in author filter by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/807
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/806
+* fix(preview-env): stop word splitting shattering PR JSON in clean job by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/808
+* feat(renovate): add preset tracking per-action release versions by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/810
+* feat(release): onboard all remaining root-level actions to release-please by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/811
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/809
+* docs: document the Renovate preset and restructure the README by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/812
+* feat: add ability to switch to ARM-based FOSSA CLI by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/813
+* chore: adds bootstrap-sha to support first release of kubernetes-image-replace and fix FOSSA release by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/814
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/815
+* chore(deps): update dependency fossas/fossa-cli to v3.18.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/816
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/817
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/818
+* fix(fossa): survive a reset connection when downloading the FOSSA CLI by @yanavasileva in https://github.com/camunda/infra-global-github-actions/pull/819
+* docs(submit-test-status): document the test_status values producers actually send by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/821
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/820
+* docs(submit-test-status): document test_status meanings by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/822
+* docs: lead vault-action examples with JWT auth by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/824
+* fix: migrate Vault auth from AppRole to JWT/OIDC by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/825
+
+## New Contributors
+* @yanavasileva made their first contribution in https://github.com/camunda/infra-global-github-actions/pull/819
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/rerun-failed-run-1.1.2...rerun-failed-run-1.1.3
+
 ## 1.1.2 (2026-08-22)
 
 ## What's Changed
