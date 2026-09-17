@@ -90,6 +90,7 @@ jobs:
 
   notify-on-failure:
     permissions:
+      actions: read  # action-slack's job field calls listJobsForWorkflowRun
       id-token: write  # mint GitHub OIDC token for Vault JWT auth
     if: always() && needs.monitor-retry-workflow.result == 'failure'
     needs:
