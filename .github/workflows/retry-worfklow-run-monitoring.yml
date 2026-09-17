@@ -18,6 +18,10 @@ on:
 
 jobs:
   monitor-retry-workflow:
+    permissions:
+      contents: read
+      actions: read  # workflow-run-stats calls the workflow runs API
+      id-token: write  # mint GitHub OIDC token for Vault JWT auth
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -28,9 +32,10 @@ jobs:
         uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
         with:
           url: ${{ secrets.VAULT_ADDR }}
-          method: approle
-          roleId: ${{ secrets.VAULT_ROLE_ID }}
-          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          method: jwt
+          role: ${{ secrets.VAULT_JWT_ROLE }}
+          path: ${{ secrets.VAULT_JWT_PATH }}
+          jwtGithubAudience: ${{ secrets.VAULT_JWT_AUDIENCE }}
           secrets: |
             secret/data/products/infra/ci/infra-core SLACK_WEBHOOK_INFRA_ALERTS;
 
