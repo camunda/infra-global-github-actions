@@ -86,16 +86,22 @@ Please check the `Import Secrets` Step in the example below on how you will get 
 
 ## Example 1: Upload Enterprise Artifact to Camunda Download Center (Dev)
 
+Add `id-token: write` to the job's `permissions` so GitHub can mint the OIDC token Vault authenticates with.
+
 ```yaml
+    permissions:
+      id-token: write
+
     steps:
       - name: Import Secrets
         id: secrets
-        uses: hashicorp/vault-action@v2.5.0
+        uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
         with:
           url: ${{ secrets.VAULT_ADDR }}
-          method: approle
-          roleId: ${{ secrets.VAULT_ROLE_ID }}
-          secretId: ${{ secrets.VAULT_SECRET_ID }}
+          method: jwt
+          role: ${{ secrets.VAULT_JWT_ROLE }}
+          path: ${{ secrets.VAULT_JWT_PATH }}
+          jwtGithubAudience: ${{ secrets.VAULT_JWT_AUDIENCE }}
           secrets: |
               secret/data/common/jenkins/downloads-camunda-cloud_google_sa_key DEV_DOWNLOAD_CENTER_GCLOUD_KEY_BYTES | GCP_CREDENTIALS_NAME;
 
@@ -117,15 +123,19 @@ artifact under this path [https://dev.downloads.camunda.cloud/enterprise-release
 ## Example 2: Uploading an Enterprise Artifact with Custom Repository Name
 
 ```yaml
+permissions:
+  id-token: write
+
 steps:
   - name: Import Secrets
     id: secrets
-    uses: hashicorp/vault-action@v2.5.0
+    uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
     with:
       url: ${{ secrets.VAULT_ADDR }}
-      method: approle
-      roleId: ${{ secrets.VAULT_ROLE_ID }}
-      secretId: ${{ secrets.VAULT_SECRET_ID }}
+      method: jwt
+      role: ${{ secrets.VAULT_JWT_ROLE }}
+      path: ${{ secrets.VAULT_JWT_PATH }}
+      jwtGithubAudience: ${{ secrets.VAULT_JWT_AUDIENCE }}
       secrets: |
           secret/data/common/jenkins/downloads-camunda-cloud_google_sa_key DEV_DOWNLOAD_CENTER_GCLOUD_KEY_BYTES | GCP_CREDENTIALS_NAME;
 

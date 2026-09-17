@@ -24,9 +24,9 @@ This composite GHA can be used in any repository.
 | owner                               | The owner of the GitHub App installation (defaults to current repository owner, optional). |
 | repositories                        | Comma or newline-separated list of repositories for which the GitHub app token will be valid for(defaults to current repository if owner is unset, optional). If you want to generate a token that has access to all repositories of the owner, set this to `!all` and explicitely set an `owner`. |
 
-> (*) Supports both App Role (`vault-auth-method=approle`) and GitHub OIDC/JWT
-> (`vault-auth-method=jwt`) authentication. When using `jwt`, the calling job
-> must grant `id-token: write` permission so GitHub can mint the OIDC token.
+> (*) Supports both GitHub OIDC/JWT (`vault-auth-method=jwt`, recommended) and legacy
+> App Role (`vault-auth-method=approle`) authentication. When using `jwt`, the calling
+> job must grant `id-token: write` permission so GitHub can mint the OIDC token.
 
 ### Outputs
 | Output name      | Description                       |
@@ -36,31 +36,6 @@ This composite GHA can be used in any repository.
 | app-slug         | GitHub App slug                   |
 
 ### Workflow Example
-```yaml
----
-name: example
-on:
-  pull_request:
-jobs:
-  configure-pr:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@main
-      with:
-        github-app-id-vault-key: THE_KEY_NAME_OF_THE_VAULT_SECRET_STORING_THE_APP_ID
-        github-app-id-vault-path: the/path/of/the/vault/secret/storing/the/app/id
-        github-app-private-key-vault-key: THE_KEY_NAME_OF_THE_VAULT_SECRET_STORING_THE_APP_PRIVATE_KEY
-        github-app-private-key-vault-path: the/path/of/the/vault/secret/storing/the/app/private/key
-        vault-auth-method: approle
-        vault-auth-role-id: ${{ secrets.VAULT_ROLE_ID }}
-        vault-auth-secret-id: ${{ secrets.VAULT_SECRET_ID }}
-        vault-url: ${{ secrets.VAULT_ADDR }}
-        skip-token-revoke: false  # Optional, defaults to false if omitted
-        owner: ${{ github.repository_owner }}  # Optional, defaults to current repository owner
-        repositories: ${{ github.repository }}  # Optional, defaults to current repository
-```
-
-#### Using GitHub OIDC/JWT authentication
 
 ```yaml
 ---
@@ -85,6 +60,35 @@ jobs:
         vault-auth-jwt-role: ${{ secrets.VAULT_JWT_ROLE }}
         vault-auth-jwt-audience: ${{ secrets.VAULT_JWT_AUDIENCE }}
         vault-url: ${{ secrets.VAULT_ADDR }}
+        skip-token-revoke: false  # Optional, defaults to false if omitted
+        owner: ${{ github.repository_owner }}  # Optional, defaults to current repository owner
+        repositories: ${{ github.repository }}  # Optional, defaults to current repository
+```
+
+#### 🚫 Legacy: AppRole authentication
+
+```yaml
+---
+name: example
+on:
+  pull_request:
+jobs:
+  configure-pr:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@main
+      with:
+        github-app-id-vault-key: THE_KEY_NAME_OF_THE_VAULT_SECRET_STORING_THE_APP_ID
+        github-app-id-vault-path: the/path/of/the/vault/secret/storing/the/app/id
+        github-app-private-key-vault-key: THE_KEY_NAME_OF_THE_VAULT_SECRET_STORING_THE_APP_PRIVATE_KEY
+        github-app-private-key-vault-path: the/path/of/the/vault/secret/storing/the/app/private/key
+        vault-auth-method: approle
+        vault-auth-role-id: ${{ secrets.VAULT_ROLE_ID }}
+        vault-auth-secret-id: ${{ secrets.VAULT_SECRET_ID }}
+        vault-url: ${{ secrets.VAULT_ADDR }}
+        skip-token-revoke: false  # Optional, defaults to false if omitted
+        owner: ${{ github.repository_owner }}  # Optional, defaults to current repository owner
+        repositories: ${{ github.repository }}  # Optional, defaults to current repository
 ```
 
 ### Token Generation

@@ -21,15 +21,18 @@ on:
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
     - name: Import Secrets
       id: vault-secrets
-      uses: hashicorp/vault-action@v3.0.0
+      uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
       with:
         url: ${{ secrets.VAULT_ADDR }}
-        method: approle
-        roleId: ${{ secrets.VAULT_ROLE_ID }}
-        secretId: ${{ secrets.VAULT_SECRET_ID}}
+        method: jwt
+        role: ${{ secrets.VAULT_JWT_ROLE }}
+        path: ${{ secrets.VAULT_JWT_PATH }}
+        jwtGithubAudience: ${{ secrets.VAULT_JWT_AUDIENCE }}
         secrets: |
           secret/data/products/infra/ci/infra-releases RELEASES_APP_ID;
           secret/data/products/infra/ci/infra-releases RELEASES_APP_KEY;
