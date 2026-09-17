@@ -45,6 +45,9 @@ The calling job must grant `id-token: write` so GitHub can mint the OIDC token.
 ```
 
 ### Conditional Retry
+
+The calling job must grant `id-token: write` so GitHub can mint the OIDC token.
+
 ```yaml
 - uses: camunda/infra-global-github-actions/rerun-failed-run@main
   with:
