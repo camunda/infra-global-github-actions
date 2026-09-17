@@ -95,7 +95,7 @@ Add `id-token: write` to the job's `permissions` so GitHub can mint the OIDC tok
     steps:
       - name: Import Secrets
         id: secrets
-        uses: hashicorp/vault-action@v3.4.0
+        uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
         with:
           url: ${{ secrets.VAULT_ADDR }}
           method: jwt
@@ -129,7 +129,7 @@ permissions:
 steps:
   - name: Import Secrets
     id: secrets
-    uses: hashicorp/vault-action@v3.4.0
+    uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
     with:
       url: ${{ secrets.VAULT_ADDR }}
       method: jwt
