@@ -57,13 +57,13 @@ runs:
           # tarball and the checksum that matches it.
           curl --fail --silent --show-error --location \
                --proto '=https' --proto-redir '=https' \
-               --retry 3 --retry-all-errors --retry-delay 2 \
+               --retry 5 --retry-all-errors \
                -H 'Cache-Control: no-cache' \
                --output "${workdir}/${asset}" "${release}/${asset}"
 
           curl --fail --silent --show-error --location \
                --proto '=https' --proto-redir '=https' \
-               --retry 3 --retry-all-errors --retry-delay 2 \
+               --retry 5 --retry-all-errors \
                -H 'Cache-Control: no-cache' \
                --output "${workdir}/${asset}.sha256" "${release}/${asset}.sha256"
 
