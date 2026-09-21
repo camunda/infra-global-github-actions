@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.0.5 (2026-09-19)
+
+## What's Changed
+* chore(deps): update docker/build-push-action action to v7.4.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/827
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.103.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/830
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/build-docker-image-1.0.4...build-docker-image-1.0.5
+
 ## 1.0.4 (2026-09-17)
 
 ## What's Changed
