@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.0.6 (2026-09-21)
+
+## What's Changed
+* chore(deps): update docker/setup-qemu-action action to v4.4.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/829
+* chore(deps): update docker/setup-buildx-action action to v4.4.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/828
+* fix(fossa): use curl's default exponential backoff on retry by @yanavasileva in https://github.com/camunda/infra-global-github-actions/pull/826
+* fix(actionlint): accept ubuntu-26.04 as a valid runner label by @wollefitz in https://github.com/camunda/infra-global-github-actions/pull/834
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/build-docker-image-1.0.5...build-docker-image-1.0.6
+
 ## 1.0.5 (2026-09-19)
 
 ## What's Changed
