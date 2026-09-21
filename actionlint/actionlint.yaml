@@ -53,6 +53,11 @@ self-hosted-runner:
     - n2-standard-32-netssd-preempt
     - n2-standard-8-netssd-preempt
     - n2-standard-8-netssd-preempt-quick
+    # ubuntu-26.04 is a GitHub-hosted runner label, but actionlint doesn't
+    # recognize it yet (https://github.com/rhysd/actionlint/pull/683 is
+    # unreleased). Listing it here as if self-hosted silences the "unknown
+    # runner" error until an actionlint release adds native support.
+    - ubuntu-26.04
 
 # Configuration variables in array of strings defined in your repository or
 # organization. `null` means disabling configuration variables check.
