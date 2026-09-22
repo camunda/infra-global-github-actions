@@ -1,5 +1,39 @@
 # Changelog
 
+## 1.0.8 (2026-09-21)
+
+## What's Changed
+* fix(preview-env): stop word splitting shattering PR JSON in clean job by @szpraat in https://github.com/camunda/infra-global-github-actions/pull/808
+* feat(renovate): add preset tracking per-action release versions by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/810
+* feat(release): onboard all remaining root-level actions to release-please by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/811
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/809
+* docs: document the Renovate preset and restructure the README by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/812
+* feat: add ability to switch to ARM-based FOSSA CLI by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/813
+* chore: adds bootstrap-sha to support first release of kubernetes-image-replace and fix FOSSA release by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/814
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/815
+* chore(deps): update dependency fossas/fossa-cli to v3.18.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/816
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/817
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/818
+* fix(fossa): survive a reset connection when downloading the FOSSA CLI by @yanavasileva in https://github.com/camunda/infra-global-github-actions/pull/819
+* docs(submit-test-status): document the test_status values producers actually send by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/821
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/820
+* docs(submit-test-status): document test_status meanings by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/822
+* docs: lead vault-action examples with JWT auth by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/824
+* fix: migrate Vault auth from AppRole to JWT/OIDC by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/825
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/823
+* chore(deps): update docker/build-push-action action to v7.4.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/827
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.103.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/830
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/831
+* chore(deps): update docker/setup-qemu-action action to v4.4.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/829
+* chore(deps): update docker/setup-buildx-action action to v4.4.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/828
+* fix(fossa): use curl's default exponential backoff on retry by @yanavasileva in https://github.com/camunda/infra-global-github-actions/pull/826
+* fix(actionlint): accept ubuntu-26.04 as a valid runner label by @wollefitz in https://github.com/camunda/infra-global-github-actions/pull/834
+
+## New Contributors
+* @yanavasileva made their first contribution in https://github.com/camunda/infra-global-github-actions/pull/819
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/common-tooling-1.0.7...common-tooling-1.0.8
+
 ## 1.0.7 (2026-09-07)
 
 ## What's Changed

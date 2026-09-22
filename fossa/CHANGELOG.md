@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.21 (2026-09-21)
+
+## What's Changed
+* docs(submit-test-status): document test_status meanings by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/822
+* docs: lead vault-action examples with JWT auth by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/824
+* fix: migrate Vault auth from AppRole to JWT/OIDC by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/825
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/823
+* chore(deps): update docker/build-push-action action to v7.4.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/827
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.103.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/830
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/831
+* chore(deps): update docker/setup-qemu-action action to v4.4.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/829
+* chore(deps): update docker/setup-buildx-action action to v4.4.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/828
+* fix(fossa): use curl's default exponential backoff on retry by @yanavasileva in https://github.com/camunda/infra-global-github-actions/pull/826
+* fix(actionlint): accept ubuntu-26.04 as a valid runner label by @wollefitz in https://github.com/camunda/infra-global-github-actions/pull/834
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.20...fossa-1.0.21
+
 ## 1.0.20 (2026-09-15)
 
 ## What's Changed
