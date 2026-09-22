@@ -149,7 +149,7 @@ runs:
       BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
     run: |
       # add mandatory report_time, ci_url and build_id to the test records
-      REPORT_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+      REPORT_TIME=$(date -u '+%Y-%m-%d %H:%M:%S')
       jq -c \
         --arg REPORT_TIME "$REPORT_TIME" \
         --arg CI_URL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
