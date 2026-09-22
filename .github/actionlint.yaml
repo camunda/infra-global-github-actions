@@ -1,0 +1,6 @@
+self-hosted-runner:
+  # AGENT-TODO: drop this label once actionlint ships native `ubuntu-26.04` support
+  # blocker: rhysd/actionlint#682
+  # action: remove this label from self-hosted-runner.labels and bump the actionlint pre-commit rev
+  labels:
+  - ubuntu-26.04
