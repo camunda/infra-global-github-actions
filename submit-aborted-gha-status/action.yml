@@ -77,7 +77,7 @@ runs:
 
           JSON_ROW=$(cat <<EOF
       {
-        "report_time": "$(date '+%Y-%m-%d %H:%M:%S')",
+        "report_time": "$(date -u '+%Y-%m-%d %H:%M:%S')",
         "ci_url": "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY",
         "workflow_name": "$GITHUB_WORKFLOW",
         "workflow_ref": "$WORKFLOW_REF_PATH",

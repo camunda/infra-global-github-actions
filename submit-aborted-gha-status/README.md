@@ -33,7 +33,7 @@ All data submitted by this action is stored as one record in the Big Query table
 
 | Field Name       | Field Type | Field Mode | Description/Purpose |
 |------------------|------------|------------|---------------------|
-| report_time      | TIMESTAMP  | REQUIRED   | Time of record submission |
+| report_time      | TIMESTAMP  | REQUIRED   | Time of record submission, in UTC |
 | ci_url           | STRING     | REQUIRED   | Github repository URL from `"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"` |
 | workflow_name    | STRING     | NULLABLE   | GHA workflow name from `"$GITHUB_WORKFLOW"` |
 | workflow_ref     | STRING     | NULLABLE   | GHA workflow file path extracted from `"$GITHUB_WORKFLOW_REF"`, e.g. `.github/workflows/ci.yml` |

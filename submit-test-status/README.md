@@ -58,7 +58,7 @@ All data submitted by this action is stored as one record per JSONL input line i
 
 | Field Name                       | Field Type | Field Mode | Description/Purpose |
 |----------------------------------|------------|------------|---------------------|
-| report_time                      | TIMESTAMP  | REQUIRED   | Time of record submission |
+| report_time                      | TIMESTAMP  | REQUIRED   | Time of record submission, in UTC |
 | ci_url                           | STRING     | REQUIRED   | Github repository URL from `"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"` |
 | build_id                         | STRING     | REQUIRED   | GHA workflow run ID from `"$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT"` |
 | job_name                         | STRING     | REQUIRED   | GHA workflow job ID from `"$GITHUB_JOB"` |
