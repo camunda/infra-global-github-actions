@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.0.5 (2026-09-22)
+
+## What's Changed
+* chore(deps): update docker/build-push-action action to v7.4.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/827
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.103.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/830
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/831
+* chore(deps): update docker/setup-qemu-action action to v4.4.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/829
+* chore(deps): update docker/setup-buildx-action action to v4.4.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/828
+* fix(fossa): use curl's default exponential backoff on retry by @yanavasileva in https://github.com/camunda/infra-global-github-actions/pull/826
+* fix(actionlint): accept ubuntu-26.04 as a valid runner label by @wollefitz in https://github.com/camunda/infra-global-github-actions/pull/834
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/833
+* fix: stamp CI Analytics report_time in UTC by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/835
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/submit-test-status-1.0.4...submit-test-status-1.0.5
+
 ## 1.0.4 (2026-09-17)
 
 ## What's Changed
