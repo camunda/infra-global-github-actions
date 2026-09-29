@@ -238,9 +238,9 @@ def test_classify_403_primary_ratelimit_retryable():
 
 def test_ancestor_picks_newest(monkeypatch):
     runs = {"workflow_runs": [
-        {"head_sha": "newer", "id": 3},
-        {"head_sha": "anc", "id": 2},
-        {"head_sha": "older", "id": 1},
+        {"head_sha": "newer", "id": 3, "event": "push"},
+        {"head_sha": "anc", "id": 2, "event": "push"},
+        {"head_sha": "older", "id": 1, "event": "push"},
     ]}
     monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
     statuses = {"newer": "diverged", "anc": "ahead", "older": "ahead"}
@@ -250,7 +250,7 @@ def test_ancestor_picks_newest(monkeypatch):
 
 
 def test_ancestor_identical_at_top(monkeypatch):
-    runs = {"workflow_runs": [{"head_sha": "BASE", "id": 9}]}
+    runs = {"workflow_runs": [{"head_sha": "BASE", "id": 9, "event": "push"}]}
     monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
     monkeypatch.setattr(check, "_compare_status", lambda *a: "identical")
     eff, _, scanned, _ = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
@@ -258,7 +258,10 @@ def test_ancestor_identical_at_top(monkeypatch):
 
 
 def test_ancestor_none_found(monkeypatch):
-    runs = {"workflow_runs": [{"head_sha": "x", "id": 1}, {"head_sha": "y", "id": 2}]}
+    runs = {"workflow_runs": [
+        {"head_sha": "x", "id": 1, "event": "push"},
+        {"head_sha": "y", "id": 2, "event": "push"},
+    ]}
     monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
     monkeypatch.setattr(check, "_compare_status", lambda *a: "behind")
     eff, run_id, scanned, _ = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
@@ -277,7 +280,8 @@ def test_ancestor_query_uses_base_ref_and_workflow(monkeypatch):
     # branch name with slash must be percent-encoded so it is not misread as a path segment
     assert "branch=stable%2F8.8" in captured["url"]
     assert "maven-dependency-snapshot.yml" in captured["url"]
-    assert "event=push" in captured["url"] and "status=success" in captured["url"]
+    assert "status=success" in captured["url"]
+    assert "event=" not in captured["url"]
 
 
 def test_ancestor_query_plain_branch_not_double_encoded(monkeypatch):
@@ -303,14 +307,16 @@ def test_has_override_label_no_pr_number(monkeypatch):
 
 def test_ancestor_paginates_to_honor_lookback(monkeypatch):
     # lookback > 100 → per_page capped at 100, follow the next page to keep scanning.
-    page1 = {"workflow_runs": [{"head_sha": f"p1-{i}", "id": i} for i in range(100)]}
-    page2 = {"workflow_runs": [{"head_sha": "anc", "id": 999}]}
+    page1 = {"workflow_runs": [
+        {"head_sha": f"p1-{i}", "id": i, "event": "push"} for i in range(100)
+    ]}
+    page2 = {"workflow_runs": [{"head_sha": "anc", "id": 999, "event": "push"}]}
     calls = []
 
     def fake_get(url, tok):
         calls.append(url)
         if len(calls) == 1:
-            assert "per_page=100" in url  # capped, not per_page=150
+            assert "per_page=100" in url
             return page1, {"Link": '<https://api.github.com/next>; rel="next"'}
         return page2, {"Link": ""}
 
@@ -326,6 +332,40 @@ def test_ancestor_paginates_to_honor_lookback(monkeypatch):
     assert eff == "anc" and run_id == 999
     assert scanned == 101  # 100 from page 1 + 1 match on page 2
     assert len(calls) == 2  # followed pagination
+
+
+def test_ancestor_skips_non_push_and_unknown_runs_across_pages(monkeypatch):
+    page1 = {"workflow_runs": [
+        {"head_sha": "newer-pull-request", "id": 3, "event": "pull_request"},
+        {"head_sha": "newer-schedule", "id": 2, "event": "schedule"},
+        {"head_sha": "newer-unknown", "id": 4},
+    ]}
+    page2 = {"workflow_runs": [
+        {"head_sha": "push-ancestor", "id": 1, "event": "push"},
+    ]}
+    calls = []
+
+    def fake_get(url, tok):
+        calls.append(url)
+        if len(calls) == 1:
+            return page1, {"Link": '<https://api.github.com/next>; rel="next"'}
+        return page2, {"Link": ""}
+
+    compared = []
+    monkeypatch.setattr(check, "_http_get_json", fake_get)
+
+    def fake_compare(repo, head, base, tok):
+        compared.append(head)
+        return "ahead"
+
+    monkeypatch.setattr(check, "_compare_status", fake_compare)
+    result = check.latest_snapshotted_ancestor(
+        "o/r", "main", "BASE", "wf.yml", "tok", 1
+    )
+
+    assert result == ("push-ancestor", 1, 1, "push-ancestor")
+    assert compared == ["push-ancestor"]
+    assert len(calls) == 2
 
 
 def test_has_override_label_live_read(monkeypatch):

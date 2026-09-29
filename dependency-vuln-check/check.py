@@ -203,34 +203,37 @@ def latest_snapshotted_ancestor(
 ):
     """Most recent snapshotted commit that is an ancestor-or-equal of base_sha.
 
-    Lists successful push-event runs of `workflow` on `base_ref` (newest-first;
-    a successful run guarantees a submitted snapshot — the workflow's submit step
-    is unconditional). For each run's head_sha, compares head_sha...base_sha and
-    accepts the first whose status is `identical` (same commit) or `ahead`
+    Lists successful runs of `workflow` on `base_ref` (newest-first), then filters
+    to push-event runs client-side. GitHub's combined status + event workflow-run
+    filters can return stale results, so `event=push` must not be sent to the API.
+    A successful push run guarantees a submitted snapshot — the workflow's submit
+    step is unconditional. For each run's head_sha, compares head_sha...base_sha
+    and accepts the first whose status is `identical` (same commit) or `ahead`
     (base_sha is ahead → the run commit is an ancestor).
 
     Returns (effective_base_sha, run_id, scanned_count, latest_on_branch); the first
     three are (None, None, scanned) if no ancestor is found within the window.
-    `latest_on_branch` is the head_sha of the most recent successful run on
-    `base_ref` (the very first run examined), regardless of ancestry — the latest
-    *snapshotted* tip of the branch. The pre-existing dep filter diffs against this
-    (to surface Maven base-branch drift, which is only visible at snapshotted
-    commits) unioned with the PR's base-sha (to surface natively-detected
-    ecosystems like Go/npm at the true branch tip). NOTE: because this is the latest
-    *snapshotted* commit rather than the actual branch tip, a path-filtered push
-    (e.g. a Go-only change that never triggers the Maven snapshot workflow) leaves it
-    behind the branch tip — which is exactly why the filter also needs base-sha. See
-    `_base_branch_pre_existing`.
+    `latest_on_branch` is the head_sha of the most recent successful push run on
+    `base_ref` (the first eligible run examined), regardless of ancestry — the
+    latest *snapshotted* tip of the branch. The pre-existing dep filter diffs
+    against this (to surface Maven base-branch drift, which is only visible at
+    snapshotted commits) unioned with the PR's base-sha (to surface
+    natively-detected ecosystems like Go/npm at the true branch tip). NOTE:
+    because this is the latest *snapshotted* commit rather than the actual branch
+    tip, a path-filtered push (e.g. a Go-only change that never triggers the Maven
+    snapshot workflow) leaves it behind the branch tip — which is exactly why the
+    filter also needs base-sha. See `_base_branch_pre_existing`.
     Raises ApiError on API failure so the caller can fail closed.
 
-    `lookback` is honored even beyond the API's 100-per-page cap by following
-    pagination, so a large lookback never silently scans fewer runs than asked.
+    `lookback` counts eligible push runs, not all successful runs. It is honored
+    even beyond the API's 100-per-page cap by following pagination, so non-push
+    runs and a large lookback never silently reduce the requested scan window.
     """
     per_page = min(lookback, 100)  # GitHub caps per_page at 100
     url = (
         f"{_GITHUB_API}/repos/{repository}/actions/workflows/{workflow}/runs"
         f"?branch={urllib.parse.quote(base_ref, safe='')}"
-        f"&status=success&event=push&per_page={per_page}"
+        f"&status=success&per_page={per_page}"
     )
     scanned = 0
     latest_on_branch: str | None = None
@@ -240,6 +243,10 @@ def latest_snapshotted_ancestor(
         for run in runs:
             if scanned >= lookback:
                 break
+            # Only an explicit push is eligible. Missing/unknown event data must
+            # not be trusted as a submitted base snapshot.
+            if run.get("event") != "push":
+                continue
             run_sha = run.get("head_sha")
             if not run_sha:
                 continue
