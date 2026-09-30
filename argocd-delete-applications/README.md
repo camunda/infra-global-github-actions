@@ -13,7 +13,7 @@ Delete ArgoCD applications by name or label selector, with optional age filterin
 | `label-selector` | Label selector to filter apps | No* | - |
 | `min-age` | Minimum age before deletion (e.g. `12h`, `2d`) | No | `0` (immediate) |
 | `cascade` | Delete app resources (not just the app) | No | `true` |
-| `cli-version` | ArgoCD CLI version | No | `3.2.1` |
+| `cli-version` | ArgoCD CLI version | No | `3.5.3` |
 
 > *Either `app-name` or `label-selector` must be provided.
 
