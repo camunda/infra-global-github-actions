@@ -12,7 +12,7 @@ This composite GHA can be used in any repository.
 |        app-name         | ArgoCD application to be synced.                                                                                                                                     | :heavy_check_mark: |         |
 |      argocd-token       | ArgoCD token with sufficient permissions to sync the ArgoCD application.                                                                                             | :heavy_check_mark: |         |
 |      github-token       | A GitHub token to get a higher GitHub's API rate limit to avoid limitations when pulling the ArgoCD CLI from the ArgoCD repository.                                  | :heavy_check_mark: |         |
-|       cli-version       | Version of the ArgoCD CLI to use.                                                                                                                                    |                    |         |
+|       cli-version       | Version of the ArgoCD CLI to use.                                                                                                                                    |                    |  3.5.3  |
 | max-waiting-time-health | The time (in seconds) to wait for the ArgoCD application to be healthy (does not wait if set to 0).                                                                  |                    |   600   |
 |  max-waiting-time-sync  | The time (in seconds) to wait for the ArgoCD application to be synced (does not wait if set to 0).                                                                   |                    |   30    |
 |         server          | URL of the ArgoCD server. | :heavy_check_mark: |         |

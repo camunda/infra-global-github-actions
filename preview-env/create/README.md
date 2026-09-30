@@ -19,7 +19,7 @@ If such GitHub token is not provided then the available troubleshooting informat
 | `app_url`         | The URL to access the deployed app                                                                             | Yes      | -                       |
 | `argocd_server`   | URL of the Argo CD instance to target                                                                          | No       | `argocd.int.camunda.com`|
 | `argocd_token`    | An Argo CD token with sufficient permissions to create Applications                                            | Yes      | -                       |
-| `argocd_version`  | Version tag of Argo CD CLI tool                                                                                | No       | `v2.13.4`               |
+| `argocd_version`  | Version tag of Argo CD CLI tool                                                                                | No       | `v3.5.3`               |
 | `argocd_arguments`| List of arguments to pass to Argocd command for creating the new application                                   | Yes      | -                       |
 | `argocd_wait_for_sync_timeout`| The time (in seconds) that the action waits for the app to become healthy                          | No       | `1800`                  |
 | `github_token`    | GitHub token is used to authenticate with Teleport to gain additional troubleshooting insights from the cluster | No       | -                       |
