@@ -91,14 +91,23 @@ runs:
       RUN_ID: ${{ github.run_id }}
       RUNNER_NAME: ${{ runner.name }}
     run: |
-      # Get jobs for the current run
-      jobs=$(
-        gh api \
-          "/repos/{owner}/{repo}/actions/runs/${RUN_ID}/jobs"
-      )
+      # Get jobs for the current run, retrying transient GitHub API errors (e.g. HTTP 502)
+      max_attempts=3
+      jobs=""
+      for attempt in $(seq "$max_attempts"); do
+        if jobs=$(gh api "/repos/{owner}/{repo}/actions/runs/${RUN_ID}/jobs") \
+          && [ -n "$jobs" ] && echo "$jobs" | jq empty > /dev/null 2>&1; then
+          break
+        fi
+        jobs=""
+        if [ "$attempt" -lt "$max_attempts" ]; then
+          echo "::warning::Retrieving jobs failed (attempt ${attempt}/${max_attempts}), retrying in $((attempt * 5))s."
+          sleep $((attempt * 5))
+        fi
+      done
       # Fail if results is empty or not a valid JSON
-      if [ -z "$jobs" ] || ! echo "$jobs" | jq empty > /dev/null 2>&1; then
-        echo "Retrieving jobs failed or returned invalid JSON." >&2
+      if [ -z "$jobs" ]; then
+        echo "Retrieving jobs failed or returned invalid JSON after ${max_attempts} attempts." >&2
         exit 1
       fi
 
