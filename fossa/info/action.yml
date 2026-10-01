@@ -93,34 +93,36 @@ runs:
     run: |
       # Get jobs for the current run, retrying transient GitHub API errors (e.g. HTTP 502)
       max_attempts=3
-      status=""
       jobs=""
+      err_file=$(mktemp)
       for attempt in $(seq "$max_attempts"); do
         # --include prepends the HTTP status line and headers to the body, also for non-2xx responses
-        response=$(gh api --include "/repos/{owner}/{repo}/actions/runs/${RUN_ID}/jobs" 2>/dev/null) || true
-        status=$(echo "$response" | head -n 1 | cut -d ' ' -f 2)
+        response=$(gh api --include "/repos/{owner}/{repo}/actions/runs/${RUN_ID}/jobs" 2>"$err_file") || true
+        # Here-strings instead of `echo | head`: under pipefail, SIGPIPE on a large response would abort the step
+        read -r _ status _ <<< "$response"
         if [ "$status" = "200" ]; then
           # The body starts after the first blank line separating it from the headers
-          jobs=$(echo "$response" | awk 'body { print } /^\r?$/ { body = 1 }')
-          break
+          jobs=$(awk 'body { print } /^\r?$/ { body = 1 }' <<< "$response")
+          if jq -e '.jobs | type == "array"' > /dev/null 2>&1 <<< "$jobs"; then
+            break
+          fi
+          jobs=""
+          echo "Retrieving jobs returned HTTP 200 without a valid jobs list (empty, truncated or unexpected body)." >&2
+        else
+          cat "$err_file" >&2
+          echo "Retrieving jobs failed with HTTP status ${status:-<none>}." >&2
+          # Client errors (e.g. 403, 404, 429) won't resolve within the retry window
+          case "$status" in
+            4??) exit 1 ;;
+          esac
         fi
-        echo "Retrieving jobs failed with HTTP status ${status:-<none>}." >&2
-        # Client errors (e.g. 403, 404, 429) won't resolve within the retry window
-        case "$status" in
-          4??) exit 1 ;;
-        esac
         if [ "$attempt" -lt "$max_attempts" ]; then
           echo "::warning::Retrieving jobs failed (attempt ${attempt}/${max_attempts}), retrying in $((attempt * 5))s."
           sleep $((attempt * 5))
         fi
       done
-      if [ "$status" != "200" ]; then
+      if [ -z "$jobs" ]; then
         echo "Retrieving jobs failed after ${max_attempts} attempts." >&2
-        exit 1
-      fi
-      # -e also rejects an empty body, which plain `jq empty` accepts
-      if ! echo "$jobs" | jq -e . > /dev/null 2>&1; then
-        echo "Retrieving jobs returned an invalid JSON body." >&2
         exit 1
       fi
 
