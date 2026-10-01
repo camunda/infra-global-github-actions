@@ -94,12 +94,19 @@ runs:
       # Get jobs for the current run, retrying transient GitHub API errors (e.g. HTTP 502)
       max_attempts=3
       jobs=""
+      err_file=$(mktemp)
       for attempt in $(seq "$max_attempts"); do
-        if jobs=$(gh api "/repos/{owner}/{repo}/actions/runs/${RUN_ID}/jobs") \
+        if jobs=$(gh api "/repos/{owner}/{repo}/actions/runs/${RUN_ID}/jobs" 2>"$err_file") \
           && [ -n "$jobs" ] && echo "$jobs" | jq empty > /dev/null 2>&1; then
           break
         fi
         jobs=""
+        cat "$err_file" >&2
+        # Client errors (e.g. 403, 404, 429) won't resolve within the retry window
+        if grep -qE '\(HTTP 4[0-9]{2}\)' "$err_file"; then
+          echo "Retrieving jobs failed with a non-retryable client error." >&2
+          exit 1
+        fi
         if [ "$attempt" -lt "$max_attempts" ]; then
           echo "::warning::Retrieving jobs failed (attempt ${attempt}/${max_attempts}), retrying in $((attempt * 5))s."
           sleep $((attempt * 5))
