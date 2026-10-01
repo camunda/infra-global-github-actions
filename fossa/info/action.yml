@@ -93,28 +93,29 @@ runs:
     run: |
       # Get jobs for the current run, retrying transient GitHub API errors (e.g. HTTP 502)
       max_attempts=3
+      status=""
       jobs=""
-      err_file=$(mktemp)
       for attempt in $(seq "$max_attempts"); do
-        if jobs=$(gh api "/repos/{owner}/{repo}/actions/runs/${RUN_ID}/jobs" 2>"$err_file") \
-          && [ -n "$jobs" ] && echo "$jobs" | jq empty > /dev/null 2>&1; then
+        # --include prepends the HTTP status line and headers to the body, also for non-2xx responses
+        response=$(gh api --include "/repos/{owner}/{repo}/actions/runs/${RUN_ID}/jobs" 2>/dev/null) || true
+        status=$(echo "$response" | head -n 1 | cut -d ' ' -f 2)
+        if [ "$status" = "200" ]; then
+          # The body starts after the first blank line separating it from the headers
+          jobs=$(echo "$response" | awk 'body { print } /^\r?$/ { body = 1 }')
           break
         fi
-        jobs=""
-        cat "$err_file" >&2
+        echo "Retrieving jobs failed with HTTP status ${status:-<none>}." >&2
         # Client errors (e.g. 403, 404, 429) won't resolve within the retry window
-        if grep -qE '\(HTTP 4[0-9]{2}\)' "$err_file"; then
-          echo "Retrieving jobs failed with a non-retryable client error." >&2
-          exit 1
-        fi
+        case "$status" in
+          4??) exit 1 ;;
+        esac
         if [ "$attempt" -lt "$max_attempts" ]; then
           echo "::warning::Retrieving jobs failed (attempt ${attempt}/${max_attempts}), retrying in $((attempt * 5))s."
           sleep $((attempt * 5))
         fi
       done
-      # Fail if results is empty or not a valid JSON
-      if [ -z "$jobs" ]; then
-        echo "Retrieving jobs failed or returned invalid JSON after ${max_attempts} attempts." >&2
+      if [ "$status" != "200" ]; then
+        echo "Retrieving jobs failed after ${max_attempts} attempts." >&2
         exit 1
       fi
 
