@@ -118,6 +118,11 @@ runs:
         echo "Retrieving jobs failed after ${max_attempts} attempts." >&2
         exit 1
       fi
+      # -e also rejects an empty body, which plain `jq empty` accepts
+      if ! echo "$jobs" | jq -e . > /dev/null 2>&1; then
+        echo "Retrieving jobs returned an invalid JSON body." >&2
+        exit 1
+      fi
 
       # Get the start time of the current running job (in progress)
       # Safe to use runner.name to uniquely match the in progress job, as a runner (GitHub-managed or ephemeral Self-Hosted) runs only one job at a time.
