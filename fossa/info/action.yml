@@ -93,8 +93,8 @@ runs:
     run: |
       # Get jobs for the current run, retrying transient GitHub API errors (e.g. HTTP 502)
       max_attempts=3
-      jobs=""
       err_file=$(mktemp)
+      trap 'rm -f "$err_file"' EXIT
       for attempt in $(seq "$max_attempts"); do
         # --include prepends the HTTP status line and headers to the body, also for non-2xx responses
         response=$(gh api --include "/repos/{owner}/{repo}/actions/runs/${RUN_ID}/jobs" 2>"$err_file") || true
@@ -103,28 +103,26 @@ runs:
         if [ "$status" = "200" ]; then
           # The body starts after the first blank line separating it from the headers
           jobs=$(awk 'body { print } /^\r?$/ { body = 1 }' <<< "$response")
-          if jq -e '.jobs | type == "array"' > /dev/null 2>&1 <<< "$jobs"; then
-            break
+          if ! jq -e '.jobs | type == "array"' > /dev/null 2>&1 <<< "$jobs"; then
+            echo "Retrieving jobs returned HTTP 200 without a valid jobs list (empty, truncated or unexpected body)." >&2
+            exit 1
           fi
-          jobs=""
-          echo "Retrieving jobs returned HTTP 200 without a valid jobs list (empty, truncated or unexpected body)." >&2
-        else
-          cat "$err_file" >&2
-          echo "Retrieving jobs failed with HTTP status ${status:-<none>}." >&2
-          # Client errors (e.g. 403, 404, 429) won't resolve within the retry window
-          case "$status" in
-            4??) exit 1 ;;
-          esac
+          break
         fi
-        if [ "$attempt" -lt "$max_attempts" ]; then
-          echo "::warning::Retrieving jobs failed (attempt ${attempt}/${max_attempts}), retrying in $((attempt * 5))s."
-          sleep $((attempt * 5))
+        cat "$err_file" >&2
+        echo "Retrieving jobs failed with HTTP status ${status:-<none>}." >&2
+        # Only server errors and network failures (no HTTP status) are transient; anything else won't resolve by retrying
+        case "$status" in
+          5??|"") ;;
+          *) exit 1 ;;
+        esac
+        if [ "$attempt" -eq "$max_attempts" ]; then
+          echo "Retrieving jobs failed after ${max_attempts} attempts." >&2
+          exit 1
         fi
+        echo "::warning::Retrieving jobs failed (attempt ${attempt}/${max_attempts}), retrying in $((attempt * 5))s."
+        sleep $((attempt * 5))
       done
-      if [ -z "$jobs" ]; then
-        echo "Retrieving jobs failed after ${max_attempts} attempts." >&2
-        exit 1
-      fi
 
       # Get the start time of the current running job (in progress)
       # Safe to use runner.name to uniquely match the in progress job, as a runner (GitHub-managed or ephemeral Self-Hosted) runs only one job at a time.
