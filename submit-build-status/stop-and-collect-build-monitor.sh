@@ -10,12 +10,38 @@ MONITOR_FIELDS=""
 # NOTE: these paths are shared with start-build-monitor.sh -- if changed, update both
 PID_FILE=/tmp/_monitor-start.pid
 LOG_FILE=/tmp/_monitor-start.log
+START_TIME_FILE=/tmp/_monitor-start.epoch-seconds
+
+MAX_BUILD_DURATION_SECONDS=259200  # 72 hours
+BUILD_DURATION_MILLIS=""
+
+if [ -f "$START_TIME_FILE" ]; then
+  START_TIME_SECONDS=$(cat "$START_TIME_FILE")
+  END_TIME_SECONDS=$(date +%s)
+  # These timestamps come from monitor state, not the validated duration input.
+  # Bound their length for safe arithmetic; 10# treats leading zeros as decimal.
+  if [[ "$START_TIME_SECONDS" =~ ^[0-9]{1,18}$ ]] && [[ "$END_TIME_SECONDS" =~ ^[0-9]{1,18}$ ]]; then
+    BUILD_DURATION_SECONDS=$(( 10#$END_TIME_SECONDS - 10#$START_TIME_SECONDS ))
+    if [ "$BUILD_DURATION_SECONDS" -ge 0 ] && [ "$BUILD_DURATION_SECONDS" -le "$MAX_BUILD_DURATION_SECONDS" ]; then
+      BUILD_DURATION_MILLIS=$(( BUILD_DURATION_SECONDS * 1000 ))
+      echo "Build duration: ${BUILD_DURATION_MILLIS}ms"
+    else
+      echo "Build duration is outside the supported range (0-${MAX_BUILD_DURATION_SECONDS}s); duration omitted" >&2
+    fi
+  else
+    echo "Build start or end timestamp is invalid; duration omitted" >&2
+  fi
+else
+  echo "Build start timestamp not found; duration omitted" >&2
+fi
 
 if [ -f "$PID_FILE" ]; then
   MONITOR_PID=$(cat "$PID_FILE")
   kill "$MONITOR_PID" 2>/dev/null || true
-  rm -f "$PID_FILE"
   echo "Resource monitor stopped (PID=$MONITOR_PID)"
+fi
+
+if [ -f "$PID_FILE" ] && [ -f "$LOG_FILE" ]; then
   echo "Raw monitor log values (CPU, memory usage ratio) per interval:"
   echo "::group::Resource monitor raw log"
   cat "$LOG_FILE"
@@ -68,7 +94,12 @@ if [ -f "$PID_FILE" ]; then
   else
     echo "Resource monitor log had no data rows -- metrics omitted"
   fi
+elif [ -f "$PID_FILE" ]; then
+  echo "Resource monitor log not found -- metrics omitted" >&2
 fi
+
+# Remove monitor state only after the log and start timestamp have been collected.
+rm -f "$PID_FILE" "$LOG_FILE" "$START_TIME_FILE"
 
 # ── Network bytes: cumulative tx/rx summed across non-loopback interfaces. ──
 # Runner pods are ephemeral (one job per pod), so the counters span the job;
@@ -89,3 +120,4 @@ if [ -r /proc/net/dev ]; then
 fi
 
 printf 'monitor_fields=%s\n' "$MONITOR_FIELDS" >> "$OUTPUT_FILE"
+printf 'build_duration_millis=%s\n' "$BUILD_DURATION_MILLIS" >> "$OUTPUT_FILE"
