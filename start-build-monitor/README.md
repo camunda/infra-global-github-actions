@@ -29,7 +29,7 @@ Jobs that do **not** include `start-build-monitor` are unaffected — `submit-bu
 
 ## Behavior
 
-Starts a polling loop in the background (interval: 5s) that samples CPU and memory usage once per interval until `submit-build-status` stops it at job end. It also records the start time with millisecond precision. `submit-build-status` uses this timestamp to calculate the duration, from this action's start until resource collection begins. Keep this action as the **first job step** so the reported duration covers the entire job.
+Starts a polling loop in the background (interval: 5s) that samples CPU and memory usage once per interval until `submit-build-status` stops it at job end. It also records the start time with whole-second precision. `submit-build-status` uses this timestamp to calculate the duration, from this action's start until resource collection begins, after Google authentication. Keep this action as the **first job step** so duration measurement and CPU and memory sampling span the job.
 
 ### Metric sources
 

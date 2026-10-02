@@ -2,13 +2,13 @@
 
 INTERVAL=5  # seconds
 # NOTE: these paths are shared with the monitor stop script(s) — if changed, update both
-LOG_FILE="${BUILD_MONITOR_LOG_FILE:-/tmp/_monitor-start.log}"
-PID_FILE="${BUILD_MONITOR_PID_FILE:-/tmp/_monitor-start.pid}"
-START_TIME_FILE="${BUILD_MONITOR_START_TIME_FILE:-/tmp/_monitor-start.epoch-millis}"
+LOG_FILE=/tmp/_monitor-start.log
+PID_FILE=/tmp/_monitor-start.pid
+START_TIME_FILE=/tmp/_monitor-start.epoch-seconds
 
 # Remove state from a previous job before establishing this job's start time.
 rm -f "$PID_FILE" "$LOG_FILE" "$START_TIME_FILE"
-date +%s%3N > "$START_TIME_FILE"
+date +%s > "$START_TIME_FILE"
 
 # CPU and memory cgroup controllers are independently enabled, so detect them separately.
 # Cgroup-based metrics are scoped to this container — unaffected by other pods on the node.

@@ -38,7 +38,7 @@ All data submitted by this action is stored as one record in the Big Query table
 | build_ref        | STRING     | NULLABLE   | Git object reference from `"$GITHUB_REF"` |
 | build_base_ref   | STRING     | NULLABLE   | Git object reference of target branch for PRs or GH merge queue |
 | build_head_ref   | STRING     | NULLABLE   | Git object reference of the branch PR was built against |
-| build_duration_milliseconds | INTEGER | NULLABLE | Based on user input (time a job needed from start to finish) |
+| build_duration_milliseconds | INTEGER | NULLABLE | Explicit input or automatic monitor-derived job duration |
 | runner_name      | STRING     | NULLABLE   | Lowercase name of the runner executing the GHA workflow job |
 | runner_arch      | STRING     | NULLABLE   | Lowercase name of the runner's CPU architecture executing the GHA workflow job |
 | runner_os        | STRING     | NULLABLE   | Lowercase name of the runner's operating system executing the GHA workflow job |
@@ -49,9 +49,9 @@ All data submitted by this action is stored as one record in the Big Query table
 
 #### Build duration
 
-When [`start-build-monitor`](../start-build-monitor/) is the first step in a job, this action automatically submits the elapsed time in milliseconds. The duration starts when the monitor action runs and ends when this action collects its metrics, before Google authentication and the BigQuery request. This excludes telemetry-submission overhead.
+When [`start-build-monitor`](../start-build-monitor/) is the first step in a job, this action automatically submits the elapsed time with whole-second precision, converted to milliseconds. The duration starts when the monitor action runs and ends when this action collects its metrics, after Google authentication but before the BigQuery request. Resource sampling also continues through authentication, preserving the existing measurement window.
 
-An explicit `build_duration_millis` input takes precedence over the automatic duration. Explicit values must be non-negative integers no greater than 72 hours (`259200000` milliseconds); invalid values fail the action's input validation. If the monitor did not run, its timestamp is invalid, or the calculated duration is outside that range, the duration field is omitted without failing submission.
+An explicit `build_duration_millis` input takes precedence over the automatic duration. Explicit values must be non-negative integers no greater than 72 hours (`259200000` milliseconds); invalid values emit a warning and omit the duration field without failing submission or falling back to the monitor-derived duration. Automatic duration is used only when no explicit value is supplied. If the monitor did not run, its timestamp is invalid, or the calculated duration is outside that range, the duration field is omitted without failing submission.
 
 
 ### Integration
