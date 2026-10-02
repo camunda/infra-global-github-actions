@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.22 (2026-10-02)
+
+## What's Changed
+* fix: stamp CI Analytics report_time in UTC by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/835
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/836
+* chore(deps): update dependency ubuntu to v26 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/832
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.115.9 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/839
+* chore(deps): update argocd cli to v3.5.3 by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/842
+* fix(fossa): retry transient GitHub API errors when fetching job info by @yanavasileva in https://github.com/camunda/infra-global-github-actions/pull/843
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.0.21...fossa-1.0.22
+
 ## 1.0.21 (2026-09-21)
 
 ## What's Changed
