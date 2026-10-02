@@ -36,6 +36,20 @@ inputs:
 runs:
   using: composite
   steps:
+  - name: Echo inputs
+    shell: bash
+    env:
+      BUILD_DURATION_MILLIS: "${{ inputs.build_duration_millis }}"
+    run: |
+      echo "Inputs"
+      echo "-----"
+      echo "Build status: ${{ inputs.build_status }}"
+      echo "Build duration (in ms): $BUILD_DURATION_MILLIS"
+      echo "User reason: ${{ inputs.user_reason }}"
+      echo "User description: ${{ inputs.user_description }}"
+      echo "Job name override: ${{ inputs.job_name_override }} (default job name: $GITHUB_JOB)"
+      echo "BQ table name (for testing): ${{ inputs.big_query_table_name }}"
+
   - name: Validate inputs
     id: validate
     shell: bash
@@ -59,8 +73,32 @@ runs:
         echo "Specified user description has more than 1000 characters!"
         exit 1
       fi
-      VALIDATED_BUILD_DURATION_MILLIS=$(bash "$GITHUB_ACTION_PATH/validate-build-duration.sh" "$BUILD_DURATION_MILLIS")
-      printf 'build_duration_millis=%s\n' "$VALIDATED_BUILD_DURATION_MILLIS" >> "$GITHUB_OUTPUT"
+      if [ -n "$BUILD_DURATION_MILLIS" ]; then
+        MAX_BUILD_DURATION_MILLIS=259200000  # 72 hours
+        if ! [[ "$BUILD_DURATION_MILLIS" =~ ^[0-9]+$ ]]; then
+          echo "::warning::Build duration must be a non-negative integer; duration omitted."
+          BUILD_DURATION_MILLIS=""
+        else
+          # Strip leading zeros so numeric comparisons use decimal values.
+          BUILD_DURATION_MILLIS="${BUILD_DURATION_MILLIS#"${BUILD_DURATION_MILLIS%%[!0]*}"}"
+          BUILD_DURATION_MILLIS="${BUILD_DURATION_MILLIS:-0}"
+          # Check length before comparing numerically to avoid integer overflow.
+          if [ "${#BUILD_DURATION_MILLIS}" -gt "${#MAX_BUILD_DURATION_MILLIS}" ] ||
+            { [ "${#BUILD_DURATION_MILLIS}" -eq "${#MAX_BUILD_DURATION_MILLIS}" ] &&
+              [ "$BUILD_DURATION_MILLIS" -gt "$MAX_BUILD_DURATION_MILLIS" ]; }; then
+            echo "::warning::Build duration must not exceed ${MAX_BUILD_DURATION_MILLIS} milliseconds; duration omitted."
+            BUILD_DURATION_MILLIS=""
+          fi
+        fi
+      fi
+      printf 'build_duration_millis=%s\n' "$BUILD_DURATION_MILLIS" >> "$GITHUB_OUTPUT"
+
+  - name: Login to Google Cloud
+    id: auth
+    uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+    with:
+      credentials_json: '${{ inputs.gcp_credentials_json }}'
+      token_format: 'access_token'
 
   - name: Collect resource usage metrics
     id: monitor
@@ -73,33 +111,16 @@ runs:
     id: duration
     shell: bash
     env:
+      HAS_EXPLICIT_BUILD_DURATION: "${{ inputs.build_duration_millis != '' }}"
       EXPLICIT_BUILD_DURATION_MILLIS: "${{ steps.validate.outputs.build_duration_millis }}"
       MONITOR_BUILD_DURATION_MILLIS: "${{ steps.monitor.outputs.build_duration_millis }}"
     run: |
-      BUILD_DURATION_MILLIS=$(bash "$GITHUB_ACTION_PATH/resolve-build-duration.sh" \
-        "$EXPLICIT_BUILD_DURATION_MILLIS" "$MONITOR_BUILD_DURATION_MILLIS")
+      if [ "$HAS_EXPLICIT_BUILD_DURATION" = "true" ]; then
+        BUILD_DURATION_MILLIS="$EXPLICIT_BUILD_DURATION_MILLIS"
+      else
+        BUILD_DURATION_MILLIS="$MONITOR_BUILD_DURATION_MILLIS"
+      fi
       printf 'build_duration_millis=%s\n' "$BUILD_DURATION_MILLIS" >> "$GITHUB_OUTPUT"
-
-  - name: Echo inputs
-    shell: bash
-    env:
-      BUILD_DURATION_MILLIS: "${{ steps.duration.outputs.build_duration_millis }}"
-    run: |
-      echo "Inputs"
-      echo "-----"
-      echo "Build status: ${{ inputs.build_status }}"
-      echo "Build duration (in ms): $BUILD_DURATION_MILLIS"
-      echo "User reason: ${{ inputs.user_reason }}"
-      echo "User description: ${{ inputs.user_description }}"
-      echo "Job name override: ${{ inputs.job_name_override }} (default job name: $GITHUB_JOB)"
-      echo "BQ table name (for testing): ${{ inputs.big_query_table_name }}"
-
-  - name: Login to Google Cloud
-    id: auth
-    uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
-    with:
-      credentials_json: '${{ inputs.gcp_credentials_json }}'
-      token_format: 'access_token'
 
   - name: Submit build status to CI Analytics
     shell: bash
