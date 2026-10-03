@@ -32,5 +32,5 @@
   "teams/infra/pull-request": "1.1.1",
   "wait-for-required-checks": "1.0.0",
   "workflow-run-stats": "1.0.0",
-  "yq-yaml-processor": "1.0.5"
+  "yq-yaml-processor": "1.0.6"
 }
