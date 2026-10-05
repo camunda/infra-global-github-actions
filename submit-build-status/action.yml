@@ -102,7 +102,6 @@ runs:
 
   - name: Collect resource usage metrics
     id: monitor
-    if: always()
     shell: bash
     run: |
       bash "$GITHUB_ACTION_PATH/stop-and-collect-build-monitor.sh" "$GITHUB_OUTPUT"
