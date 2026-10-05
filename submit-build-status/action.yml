@@ -40,11 +40,13 @@ runs:
     shell: bash
     env:
       BUILD_DURATION_MILLIS: "${{ inputs.build_duration_millis }}"
+      HAS_EXPLICIT_BUILD_DURATION: "${{ inputs.build_duration_millis != '' }}"
     run: |
       echo "Inputs"
       echo "-----"
       echo "Build status: ${{ inputs.build_status }}"
       echo "Build duration (in ms): $BUILD_DURATION_MILLIS"
+      echo "Build duration provided as input: $HAS_EXPLICIT_BUILD_DURATION"
       echo "User reason: ${{ inputs.user_reason }}"
       echo "User description: ${{ inputs.user_description }}"
       echo "Job name override: ${{ inputs.job_name_override }} (default job name: $GITHUB_JOB)"
@@ -115,8 +117,10 @@ runs:
       MONITOR_BUILD_DURATION_MILLIS: "${{ steps.monitor.outputs.build_duration_millis }}"
     run: |
       if [ "$HAS_EXPLICIT_BUILD_DURATION" = "true" ]; then
+        echo "Using build duration from inputs"
         BUILD_DURATION_MILLIS="$EXPLICIT_BUILD_DURATION_MILLIS"
       else
+        echo "Using build duration from internal calculations"
         BUILD_DURATION_MILLIS="$MONITOR_BUILD_DURATION_MILLIS"
       fi
       printf 'build_duration_millis=%s\n' "$BUILD_DURATION_MILLIS" >> "$GITHUB_OUTPUT"
