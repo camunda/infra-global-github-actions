@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.3 (2026-10-06)
+
+## What's Changed
+* chore(deps): update dependency ubuntu to v26 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/832
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.115.9 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/839
+* chore(deps): update argocd cli to v3.5.3 by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/842
+* fix(fossa): retry transient GitHub API errors when fetching job info by @yanavasileva in https://github.com/camunda/infra-global-github-actions/pull/843
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/844
+* chore(deps): update mikefarah/yq action to v4.54.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/845
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.132.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/846
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/847
+* chore: include the build-duration-milliseconds github runner monitoring in the reusable workflow by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/751
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/submit-build-status-1.3.2...submit-build-status-1.3.3
+
 ## 1.3.2 (2026-09-22)
 
 ## What's Changed
