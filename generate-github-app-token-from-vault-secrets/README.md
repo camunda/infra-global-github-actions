@@ -23,6 +23,7 @@ This composite GHA can be used in any repository.
 | skip-token-revoke                   | If truthy, the token will not be revoked when the current job is complete (optional) |
 | owner                               | The owner of the GitHub App installation (defaults to current repository owner, optional). |
 | repositories                        | Comma or newline-separated list of repositories for which the GitHub app token will be valid for(defaults to current repository if owner is unset, optional). If you want to generate a token that has access to all repositories of the owner, set this to `!all` and explicitely set an `owner`. |
+| permission-contents                 | Repository contents permission of the token: `read` or `write` (optional). When set, the token has only this permission. When unset, it has every permission granted to the GitHub App. Set `read` when the job only checks out or reads repositories. |
 
 > (*) Supports both GitHub OIDC/JWT (`vault-auth-method=jwt`, recommended) and legacy
 > App Role (`vault-auth-method=approle`) authentication. When using `jwt`, the calling
