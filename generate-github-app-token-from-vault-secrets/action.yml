@@ -65,6 +65,11 @@ inputs:
     description: "Comma or newline-separated list of repositories to install the GitHub App on (defaults to current repository if owner is unset). If you want to generate a token that has access to all repositories of the owner, set this to '!all' and explicitely set an `owner`."
     required: false
     type: string
+  permission-contents:
+    description: "Repository contents permission of the token: `read` or `write` (optional). When set, the token has only this permission. When unset, it has every permission granted to the GitHub App."
+    required: false
+    default: ""
+    type: string
 
 outputs:
   token:
@@ -193,3 +198,4 @@ runs:
       skip-token-revoke: ${{ inputs.skip-token-revoke }}
       owner: ${{ inputs.owner }}
       repositories: ${{ env.repositories }}
+      permission-contents: ${{ inputs.permission-contents }}
