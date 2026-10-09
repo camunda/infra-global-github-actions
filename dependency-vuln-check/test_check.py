@@ -347,6 +347,7 @@ def test_ancestor_paginates_to_honor_lookback(monkeypatch):
         return page2, {"Link": ""}
 
     monkeypatch.setattr(check, "_http_get_json", fake_get)
+    monkeypatch.setattr(check, "_base_commit_date", lambda *a, **k: None)  # cap-only paging
     # only "anc" (on page 2) is an ancestor, and it is not identical (1 behind),
     # so the full window is scanned to confirm it is the newest.
     monkeypatch.setattr(
@@ -402,6 +403,72 @@ def test_ancestor_offline_replay_shuffled_stale_pair(monkeypatch):
     assert res.effective_base == "ba552818sep20" and res.scanned == 3
 
 
+def test_ancestor_date_paging_bounds_scan(monkeypatch):
+    # base dated Sep 10, margin 2d → cutoff Sep 8. The first run older than the cutoff
+    # (with a candidate already found) ends the scan, so an ancient tail is never
+    # compared — starvation is bounded, not merely reduced.
+    monkeypatch.setattr(check, "_base_commit_date", lambda *a, **k: "2026-09-10T00:00:00Z")
+    runs = {"workflow_runs": [
+        {"head_sha": "sep12", "id": 1, "created_at": "2026-09-12T00:00:00Z"},
+        {"head_sha": "sep09anc", "id": 2, "created_at": "2026-09-09T00:00:00Z"},
+        {"head_sha": "sep05", "id": 3, "created_at": "2026-09-05T00:00:00Z"},
+        {"head_sha": "jan01", "id": 4, "created_at": "2026-01-01T00:00:00Z"},
+    ]}
+    monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
+    compared = []
+
+    def fake_compare(repo, head, base, tok):
+        compared.append(head)
+        return ("ahead", 3) if head == "sep09anc" else ("diverged", 0)
+
+    monkeypatch.setattr(check, "_compare_ancestry", fake_compare)
+    res = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 200)
+    assert res.effective_base == "sep09anc"
+    assert res.scanned == 3  # sep12, sep09, sep05 (triggers stop); jan01 never scanned
+    assert "sep05" not in compared and "jan01" not in compared
+
+
+def test_ancestor_date_paging_keeps_scanning_until_candidate(monkeypatch):
+    # A sparse snapshot cadence can place the nearest ancestor just beyond the base
+    # window. With no candidate yet the date gate must NOT stop the scan, or the only
+    # ancestor would be dropped.
+    monkeypatch.setattr(check, "_base_commit_date", lambda *a, **k: "2026-09-10T00:00:00Z")
+    runs = {"workflow_runs": [
+        {"head_sha": "sep12", "id": 1, "created_at": "2026-09-12T00:00:00Z"},
+        {"head_sha": "sep11", "id": 2, "created_at": "2026-09-11T00:00:00Z"},
+        {"head_sha": "sep05anc", "id": 3, "created_at": "2026-09-05T00:00:00Z"},  # < cutoff, best None
+        {"head_sha": "jan01", "id": 4, "created_at": "2026-01-01T00:00:00Z"},     # < cutoff, best set
+    ]}
+    monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
+    compared = []
+
+    def fake_compare(repo, head, base, tok):
+        compared.append(head)
+        return ("ahead", 5) if head == "sep05anc" else ("diverged", 0)
+
+    monkeypatch.setattr(check, "_compare_ancestry", fake_compare)
+    res = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 200)
+    assert res.effective_base == "sep05anc" and res.scanned == 4
+    assert "jan01" not in compared  # stopped once a candidate was in hand
+
+
+def test_ancestor_date_paging_falls_back_when_base_date_unknown(monkeypatch):
+    # base commit date lookup fails → no cutoff → scan bounded only by lookback
+    # (old behaviour preserved; nothing is skipped on age).
+    monkeypatch.setattr(check, "_base_commit_date", lambda *a, **k: None)
+    runs = {"workflow_runs": [
+        {"head_sha": "old1", "id": 1, "created_at": "2024-01-01T00:00:00Z"},
+        {"head_sha": "old2anc", "id": 2, "created_at": "2023-01-01T00:00:00Z"},
+    ]}
+    monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
+    monkeypatch.setattr(
+        check, "_compare_ancestry",
+        lambda repo, head, base, tok: ("ahead", 2) if head == "old2anc" else ("diverged", 0),
+    )
+    res = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    assert res.effective_base == "old2anc" and res.scanned == 2
+
+
 def test_probe_base_staleness_returns_behind_and_age(monkeypatch):
     # Regular /compare probe surfaces ahead_by (commits behind) + base commit age.
     old = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=90)).isoformat()
@@ -425,11 +492,29 @@ def test_probe_base_staleness_failure_returns_none(monkeypatch):
     assert check._probe_base_staleness("o/r", "x", "BASE", "tok") == (None, None)
 
 
-def test_staleness_advice_stale_recommends_rebase():
-    # A stale base (thousands behind, old) → advise rebase, not override.
+def test_base_commit_date_extracts_committer_date(monkeypatch):
+    monkeypatch.setattr(
+        check, "_http_get_json",
+        lambda url, tok: ({"commit": {"committer": {"date": "2026-09-10T00:00:00Z"}}}, {}),
+    )
+    assert check._base_commit_date("o/r", "SHA", "tok") == "2026-09-10T00:00:00Z"
+
+
+def test_base_commit_date_none_on_api_error(monkeypatch):
+    def boom(url, tok):
+        raise check.ApiError("boom", 500, retryable=True)
+
+    monkeypatch.setattr(check, "_http_get_json", boom)
+    assert check._base_commit_date("o/r", "SHA", "tok") is None
+
+
+def test_staleness_advice_stale_leads_with_rebase_override_fallback():
+    # A stale base (thousands behind, old) → rebase is the primary fix; the override
+    # label follows as a fallback for a diff too large even at the freshest snapshot.
     advice = check._staleness_advice("6d3cb6c5abcd", "main", 1418, 90.0, "ci:vuln-gate-override")
     assert "rebase" in advice.lower()
-    assert "ci:vuln-gate-override" not in advice
+    assert "ci:vuln-gate-override" in advice  # fallback present
+    assert advice.lower().index("rebase") < advice.index("ci:vuln-gate-override")  # rebase first
 
 
 def test_staleness_advice_current_recommends_override():
