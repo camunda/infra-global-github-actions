@@ -265,8 +265,9 @@ def test_ancestor_picks_newest(monkeypatch):
 
 
 def test_ancestor_identical_short_circuits(monkeypatch):
-    # An `identical` match (0 behind) is provably the closest ancestor — the scan
-    # stops there and does not compare the remaining runs.
+    # An `identical` match (0 behind) is provably the closest ancestor — the compares
+    # stop there, but the tip-metadata scan still finishes the page so `latest_on_branch`
+    # reflects the newest run regardless of API order.
     runs = {"workflow_runs": [
         {"head_sha": "BASE", "id": 9, "created_at": "2026-09-01T00:00:00Z"},
         {"head_sha": "older", "id": 8, "created_at": "2026-08-01T00:00:00Z"},
@@ -280,8 +281,9 @@ def test_ancestor_identical_short_circuits(monkeypatch):
 
     monkeypatch.setattr(check, "_compare_ancestry", fake_compare)
     res = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
-    assert res.effective_base == "BASE" and res.scanned == 1
-    assert compared == ["BASE"]  # short-circuited; "older" never compared
+    assert res.effective_base == "BASE" and res.scanned == 2
+    assert res.latest_on_branch == "BASE"  # newest by start time
+    assert compared == ["BASE"]  # compares short-circuited; "older" never compared
 
 
 def test_ancestor_none_found(monkeypatch):
@@ -439,9 +441,12 @@ def test_staleness_advice_current_recommends_override():
 
 
 def test_staleness_advice_unknown_defaults_to_override():
-    # Probe failure (behind/age None) → neither signal is stale → override guidance.
+    # Probe failure (behind/age None) → staleness unknown → distinct "could not
+    # determine" message, still pointing at the override label (never claims current).
     advice = check._staleness_advice("abcdef123456", "main", None, None, "ci:vuln-gate-override")
+    assert "could not determine" in advice.lower()
     assert "ci:vuln-gate-override" in advice
+    assert "is current" not in advice
 
 
 def test_emit_compare_observation_grep_stable_line(monkeypatch, capsys):

@@ -56,7 +56,7 @@ version shows up as `added` in the diff and is evaluated normally.
 | `fallback-base-ref` | no | `main` | Branch to fall back to when `base-ref` has no dependency snapshots (e.g. stacked PRs targeting a feature branch). The gate searches this branch for the nearest snapshotted ancestor of `base-sha` instead of failing closed, and posts a notice to the PR comment |
 | `snapshot-workflow` | yes | — | Filename of the workflow that submits the base snapshot (e.g. `maven-dependency-snapshot.yml`). Its successful push-event runs are scanned to resolve the effective base |
 | `head-snapshot-succeeded` | no | `""` | Whether the job that submits the PR **head** snapshot succeeded. Pass `'true'`/`'success'` (e.g. `needs.pr-maven-snapshot.result == 'success'`). **Any other value** (`'false'`, or a raw result like `'failure'`/`'cancelled'`/`'skipped'`) **fails closed** — an un-submitted head SBOM leaves the head side empty → a real new vuln would silently pass, so an unverified head must block, not no-op. Unset skips the check (backward compatible) |
-| `max-snapshot-lookback` | no | `50` | How many recent successful snapshot runs to scan when resolving the effective base. The whole window is scanned to pick the **newest** ancestor (fewest commits behind `base-sha`), so a busy branch cannot push the nearest ancestor out of view |
+| `max-snapshot-lookback` | no | `50` | How many recent successful snapshot runs to scan when resolving the effective base. The whole window is scanned to pick the **newest** ancestor (fewest commits behind `base-sha`), so a busy branch is much less likely to push the nearest ancestor out of view |
 | `override-label` | no | `ci:vuln-gate-override` | PR label that bypasses the gate **only** when it cannot verify the PR (outage / no-ancestor). Never bypasses a real finding |
 | `config-file` | no | `.github/dependency-review-config.json` | Path to the JSON config holding `allow-ghsas` |
 | `fail-on-severity` | no | `high` | Min severity (`low`/`moderate`/`high`/`critical`) that blocks when **no fix** is available |
@@ -100,7 +100,9 @@ the API returns. GitHub does not guarantee the runs come back strictly newest-fi
 transient server-side reorder that put an old run at the top would otherwise resolve a months-old
 base, producing a huge diff that trips GitHub's `dependency-graph/compare` size limit (a 502).
 The snapshot run's start time is used only as a tiebreak between equidistant ancestors, never to
-trade away ancestry. The raw candidate list (sha, run id, commits-behind) is logged every run.
+trade away ancestry. The raw candidate list (sha, run id, commits-behind) is logged every run. A
+wide enough backlog of newer-than-base runs can still starve the window, so this reduces — but does
+not eliminate — the risk; widen `max-snapshot-lookback` if a very old base must be resolved.
 
 When the `dependency-graph/compare` call still returns a **502** (its diff exceeded GitHub's
 compare-size limit), the gate fails closed and attaches targeted guidance: if the effective base
@@ -126,8 +128,10 @@ The gate **fails closed** when it cannot verify a PR:
 Every run writes a summary trail (resolved base, runs scanned, verdict). Failure reasons are
 named explicitly in the log (rate-limit vs 5xx vs timeout vs permissions vs not-found).
 
-Every run also emits one grep-stable observability line (to the log and the step summary) to
-trend the head-graph compare toward GitHub's ~10s ceiling — forensics, not alerting:
+Every run that reaches the dependency compare also emits one grep-stable observability line (to
+the log and the step summary) to trend the head-graph compare toward GitHub's ~10s ceiling —
+forensics, not alerting. Runs that fail closed before the compare (no ancestor resolved, head
+submission failed) exit earlier and do not emit it:
 
 ```
 VULN_GATE_COMPARE outcome=<200|502|err> latency_ms=<int> changed_deps=<int|na> effective_base=<sha> head=<sha> base=<pr_base_sha> effective_base_age_days=<float|na> behind=<int|na>
@@ -137,7 +141,7 @@ VULN_GATE_COMPARE outcome=<200|502|err> latency_ms=<int> changed_deps=<int|na> e
 free from the call the gate already makes; `effective_base_age_days`/`behind` are populated only
 on the 502 path, where the staleness probe already computed them (never with an extra request).
 
-
+### Head-side verification
 
 The base side is resolved to a verified snapshotted ancestor, but the head side of the diff is
 only as good as the head SBOM. Two guards keep an unverified head from silently passing a real

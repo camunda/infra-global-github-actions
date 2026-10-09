@@ -50,9 +50,10 @@ inputs:
     description: >
       How many recent successful snapshot-workflow runs to scan when resolving the
       effective base. The whole window is scanned to pick the NEWEST ancestor (fewest
-      commits behind base-sha), so an active branch with many newer-than-base runs
-      cannot push the nearest ancestor out of view. Raise this only if a very old
-      base must be resolved; lowering it risks starving the resolver on busy branches.
+      commits behind base-sha), so an active branch with many newer-than-base runs is
+      much less likely to push the nearest ancestor out of view. Raise this only if a
+      very old base must be resolved; lowering it risks starving the resolver on busy
+      branches.
     required: false
     default: "50"
   override-label:
