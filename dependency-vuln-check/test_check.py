@@ -5,6 +5,7 @@ hit: tests feed `find_blocking` synthetic diff entries and stub `_lookup_patch`.
 Base-resolution, retry, and fail-closed tests stub the HTTP layer (`_http_get_json`
 / `urllib.request.urlopen`) and `time.sleep`, so nothing touches the network.
 """
+import datetime
 import urllib.error
 
 import pytest
@@ -237,32 +238,61 @@ def test_classify_403_primary_ratelimit_retryable():
 
 
 def test_ancestor_picks_newest(monkeypatch):
+    # the API returned an OLD ancestor at index 0 (a transient
+    # server-side reorder). The resolver must still pick the NEWEST ancestor — the
+    # one fewest commits behind base_sha — not blindly accept runs[0].
     runs = {"workflow_runs": [
-        {"head_sha": "newer", "id": 3},
-        {"head_sha": "anc", "id": 2},
-        {"head_sha": "older", "id": 1},
+        {"head_sha": "old-ancestor", "id": 1, "created_at": "2026-08-01T00:00:00Z"},
+        {"head_sha": "newest-nonanc", "id": 4, "created_at": "2026-09-30T00:00:00Z"},
+        {"head_sha": "new-ancestor", "id": 3, "created_at": "2026-09-01T00:00:00Z"},
+        {"head_sha": "mid-ancestor", "id": 2, "created_at": "2026-08-15T00:00:00Z"},
     ]}
     monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
-    statuses = {"newer": "diverged", "anc": "ahead", "older": "ahead"}
-    monkeypatch.setattr(check, "_compare_status", lambda repo, head, base, tok: statuses[head])
-    eff, run_id, scanned, _ = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
-    assert (eff, run_id, scanned) == ("anc", 2, 2)  # skipped newer (diverged), matched anc
+    # behind_by = commits the run is behind base_sha; smaller = newer ancestor.
+    behind = {"old-ancestor": 500, "mid-ancestor": 200, "new-ancestor": 10}
+    status = {
+        "old-ancestor": "ahead", "mid-ancestor": "ahead",
+        "new-ancestor": "ahead", "newest-nonanc": "diverged",
+    }
+    monkeypatch.setattr(
+        check, "_compare_ancestry",
+        lambda repo, head, base, tok: (status[head], behind.get(head, 0)),
+    )
+    res = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    assert res.effective_base == "new-ancestor"  # fewest behind, NOT runs[0]
+    assert res.run_id == 3
+    assert res.scanned == 4  # scanned the whole window to find the newest ancestor
 
 
-def test_ancestor_identical_at_top(monkeypatch):
-    runs = {"workflow_runs": [{"head_sha": "BASE", "id": 9}]}
+def test_ancestor_identical_short_circuits(monkeypatch):
+    # An `identical` match (0 behind) is provably the closest ancestor — the scan
+    # stops there and does not compare the remaining runs.
+    runs = {"workflow_runs": [
+        {"head_sha": "BASE", "id": 9, "created_at": "2026-09-01T00:00:00Z"},
+        {"head_sha": "older", "id": 8, "created_at": "2026-08-01T00:00:00Z"},
+    ]}
     monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
-    monkeypatch.setattr(check, "_compare_status", lambda *a: "identical")
-    eff, _, scanned, _ = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
-    assert eff == "BASE" and scanned == 1
+    compared = []
+
+    def fake_compare(repo, head, base, tok):
+        compared.append(head)
+        return ("identical", 0) if head == "BASE" else ("ahead", 5)
+
+    monkeypatch.setattr(check, "_compare_ancestry", fake_compare)
+    res = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    assert res.effective_base == "BASE" and res.scanned == 1
+    assert compared == ["BASE"]  # short-circuited; "older" never compared
 
 
 def test_ancestor_none_found(monkeypatch):
-    runs = {"workflow_runs": [{"head_sha": "x", "id": 1}, {"head_sha": "y", "id": 2}]}
+    runs = {"workflow_runs": [
+        {"head_sha": "x", "id": 1, "created_at": "2026-09-01T00:00:00Z"},
+        {"head_sha": "y", "id": 2, "created_at": "2026-09-02T00:00:00Z"},
+    ]}
     monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
-    monkeypatch.setattr(check, "_compare_status", lambda *a: "behind")
-    eff, run_id, scanned, _ = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
-    assert eff is None and run_id is None and scanned == 2
+    monkeypatch.setattr(check, "_compare_ancestry", lambda *a: ("behind", 3))
+    res = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    assert res.effective_base is None and res.run_id is None and res.scanned == 2
 
 
 def test_ancestor_query_uses_base_ref_and_workflow(monkeypatch):
@@ -315,17 +345,127 @@ def test_ancestor_paginates_to_honor_lookback(monkeypatch):
         return page2, {"Link": ""}
 
     monkeypatch.setattr(check, "_http_get_json", fake_get)
-    # only "anc" (on page 2) is an ancestor
+    # only "anc" (on page 2) is an ancestor, and it is not identical (1 behind),
+    # so the full window is scanned to confirm it is the newest.
     monkeypatch.setattr(
-        check, "_compare_status",
-        lambda repo, head, base, tok: "ahead" if head == "anc" else "diverged",
+        check, "_compare_ancestry",
+        lambda repo, head, base, tok: ("ahead", 1) if head == "anc" else ("diverged", 0),
     )
-    eff, run_id, scanned, _ = check.latest_snapshotted_ancestor(
+    res = check.latest_snapshotted_ancestor(
         "o/r", "main", "BASE", "wf.yml", "tok", 150
     )
-    assert eff == "anc" and run_id == 999
-    assert scanned == 101  # 100 from page 1 + 1 match on page 2
+    assert res.effective_base == "anc" and res.run_id == 999
+    assert res.scanned == 101  # 100 from page 1 + 1 match on page 2
     assert len(calls) == 2  # followed pagination
+
+
+def test_ancestor_starvation_resolved_by_widened_window(monkeypatch):
+    # an active-main backlog of newer-than-base runs pushes the
+    # nearest ancestor past the OLD lookback (30) but within the WIDENED window.
+    runs = [
+        {"head_sha": f"newer-{i}", "id": i, "created_at": f"2026-09-{(i % 28) + 1:02d}T00:00:00Z"}
+        for i in range(45)
+    ]
+    runs.append({"head_sha": "ancestor", "id": 999, "created_at": "2026-08-01T00:00:00Z"})
+    monkeypatch.setattr(check, "_http_get_json", lambda url, tok: ({"workflow_runs": runs}, {}))
+    monkeypatch.setattr(
+        check, "_compare_ancestry",
+        lambda repo, head, base, tok: ("ahead", 5) if head == "ancestor" else ("diverged", 0),
+    )
+    # Old window (30) stops before position 46 → starved → None.
+    starved = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 30)
+    assert starved.effective_base is None
+    # Widened window (50) reaches it.
+    res = check.latest_snapshotted_ancestor("o/r", "main", "BASE", "wf.yml", "tok", 50)
+    assert res.effective_base == "ancestor" and res.scanned == 46
+
+
+def test_ancestor_offline_replay_shuffled_stale_pair(monkeypatch):
+    # Offline replay of a real stale pair (#64079: 6d3cb6c5 Aug3 base) with a SHUFFLED
+    # runs fixture — a much older ancestor returned first. The resolver must choose the
+    # newest ancestor regardless of API order.
+    runs = {"workflow_runs": [
+        {"head_sha": "211d0304jun24", "id": 10, "created_at": "2026-06-24T09:00:00Z"},
+        {"head_sha": "6d3cb6c5aug03", "id": 20, "created_at": "2026-08-03T09:00:00Z"},
+        {"head_sha": "ba552818sep20", "id": 30, "created_at": "2026-09-20T09:00:00Z"},
+    ]}
+    monkeypatch.setattr(check, "_http_get_json", lambda url, tok: (runs, {}))
+    behind = {"211d0304jun24": 12830, "6d3cb6c5aug03": 6619, "ba552818sep20": 0}
+    status = {"211d0304jun24": "ahead", "6d3cb6c5aug03": "ahead", "ba552818sep20": "identical"}
+    monkeypatch.setattr(
+        check, "_compare_ancestry",
+        lambda repo, head, base, tok: (status[head], behind[head]),
+    )
+    res = check.latest_snapshotted_ancestor("o/r", "main", "ba552818sep20", "wf.yml", "tok", 50)
+    assert res.effective_base == "ba552818sep20" and res.scanned == 3
+
+
+def test_probe_base_staleness_returns_behind_and_age(monkeypatch):
+    # Regular /compare probe surfaces ahead_by (commits behind) + base commit age.
+    old = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=90)).isoformat()
+    monkeypatch.setattr(
+        check, "_http_get_json",
+        lambda url, tok: (
+            {"ahead_by": 1418, "base_commit": {"commit": {"committer": {"date": old}}}},
+            {},
+        ),
+    )
+    behind, age = check._probe_base_staleness("o/r", "6d3cb6c5abcd", "BASE", "tok")
+    assert behind == 1418
+    assert 89 <= age <= 91  # ~90 days, fractional
+
+
+def test_probe_base_staleness_failure_returns_none(monkeypatch):
+    def boom(url, tok):
+        raise check.ApiError("probe exploded", 500, retryable=True)
+
+    monkeypatch.setattr(check, "_http_get_json", boom)
+    assert check._probe_base_staleness("o/r", "x", "BASE", "tok") == (None, None)
+
+
+def test_staleness_advice_stale_recommends_rebase():
+    # A stale base (thousands behind, old) → advise rebase, not override.
+    advice = check._staleness_advice("6d3cb6c5abcd", "main", 1418, 90.0, "ci:vuln-gate-override")
+    assert "rebase" in advice.lower()
+    assert "ci:vuln-gate-override" not in advice
+
+
+def test_staleness_advice_current_recommends_override():
+    # A current base (few commits behind, fresh) → advise override, since rebasing
+    # cannot shrink the diff.
+    advice = check._staleness_advice("abcdef123456", "main", 3, 0.5, "ci:vuln-gate-override")
+    assert "ci:vuln-gate-override" in advice
+    assert "rebase" not in advice.lower()
+
+
+def test_staleness_advice_unknown_defaults_to_override():
+    # Probe failure (behind/age None) → neither signal is stale → override guidance.
+    advice = check._staleness_advice("abcdef123456", "main", None, None, "ci:vuln-gate-override")
+    assert "ci:vuln-gate-override" in advice
+
+
+def test_emit_compare_observation_grep_stable_line(monkeypatch, capsys):
+    # The observability rider line is grep-stable and carries the free head-graph
+    # margin signals on the happy path (na for the 502-only fields).
+    written = []
+    monkeypatch.setattr(check, "_write_summary", lambda path, text: written.append(text))
+    check._emit_compare_observation(
+        "SUMMARY", "200", 1234, 57, "eff123", "head456", "base789", None, None
+    )
+    out = capsys.readouterr().out
+    assert "VULN_GATE_COMPARE outcome=200 latency_ms=1234 changed_deps=57" in out
+    assert "effective_base=eff123 head=head456 base=base789" in out
+    assert "effective_base_age_days=na behind=na" in out
+    assert written and written[0] == out.strip()  # same line appended to the summary
+
+
+def test_emit_compare_observation_502_carries_probed_fields(capsys):
+    check._emit_compare_observation(
+        None, "502", 9800, None, "eff123", "head456", "base789", 1418.0, 1418
+    )
+    out = capsys.readouterr().out
+    assert "outcome=502 latency_ms=9800 changed_deps=na" in out
+    assert "effective_base_age_days=1418.0 behind=1418" in out
 
 
 def test_has_override_label_live_read(monkeypatch):
@@ -390,6 +530,66 @@ def test_main_fail_closed_when_no_ancestor(monkeypatch):
     with pytest.raises(SystemExit) as ei:
         check.main()
     assert ei.value.code == 1
+
+
+def test_main_502_on_stale_base_fails_closed_with_rebase_advice(monkeypatch, capsys):
+    # End-to-end: the dependency-graph/compare 502s (compare-size limit). Because the
+    # resolved base is stale, main() must fail closed AND attach rebase guidance,
+    # and emit the observation line tagged outcome=502 with the probed behind value.
+    _set_main_env(monkeypatch)
+    monkeypatch.setattr(
+        check, "latest_snapshotted_ancestor", lambda *a, **k: ("6d3cb6c5abcd", 1, 1, "latest")
+    )
+
+    def dep_compare_502(url, tok):
+        raise check.ApiError("bad gateway", 502, retryable=True)
+
+    monkeypatch.setattr(check, "_api_get", dep_compare_502)
+    # Staleness probe (regular /compare): thousands behind and old → rebase guidance.
+    monkeypatch.setattr(
+        check, "_http_get_json",
+        lambda url, tok: (
+            {"ahead_by": 1400, "base_commit": {"commit": {"committer": {"date": "2026-07-01T00:00:00Z"}}}},
+            {},
+        ),
+    )
+    captured = {}
+    real_fail_closed = check.fail_closed
+
+    def spy_fail_closed(*args, **kwargs):
+        captured["advice"] = kwargs.get("advice")
+        real_fail_closed(*args, **kwargs)
+
+    monkeypatch.setattr(check, "fail_closed", spy_fail_closed)
+    monkeypatch.setattr(check, "has_override_label", lambda *a, **k: False)
+    monkeypatch.setattr(check, "_upsert_comment", lambda *a, **k: None)
+    with pytest.raises(SystemExit) as ei:
+        check.main()
+    assert ei.value.code == 1
+    assert captured["advice"] and "rebase" in captured["advice"].lower()
+    out = capsys.readouterr().out
+    assert "VULN_GATE_COMPARE outcome=502" in out and "changed_deps=na" in out
+    assert "behind=1400" in out
+
+
+def test_main_happy_path_emits_compare_observation(monkeypatch, capsys):
+    # On a clean pass the free head-graph margin signals are still emitted:
+    # outcome=200, a real changed_deps count, and na for the 502-only fields.
+    _set_main_env(monkeypatch)
+    monkeypatch.setattr(check, "latest_snapshotted_ancestor", lambda *a, **k: ("eff", 1, 1, "latest"))
+    monkeypatch.setattr(check, "_base_branch_pre_existing", lambda *a, **k: set())
+    monkeypatch.setattr(
+        check, "_api_get",
+        lambda url, tok: [
+            _dep(change_type="added", severity="low", fix=None),
+            _dep(change_type="removed", severity="low", fix=None),
+        ],
+    )
+    check.main()
+    out = capsys.readouterr().out
+    assert "VULN_GATE_COMPARE outcome=200" in out
+    assert "changed_deps=2" in out
+    assert "effective_base_age_days=na behind=na" in out
 
 
 # ── Head-snapshot guard: _looks_like_missing_head helper ──
