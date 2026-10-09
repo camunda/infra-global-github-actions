@@ -35,6 +35,7 @@ either ``base_ref`` or the fallback, or a GitHub API failure that survives retri
 A human may bypass a genuinely un-checkable PR by adding the override label (read
 live, not from the stale event payload). The label never bypasses a real finding.
 """
+import datetime
 import json
 import os
 import re
@@ -43,11 +44,18 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from typing import NamedTuple
 
 
 _GITHUB_API = "https://api.github.com"
 _COMMENT_MARKER = "<!-- dependency-vuln-check -->"
 _DEVOPS_TEAM = "@camunda/monorepo-devops-team"
+
+# On-502 diagnosis only: thresholds that pick the rebase-vs-override advice for a
+# dependency-graph/compare 502. They NEVER decide pass/fail — the 502 itself is the
+# fail trigger — they only select which message helps the author.
+_STALE_BEHIND_COMMITS = 100
+_STALE_AGE_DAYS = 2
 
 # Retry policy for transient GitHub API failures (5xx, network, timeout, rate limit).
 _MAX_ATTEMPTS = 3
@@ -190,41 +198,108 @@ def _api_get(url: str, token: str) -> list:
     return results
 
 
-def _compare_status(repository: str, base: str, head: str, token: str) -> str:
-    """Return the commit-comparison status: identical | ahead | behind | diverged."""
+def _compare_ancestry(repository: str, run_sha: str, base_sha: str, token: str) -> tuple[str, int]:
+    """Regular commit compare run_sha...base_sha → (status, ahead_by).
+
+    status `identical`/`ahead` ⇒ run_sha is an ancestor-or-equal of base_sha (the
+    only runs we accept as an effective base). `ahead_by` is how many commits
+    base_sha is ahead of run_sha = how many commits run_sha is *behind* base_sha —
+    i.e. the run's staleness as a base. It comes free on the same cheap regular
+    /compare the resolver already needs, so selection costs no extra call
+    per candidate.
+    """
     payload, _ = _http_get_json(
-        f"{_GITHUB_API}/repos/{repository}/compare/{base}...{head}?per_page=1", token
+        f"{_GITHUB_API}/repos/{repository}/compare/{run_sha}...{base_sha}?per_page=1", token
     )
-    return payload.get("status", "") if isinstance(payload, dict) else ""
+    if not isinstance(payload, dict):
+        return "", 0
+    return payload.get("status", ""), payload.get("ahead_by", 0) or 0
+
+
+def _epoch(timestamp: str | None) -> float:
+    """ISO-8601 timestamp → POSIX seconds, or 0.0 when absent/unparseable.
+
+    Used only to order snapshot runs by recency (a tiebreak between equidistant
+    ancestors and the on-502 age proxy); never as an ancestry signal.
+    """
+    if not timestamp:
+        return 0.0
+    try:
+        return datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return 0.0
+
+
+class BaseResolution(NamedTuple):
+    """Outcome of resolving base_sha to a snapshotted ancestor.
+
+    `effective_base`/`run_id` are None when no ancestor was found within the
+    window. `scanned` is how many runs were examined; `latest_on_branch` is the
+    head_sha of the most recent successful snapshot run on the branch (used by the
+    pre-existing dep filter). Unpacks as a 4-tuple for backward-compatible callers.
+    """
+    effective_base: str | None
+    run_id: int | None
+    scanned: int
+    latest_on_branch: str | None
+
+
+def _log_candidates(candidates: list, chosen_sha: str | None) -> None:
+    """Emit the raw candidate list so prod logs reveal when the API returned runs
+    out of order — i.e. when runs[0] was NOT the newest ancestor yet the newest was
+    still chosen. This is the only visibility into the transient server-side reorder,
+    which cannot be reproduced on demand."""
+    if not candidates:
+        return
+    print("Snapshot ancestor candidates (API scan order):")
+    for run_sha, created_at, run_id, behind_base, status in candidates:
+        mark = "  <= chosen" if run_sha == chosen_sha else ""
+        print(
+            f"  sha={run_sha} created_at={created_at} run_id={run_id} "
+            f"behind_base={behind_base} status={status}{mark}"
+        )
 
 
 def latest_snapshotted_ancestor(
     repository: str, base_ref: str, base_sha: str, workflow: str, token: str, lookback: int
-):
-    """Most recent snapshotted commit that is an ancestor-or-equal of base_sha.
+) -> "BaseResolution":
+    """Newest snapshotted commit that is an ancestor-or-equal of base_sha.
 
-    Lists successful push-event runs of `workflow` on `base_ref` (newest-first;
-    a successful run guarantees a submitted snapshot — the workflow's submit step
-    is unconditional). For each run's head_sha, compares head_sha...base_sha and
-    accepts the first whose status is `identical` (same commit) or `ahead`
-    (base_sha is ahead → the run commit is an ancestor).
+    Lists successful push-event runs of `workflow` on `base_ref` and, for each
+    run's head_sha, compares head_sha...base_sha. A run is a candidate base when
+    the status is `identical` (same commit) or `ahead` (base_sha is ahead → the run
+    commit is an ancestor). A successful run guarantees a submitted snapshot — the
+    workflow's submit step is unconditional.
+
+    Pick the NEWEST ancestor, not the first. GitHub does not guarantee the
+    runs come back strictly newest-first; a transient server-side reorder can put an
+    old run at index 0, and blindly accepting the first ancestor then resolves a
+    months-old base → a huge diff → the compare 502. So among all ancestor
+    candidates in the window we pick the one with the FEWEST commits behind base_sha
+    (smallest `ahead_by`), using the snapshot run's start time only as a tiebreak —
+    never trading ancestry for recency, since start time is not commit time. We
+    short-circuit only on an `identical` match (0 behind — provably the closest).
+    The raw candidate list is logged (see `_log_candidates`).
 
     Returns (effective_base_sha, run_id, scanned_count, latest_on_branch); the first
-    three are (None, None, scanned) if no ancestor is found within the window.
-    `latest_on_branch` is the head_sha of the most recent successful run on
-    `base_ref` (the very first run examined), regardless of ancestry — the latest
-    *snapshotted* tip of the branch. The pre-existing dep filter diffs against this
-    (to surface Maven base-branch drift, which is only visible at snapshotted
-    commits) unioned with the PR's base-sha (to surface natively-detected
-    ecosystems like Go/npm at the true branch tip). NOTE: because this is the latest
-    *snapshotted* commit rather than the actual branch tip, a path-filtered push
-    (e.g. a Go-only change that never triggers the Maven snapshot workflow) leaves it
-    behind the branch tip — which is exactly why the filter also needs base-sha. See
-    `_base_branch_pre_existing`.
+    two are None when no ancestor is found within the window. `latest_on_branch` is
+    the head_sha of the run with the greatest start time on `base_ref` (so a
+    reordered API response cannot pin it to a stale commit), regardless of ancestry
+    — the latest *snapshotted* tip of the branch,
+    used by the pre-existing dep filter (Maven drift is only visible at snapshotted
+    commits), unioned with the PR's base-sha for natively-detected ecosystems. NOTE:
+    because this is the latest *snapshotted* commit rather than the actual branch
+    tip, a path-filtered push (e.g. a Go-only change that never triggers the Maven
+    snapshot) leaves it behind the branch tip — which is why the filter also needs
+    base-sha. See `_base_branch_pre_existing`.
     Raises ApiError on API failure so the caller can fail closed.
 
-    `lookback` is honored even beyond the API's 100-per-page cap by following
-    pagination, so a large lookback never silently scans fewer runs than asked.
+    `lookback` bounds how many runs are scanned, honored even beyond the API's
+    100-per-page cap by following pagination. The scan is order-independent: every
+    run in the window is compared and the ancestor with the fewest commits behind
+    wins, so a reordered response cannot change the result — only an ancestor beyond
+    the `lookback` window can be missed. Worst case is `lookback` compare calls per
+    resolution (reached when no `identical` match short-circuits the scan).
     """
     per_page = min(lookback, 100)  # GitHub caps per_page at 100
     url = (
@@ -234,7 +309,12 @@ def latest_snapshotted_ancestor(
     )
     scanned = 0
     latest_on_branch: str | None = None
-    while url and scanned < lookback:
+    latest_created_at = ""  # start time of the run behind latest_on_branch
+    candidates: list = []  # (run_sha, created_at, run_id, behind_base, status), scan order
+    best: tuple | None = None  # (behind_base, -epoch, run_sha, run_id)
+    closest_found = False  # identical ancestor seen: stop comparing, keep scanning tip metadata
+    done = False
+    while url and scanned < lookback and not done:
         payload, headers = _http_get_json(url, token)
         runs = payload.get("workflow_runs", []) if isinstance(payload, dict) else []
         for run in runs:
@@ -243,17 +323,35 @@ def latest_snapshotted_ancestor(
             run_sha = run.get("head_sha")
             if not run_sha:
                 continue
-            if latest_on_branch is None:
-                latest_on_branch = run_sha  # most recent snapshot on this branch
             scanned += 1
+            created_at = run.get("created_at")
+            ep = _epoch(created_at)
+            # Latest snapshot tip = greatest run start time, independent of API order
+            # (not reliably newest-first) and of the compare short-circuit below.
+            if latest_on_branch is None or ep > _epoch(latest_created_at):
+                latest_on_branch = run_sha
+                latest_created_at = created_at or ""
+            if closest_found:
+                continue  # closest ancestor already known; only the tip metadata matters now
             # compare/{run_sha}...{base_sha}: "ahead" = base_sha is ahead of run_sha
-            # = run_sha is an ancestor of base_sha (what we want).
-            status = _compare_status(repository, run_sha, base_sha, token)
-            if status in ("identical", "ahead"):
-                return run_sha, run.get("id"), scanned, latest_on_branch
+            # = run_sha is an ancestor of base_sha; ahead_by = commits run is behind.
+            status, behind_base = _compare_ancestry(repository, run_sha, base_sha, token)
+            candidates.append((run_sha, created_at, run.get("id"), behind_base, status))
+            if status not in ("identical", "ahead"):
+                continue
+            key = (behind_base, -ep)
+            if best is None or key < (best[0], best[1]):
+                best = (behind_base, -ep, run_sha, run.get("id"))
+            if behind_base == 0:
+                closest_found = True  # base_sha is itself snapshotted — no closer ancestor exists
+        if closest_found:
+            done = True  # stop paginating for compares; this page's tip metadata is scanned
         match = re.search(r'<([^>]+)>;\s*rel="next"', headers.get("Link", "") or "")
         url = match.group(1) if match else None
-    return None, None, scanned, latest_on_branch
+    _log_candidates(candidates, best[2] if best else None)
+    if best is None:
+        return BaseResolution(None, None, scanned, latest_on_branch)
+    return BaseResolution(best[2], best[3], scanned, latest_on_branch)
 
 
 def _dep_triple(dep: dict) -> tuple:
@@ -658,12 +756,113 @@ def _pr_number():
         return None
 
 
-def fail_closed(repository, pr_number, token, override_label, reason, summary_path):
+def _age_days(created_at: str | None) -> float | None:
+    """Days (fractional) between `created_at` and now (UTC), or None when unparseable."""
+    epoch = _epoch(created_at)
+    if not epoch:
+        return None
+    now = datetime.datetime.now(datetime.timezone.utc).timestamp()
+    return (now - epoch) / 86400
+
+
+def _probe_base_staleness(
+    repository: str, effective_base: str, base_sha: str, token: str
+) -> tuple[int | None, float | None]:
+    """One cheap *regular* /compare of `effective_base...base_sha` → (behind, age_days).
+
+    Not the dependency-graph compare that 502'd: a regular commit compare returns
+    metadata only, so it stays under the size limit even across thousands of commits
+    and will not itself 502. Relies on `_http_get_json`'s existing socket timeout and
+    retries. Returns (None, None) on failure so the caller degrades gracefully.
+    """
+    try:
+        payload, _ = _http_get_json(
+            f"{_GITHUB_API}/repos/{repository}/compare/"
+            f"{effective_base}...{base_sha}?per_page=1",
+            token,
+        )
+    except ApiError as exc:
+        print(f"::warning::Could not probe base staleness ({exc.reason})")
+        return None, None
+    if not isinstance(payload, dict):
+        return None, None
+    commit = (payload.get("base_commit") or {}).get("commit") or {}
+    return payload.get("ahead_by"), _age_days((commit.get("committer") or {}).get("date"))
+
+
+def _staleness_advice(
+    effective_base: str, base_ref: str, behind_count: int | None,
+    age_days: float | None, override_label: str,
+) -> str:
+    """Pick rebase-vs-override guidance for a dependency-graph/compare 502.
+
+    The 502 is already the fail trigger; this only chooses the message that most
+    helps the author. A stale base (far behind `base_sha` or old) means a fresher
+    snapshot exists closer to the branch tip, so rebasing shrinks the diff and
+    clears the 502 — with the override label offered as a fallback for the rare case
+    the diff is too large even at the freshest snapshot. A current base means the diff
+    is large for another reason (e.g. a big single-PR dependency change) that rebasing
+    will not fix, so the manual override label is the right escape hatch.
+    """
+    short = effective_base[:12]
+    if behind_count is None and age_days is None:
+        # Probe failed: staleness is unknown, so do not claim the base is current.
+        return (
+            f"Could not determine how stale the effective base `{short}` is (the staleness "
+            f"probe failed). If this is a known GitHub compare-size limit or outage, add the "
+            f"`{override_label}` label and re-run to bypass (this never bypasses a real finding)."
+        )
+    stale = (behind_count is not None and behind_count >= _STALE_BEHIND_COMMITS) or (
+        age_days is not None and age_days >= _STALE_AGE_DAYS
+    )
+    behind_txt = (
+        f"{behind_count} commit(s)" if behind_count is not None else "an unknown number of commits"
+    )
+    age_txt = f"{int(age_days)} day(s) old" if age_days is not None else "of unknown age"
+    if stale:
+        return (
+            f"The effective base `{short}` is {behind_txt} behind this PR's base and {age_txt}, "
+            f"so the dependency diff is large and likely exceeded GitHub's compare-size limit. "
+            f"**Rebase this PR onto the latest `{base_ref}` (or merge it in)** to move to a fresher "
+            f"snapshot, shrink the diff, and clear the 502. If the diff is still too large even at "
+            f"the freshest snapshot, add the `{override_label}` label and re-run to bypass (this "
+            f"never bypasses a real finding)."
+        )
+    return (
+        f"The effective base `{short}` is current ({behind_txt} behind, {age_txt}), so rebasing "
+        f"will not shrink the diff. If this is a known GitHub compare-size limit or outage, add the "
+        f"`{override_label}` label and re-run to bypass (this never bypasses a real finding)."
+    )
+
+
+def _emit_compare_observation(
+    summary_path, outcome: str, latency_ms: int, changed_deps: int | None,
+    effective_base: str, head_sha: str, base_sha: str,
+    age_days: float | None, behind: int | None,
+) -> None:
+    """One grep-stable line trending the head-graph compare toward GitHub's ~10s
+    ceiling (forensics, not alerting). `latency_ms`/`changed_deps` are free from the
+    call we already make; `age_days`/`behind` are filled only when the 502 path
+    already probed them — never with an extra happy-path request."""
+    age_txt = f"{age_days:.1f}" if age_days is not None else "na"
+    line = (
+        f"VULN_GATE_COMPARE outcome={outcome} latency_ms={latency_ms} "
+        f"changed_deps={changed_deps if changed_deps is not None else 'na'} "
+        f"effective_base={effective_base} head={head_sha} base={base_sha} "
+        f"effective_base_age_days={age_txt} behind={behind if behind is not None else 'na'}"
+    )
+    print(line)
+    _write_summary(summary_path, line)
+
+
+def fail_closed(repository, pr_number, token, override_label, reason, summary_path, advice=None):
     """Block the PR (exit 1) unless the override label is present (exit 0).
 
     Loud on both paths: the run log, step summary, and PR comment all explain that
     the gate could not verify the PR and why. The override label only bypasses an
-    unverifiable PR — never a real vulnerability finding.
+    unverifiable PR — never a real vulnerability finding. `advice` is optional
+    diagnosis text (e.g. the on-502 rebase-vs-override guidance) appended to the
+    fail-closed messages.
     """
     if has_override_label(repository, pr_number, token, override_label):
         msg = (
@@ -688,18 +887,20 @@ def fail_closed(repository, pr_number, token, override_label, reason, summary_pa
             )
         sys.exit(0)
 
-    msg = (
-        f"Vulnerability gate FAILED CLOSED: {reason}. Add the `{override_label}` label and "
-        f"re-run to bypass if this is a known GitHub outage. {_DEVOPS_TEAM}"
+    # One remediation only: on the 502 path `advice` already selects rebase-or-override,
+    # so it must not be stacked on top of the generic override instruction.
+    remediation = advice or (
+        f"If this is a known GitHub outage, add the `{override_label}` label and "
+        f"re-run the job to bypass."
     )
-    print(f"::error::{msg}")
+    print(f"::error::Vulnerability gate FAILED CLOSED: {reason}. {_DEVOPS_TEAM}")
+    print(f"::warning::{remediation}")
     _write_summary(
         summary_path,
         f"### 🚨 Vulnerability gate failed closed\n\n"
         f"**Reason:** {reason}\n\n"
         f"The gate blocks when it cannot confirm the PR introduces no new vulnerable "
-        f"dependencies. If this is a known GitHub outage, add the `{override_label}` label "
-        f"and re-run the job to bypass. {_DEVOPS_TEAM}",
+        f"dependencies. {remediation} {_DEVOPS_TEAM}",
     )
     if pr_number:
         _upsert_comment(
@@ -707,8 +908,7 @@ def fail_closed(repository, pr_number, token, override_label, reason, summary_pa
             f"## 🚨 Vulnerability Gate could not verify this PR\n\n"
             f"**Reason:** {reason}\n\n"
             f"The gate blocks when it cannot confirm this PR introduces no new vulnerable "
-            f"dependencies (fail-closed). If this is a known GitHub outage, add the "
-            f"`{override_label}` label and **re-run the job** to bypass. {_DEVOPS_TEAM}",
+            f"dependencies (fail-closed). {remediation} {_DEVOPS_TEAM}",
         )
     sys.exit(1)
 
@@ -726,7 +926,7 @@ def main() -> None:
     # (see the guard below) so a wiring mistake can't silently disable it.
     head_snapshot_ok = os.environ.get("HEAD_SNAPSHOT_SUCCEEDED", "").strip().lower()
     snapshot_workflow = os.environ["SNAPSHOT_WORKFLOW"]
-    lookback = int(os.environ.get("MAX_SNAPSHOT_LOOKBACK", "30"))
+    lookback = int(os.environ.get("MAX_SNAPSHOT_LOOKBACK", "50"))
     override_label = os.environ.get("OVERRIDE_LABEL", "ci:vuln-gate-override")
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     pr_number = _pr_number()
@@ -748,7 +948,7 @@ def main() -> None:
     # ── Resolve the effective base to a snapshotted ancestor (Workstream D) ──
     print(f"::notice::Resolving base {base_sha} on '{base_ref}' to the nearest snapshotted ancestor")
     try:
-        effective_base, run_id, scanned, latest_on_branch = latest_snapshotted_ancestor(
+        res = latest_snapshotted_ancestor(
             repository, base_ref, base_sha, snapshot_workflow, token, lookback
         )
     except ApiError as e:
@@ -757,6 +957,7 @@ def main() -> None:
             f"could not resolve base snapshot ({e.reason})", summary_path,
         )
         return  # unreachable: fail_closed exits
+    effective_base, run_id, scanned, latest_on_branch = res
 
     # ── Stacked PR fallback: base_ref has no snapshots — try the default branch ──
     scanned_base = scanned
@@ -765,7 +966,7 @@ def main() -> None:
             f"::notice::No snapshot found on '{base_ref}' — falling back to '{fallback_ref}' snapshots"
         )
         try:
-            effective_base, run_id, scanned, latest_on_branch = latest_snapshotted_ancestor(
+            res = latest_snapshotted_ancestor(
                 repository, fallback_ref, base_sha, snapshot_workflow, token, lookback
             )
         except ApiError as e:
@@ -775,6 +976,7 @@ def main() -> None:
                 summary_path,
             )
             return
+        effective_base, run_id, scanned, latest_on_branch = res
         if effective_base is not None:
             stacked_pr_fallback = True
             print(
@@ -825,19 +1027,41 @@ def main() -> None:
     # shows the same shape and simply re-confirms — we never block on this signal,
     # only wait out indexing lag, so it cannot misfire on a legitimate removal.
     diff = None
+    compare_url = (
+        f"{_GITHUB_API}/repos/{repository}/dependency-graph/compare/{effective_base}...{head_sha}"
+    )
     for attempt in range(1, _HEAD_INDEX_MAX_ATTEMPTS + 1):
+        t0 = time.monotonic()
         try:
-            diff = _api_get(
-                f"{_GITHUB_API}/repos/{repository}/dependency-graph/compare/{effective_base}...{head_sha}",
-                token,
-            )
+            diff = _api_get(compare_url, token)
         except ApiError as e:
+            latency_ms = int((time.monotonic() - t0) * 1000)
+            # On a 502 (the compare-size limit — a huge effective_base...head diff),
+            # probe base staleness once with a cheap regular /compare and tell the
+            # author whether to rebase or use the override label. The 502 still
+            # fails the gate; the diagnosis only picks the message. The probed
+            # behind/age also feed the observation line (no extra request).
+            advice = None
+            behind = age_days = None
+            if e.status == 502:
+                behind, age_days = _probe_base_staleness(repository, effective_base, base_sha, token)
+                advice = _staleness_advice(effective_base, base_ref, behind, age_days, override_label)
+            outcome = "502" if e.status == 502 else "err"
+            _emit_compare_observation(
+                summary_path, outcome, latency_ms, None, effective_base, head_sha,
+                base_sha, age_days, behind,
+            )
             fail_closed(
                 repository, pr_number, token, override_label,
-                f"dependency review API failed ({e.reason})", summary_path,
+                f"dependency review API failed ({e.reason})", summary_path, advice=advice,
             )
             return
+        latency_ms = int((time.monotonic() - t0) * 1000)
         if attempt == _HEAD_INDEX_MAX_ATTEMPTS or not _looks_like_missing_head(diff):
+            _emit_compare_observation(
+                summary_path, "200", latency_ms, len(diff), effective_base, head_sha,
+                base_sha, None, None,
+            )
             break
         delay = _HEAD_INDEX_BACKOFF_SECONDS * attempt
         print(

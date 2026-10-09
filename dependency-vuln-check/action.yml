@@ -49,10 +49,12 @@ inputs:
   max-snapshot-lookback:
     description: >
       How many recent successful snapshot-workflow runs to scan when resolving the
-      effective base. The nearest ancestor is normally near the top; raise this only
-      if a very old base must be resolved.
+      effective base. The whole window is scanned to pick the NEWEST ancestor (fewest
+      commits behind base-sha), independent of the order the API returns runs in.
+      Raise this only if a very old base must be resolved; lowering it risks starving
+      the resolver on busy branches.
     required: false
-    default: "30"
+    default: "50"
   override-label:
     description: >
       PR label that bypasses the gate ONLY when it cannot verify the PR (GitHub
