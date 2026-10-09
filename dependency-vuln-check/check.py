@@ -57,6 +57,12 @@ _DEVOPS_TEAM = "@camunda/monorepo-devops-team"
 _STALE_BEHIND_COMMITS = 100
 _STALE_AGE_DAYS = 2
 
+# Resolver paging bound: once the scan has passed the base commit's own date by this
+# margin AND holds at least one ancestor, stop widening the window. The margin absorbs
+# snapshot lag / local run-ordering jitter; the lookback cap bounds the no-ancestor
+# case. Together they make ancestor starvation bounded, not just reduced.
+_RESOLVER_PAGE_MARGIN_DAYS = 2
+
 # Retry policy for transient GitHub API failures (5xx, network, timeout, rate limit).
 _MAX_ATTEMPTS = 3
 _BACKOFF_BASE_SECONDS = 2
@@ -260,6 +266,23 @@ def _log_candidates(candidates: list, chosen_sha: str | None) -> None:
         )
 
 
+def _base_commit_date(repository: str, base_sha: str, token: str) -> str | None:
+    """Committer date (ISO-8601) of base_sha, or None on failure.
+
+    Bounds how far back `latest_snapshotted_ancestor` pages: once snapshot runs
+    predate this, the newest ancestor has been passed. A regular commit GET returns
+    metadata only, so it never hits the compare-size limit.
+    """
+    try:
+        payload, _ = _http_get_json(f"{_GITHUB_API}/repos/{repository}/commits/{base_sha}", token)
+    except ApiError as exc:
+        print(f"::warning::Could not fetch base commit date ({exc.reason}); paging by lookback cap only")
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return ((payload.get("commit") or {}).get("committer") or {}).get("date")
+
+
 def latest_snapshotted_ancestor(
     repository: str, base_ref: str, base_sha: str, workflow: str, token: str, lookback: int
 ) -> "BaseResolution":
@@ -294,12 +317,16 @@ def latest_snapshotted_ancestor(
     base-sha. See `_base_branch_pre_existing`.
     Raises ApiError on API failure so the caller can fail closed.
 
-    `lookback` bounds how many runs are scanned (widened the default so an
-    active-main backlog of newer-than-base runs is much less likely to push the
-    nearest ancestor out of the window — a wide enough backlog can still starve it,
-    since the window is bounded). It is honored even beyond the API's 100-per-page
-    cap by following pagination. Worst case is `lookback` compare calls per
-    resolution (reached when no `identical` match short-circuits the compares).
+    `lookback` bounds how many runs are scanned. The scan also pages back (following
+    `rel="next"`, honored beyond the API's 100-per-page cap) until it has passed the
+    base commit's own date by `_RESOLVER_PAGE_MARGIN_DAYS` *and* holds at least one
+    ancestor — past that point every remaining run is older, hence more behind, so it
+    cannot be the *newest* ancestor. `lookback` is the hard cap that bounds the
+    no-ancestor case (where the date gate never fires). So a backlog of newer-than-base
+    runs cannot push the nearest ancestor out of view unless the base predates the
+    `lookback` cap. Worst case is `lookback` compare calls (no `identical` short-circuit
+    and no ancestor ever found). The base commit date is fetched once up front; if that
+    lookup fails the resolver degrades to the `lookback` cap alone.
     """
     per_page = min(lookback, 100)  # GitHub caps per_page at 100
     url = (
@@ -307,14 +334,19 @@ def latest_snapshotted_ancestor(
         f"?branch={urllib.parse.quote(base_ref, safe='')}"
         f"&status=success&event=push&per_page={per_page}"
     )
+    # Page back to the base commit's own timeframe so a backlog of newer runs cannot
+    # hide the nearest ancestor. None (lookup failed) ⇒ cap-only paging (graceful).
+    base_date = _base_commit_date(repository, base_sha, token)
+    cutoff = _epoch(base_date) - _RESOLVER_PAGE_MARGIN_DAYS * 86400 if base_date else None
     scanned = 0
     latest_on_branch: str | None = None
     latest_created_at = ""  # start time of the run behind latest_on_branch
     candidates: list = []  # (run_sha, created_at, run_id, behind_base, status), scan order
     best: tuple | None = None  # (behind_base, -epoch, run_sha, run_id)
     closest_found = False  # identical ancestor seen: stop comparing, keep scanning tip metadata
+    reached_base_window = False  # scanned past the base date with a candidate in hand
     done = False
-    while url and scanned < lookback and not done:
+    while url and scanned < lookback and not done and not reached_base_window:
         payload, headers = _http_get_json(url, token)
         runs = payload.get("workflow_runs", []) if isinstance(payload, dict) else []
         for run in runs:
@@ -325,11 +357,18 @@ def latest_snapshotted_ancestor(
                 continue
             scanned += 1
             created_at = run.get("created_at")
+            ep = _epoch(created_at)
             # Latest snapshot tip = greatest run start time, independent of API order
             # (not reliably newest-first) and of the compare short-circuit below.
-            if latest_on_branch is None or _epoch(created_at) > _epoch(latest_created_at):
+            if latest_on_branch is None or ep > _epoch(latest_created_at):
                 latest_on_branch = run_sha
                 latest_created_at = created_at or ""
+            if cutoff is not None and ep and ep < cutoff and best is not None:
+                # Past the base date with a candidate in hand; older runs can only be
+                # more behind. (Keep scanning while best is None so a sparse snapshot
+                # cadence can't drop the only ancestor just beyond the window.)
+                reached_base_window = True
+                break
             if closest_found:
                 continue  # closest ancestor already known; only the tip metadata matters now
             # compare/{run_sha}...{base_sha}: "ahead" = base_sha is ahead of run_sha
@@ -338,9 +377,9 @@ def latest_snapshotted_ancestor(
             candidates.append((run_sha, created_at, run.get("id"), behind_base, status))
             if status not in ("identical", "ahead"):
                 continue
-            key = (behind_base, -_epoch(created_at))
+            key = (behind_base, -ep)
             if best is None or key < (best[0], best[1]):
-                best = (behind_base, -_epoch(created_at), run_sha, run.get("id"))
+                best = (behind_base, -ep, run_sha, run.get("id"))
             if behind_base == 0:
                 closest_found = True  # base_sha is itself snapshotted — no closer ancestor exists
         if closest_found:
@@ -798,9 +837,10 @@ def _staleness_advice(
     The 502 is already the fail trigger; this only chooses the message that most
     helps the author. A stale base (far behind `base_sha` or old) means a fresher
     snapshot exists closer to the branch tip, so rebasing shrinks the diff and
-    clears the 502. A current base means the diff is large for another reason (e.g.
-    a big single-PR dependency change) that rebasing will not fix, so the manual
-    override label is the right escape hatch.
+    clears the 502 — with the override label offered as a fallback for the rare case
+    the diff is too large even at the freshest snapshot. A current base means the diff
+    is large for another reason (e.g. a big single-PR dependency change) that rebasing
+    will not fix, so the manual override label is the right escape hatch.
     """
     short = effective_base[:12]
     if behind_count is None and age_days is None:
@@ -822,7 +862,9 @@ def _staleness_advice(
             f"The effective base `{short}` is {behind_txt} behind this PR's base and {age_txt}, "
             f"so the dependency diff is large and likely exceeded GitHub's compare-size limit. "
             f"**Rebase this PR onto the latest `{base_ref}` (or merge it in)** to move to a fresher "
-            f"snapshot, shrink the diff, and clear the 502."
+            f"snapshot, shrink the diff, and clear the 502. If the diff is still too large even at "
+            f"the freshest snapshot, add the `{override_label}` label and re-run to bypass (this "
+            f"never bypasses a real finding)."
         )
     return (
         f"The effective base `{short}` is current ({behind_txt} behind, {age_txt}), so rebasing "
