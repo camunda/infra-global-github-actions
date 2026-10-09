@@ -57,12 +57,6 @@ _DEVOPS_TEAM = "@camunda/monorepo-devops-team"
 _STALE_BEHIND_COMMITS = 100
 _STALE_AGE_DAYS = 2
 
-# Resolver paging bound: once the scan has passed the base commit's own date by this
-# margin AND holds at least one ancestor, stop widening the window. The margin absorbs
-# snapshot lag / local run-ordering jitter; the lookback cap bounds the no-ancestor
-# case. Together they make ancestor starvation bounded, not just reduced.
-_RESOLVER_PAGE_MARGIN_DAYS = 2
-
 # Retry policy for transient GitHub API failures (5xx, network, timeout, rate limit).
 _MAX_ATTEMPTS = 3
 _BACKOFF_BASE_SECONDS = 2
@@ -266,23 +260,6 @@ def _log_candidates(candidates: list, chosen_sha: str | None) -> None:
         )
 
 
-def _base_commit_date(repository: str, base_sha: str, token: str) -> str | None:
-    """Committer date (ISO-8601) of base_sha, or None on failure.
-
-    Bounds how far back `latest_snapshotted_ancestor` pages: once snapshot runs
-    predate this, the newest ancestor has been passed. A regular commit GET returns
-    metadata only, so it never hits the compare-size limit.
-    """
-    try:
-        payload, _ = _http_get_json(f"{_GITHUB_API}/repos/{repository}/commits/{base_sha}", token)
-    except ApiError as exc:
-        print(f"::warning::Could not fetch base commit date ({exc.reason}); paging by lookback cap only")
-        return None
-    if not isinstance(payload, dict):
-        return None
-    return ((payload.get("commit") or {}).get("committer") or {}).get("date")
-
-
 def latest_snapshotted_ancestor(
     repository: str, base_ref: str, base_sha: str, workflow: str, token: str, lookback: int
 ) -> "BaseResolution":
@@ -317,16 +294,12 @@ def latest_snapshotted_ancestor(
     base-sha. See `_base_branch_pre_existing`.
     Raises ApiError on API failure so the caller can fail closed.
 
-    `lookback` bounds how many runs are scanned. The scan also pages back (following
-    `rel="next"`, honored beyond the API's 100-per-page cap) until it has passed the
-    base commit's own date by `_RESOLVER_PAGE_MARGIN_DAYS` *and* holds at least one
-    ancestor — past that point every remaining run is older, hence more behind, so it
-    cannot be the *newest* ancestor. `lookback` is the hard cap that bounds the
-    no-ancestor case (where the date gate never fires). So a backlog of newer-than-base
-    runs cannot push the nearest ancestor out of view unless the base predates the
-    `lookback` cap. Worst case is `lookback` compare calls (no `identical` short-circuit
-    and no ancestor ever found). The base commit date is fetched once up front; if that
-    lookup fails the resolver degrades to the `lookback` cap alone.
+    `lookback` bounds how many runs are scanned, honored even beyond the API's
+    100-per-page cap by following pagination. The scan is order-independent: every
+    run in the window is compared and the ancestor with the fewest commits behind
+    wins, so a reordered response cannot change the result — only an ancestor beyond
+    the `lookback` window can be missed. Worst case is `lookback` compare calls per
+    resolution (reached when no `identical` match short-circuits the scan).
     """
     per_page = min(lookback, 100)  # GitHub caps per_page at 100
     url = (
@@ -334,19 +307,14 @@ def latest_snapshotted_ancestor(
         f"?branch={urllib.parse.quote(base_ref, safe='')}"
         f"&status=success&event=push&per_page={per_page}"
     )
-    # Page back to the base commit's own timeframe so a backlog of newer runs cannot
-    # hide the nearest ancestor. None (lookup failed) ⇒ cap-only paging (graceful).
-    base_date = _base_commit_date(repository, base_sha, token)
-    cutoff = _epoch(base_date) - _RESOLVER_PAGE_MARGIN_DAYS * 86400 if base_date else None
     scanned = 0
     latest_on_branch: str | None = None
     latest_created_at = ""  # start time of the run behind latest_on_branch
     candidates: list = []  # (run_sha, created_at, run_id, behind_base, status), scan order
     best: tuple | None = None  # (behind_base, -epoch, run_sha, run_id)
     closest_found = False  # identical ancestor seen: stop comparing, keep scanning tip metadata
-    reached_base_window = False  # scanned past the base date with a candidate in hand
     done = False
-    while url and scanned < lookback and not done and not reached_base_window:
+    while url and scanned < lookback and not done:
         payload, headers = _http_get_json(url, token)
         runs = payload.get("workflow_runs", []) if isinstance(payload, dict) else []
         for run in runs:
@@ -363,12 +331,6 @@ def latest_snapshotted_ancestor(
             if latest_on_branch is None or ep > _epoch(latest_created_at):
                 latest_on_branch = run_sha
                 latest_created_at = created_at or ""
-            if cutoff is not None and ep and ep < cutoff and best is not None:
-                # Past the base date with a candidate in hand; older runs can only be
-                # more behind. (Keep scanning while best is None so a sparse snapshot
-                # cadence can't drop the only ancestor just beyond the window.)
-                reached_base_window = True
-                break
             if closest_found:
                 continue  # closest ancestor already known; only the tip metadata matters now
             # compare/{run_sha}...{base_sha}: "ahead" = base_sha is ahead of run_sha

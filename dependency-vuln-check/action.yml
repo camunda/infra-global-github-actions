@@ -48,13 +48,13 @@ inputs:
     default: main
   max-snapshot-lookback:
     description: >
-      Hard cap on how many recent successful snapshot-workflow runs to scan when
-      resolving the effective base. The resolver pages back to the base commit's own
-      date before stopping, so a backlog of newer-than-base runs cannot push the
-      nearest ancestor out of view unless the base predates this cap. Raise it only if
-      a very old base must be resolved.
+      How many recent successful snapshot-workflow runs to scan when resolving the
+      effective base. The whole window is scanned to pick the NEWEST ancestor (fewest
+      commits behind base-sha), independent of the order the API returns runs in.
+      Raise this only if a very old base must be resolved; lowering it risks starving
+      the resolver on busy branches.
     required: false
-    default: "200"
+    default: "50"
   override-label:
     description: >
       PR label that bypasses the gate ONLY when it cannot verify the PR (GitHub

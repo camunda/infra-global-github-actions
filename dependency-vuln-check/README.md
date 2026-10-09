@@ -56,7 +56,7 @@ version shows up as `added` in the diff and is evaluated normally.
 | `fallback-base-ref` | no | `main` | Branch to fall back to when `base-ref` has no dependency snapshots (e.g. stacked PRs targeting a feature branch). The gate searches this branch for the nearest snapshotted ancestor of `base-sha` instead of failing closed, and posts a notice to the PR comment |
 | `snapshot-workflow` | yes | — | Filename of the workflow that submits the base snapshot (e.g. `maven-dependency-snapshot.yml`). Its successful push-event runs are scanned to resolve the effective base |
 | `head-snapshot-succeeded` | no | `""` | Whether the job that submits the PR **head** snapshot succeeded. Pass `'true'`/`'success'` (e.g. `needs.pr-maven-snapshot.result == 'success'`). **Any other value** (`'false'`, or a raw result like `'failure'`/`'cancelled'`/`'skipped'`) **fails closed** — an un-submitted head SBOM leaves the head side empty → a real new vuln would silently pass, so an unverified head must block, not no-op. Unset skips the check (backward compatible) |
-| `max-snapshot-lookback` | no | `200` | Hard cap on snapshot runs scanned when resolving the effective base. The resolver pages back to the base commit's own date, so a busy branch cannot push the nearest ancestor out of view unless the base predates this cap |
+| `max-snapshot-lookback` | no | `50` | How many recent successful snapshot runs to scan when resolving the effective base. The whole window is scanned to pick the **newest** ancestor (fewest commits behind `base-sha`), independent of API ordering; a busy branch with more than this many newer-than-base runs could still push the nearest ancestor out of the window |
 | `override-label` | no | `ci:vuln-gate-override` | PR label that bypasses the gate **only** when it cannot verify the PR (outage / no-ancestor). Never bypasses a real finding |
 | `config-file` | no | `.github/dependency-review-config.json` | Path to the JSON config holding `allow-ghsas` |
 | `fail-on-severity` | no | `high` | Min severity (`low`/`moderate`/`high`/`critical`) that blocks when **no fix** is available |
@@ -100,11 +100,11 @@ the API returns. GitHub does not guarantee the runs come back strictly newest-fi
 transient server-side reorder that put an old run at the top would otherwise resolve a months-old
 base, producing a huge diff that trips GitHub's `dependency-graph/compare` size limit (a 502).
 The snapshot run's start time is used only as a tiebreak between equidistant ancestors, never to
-trade away ancestry. The raw candidate list (sha, run id, commits-behind) is logged every run. To
-bound how far a backlog of newer-than-base runs can hide the nearest ancestor, the resolver pages
-back through result pages until it has passed the base commit's own date (plus a small margin) and
-holds at least one ancestor — so the nearest ancestor cannot be pushed out of view unless the base
-predates the `max-snapshot-lookback` hard cap.
+trade away ancestry. The raw candidate list (sha, run id, commits-behind) is logged every run. The
+selection is independent of the order the API returns runs in — every run in the window is compared
+and the fewest-commits-behind ancestor wins — but the window is bounded by `max-snapshot-lookback`,
+so a backlog of more than that many newer-than-base runs can still push the nearest ancestor out of
+view; widen `max-snapshot-lookback` if a very old base must be resolved.
 
 When the `dependency-graph/compare` call still returns a **502** (its diff exceeded GitHub's
 compare-size limit), the gate fails closed and attaches targeted guidance: if the effective base
