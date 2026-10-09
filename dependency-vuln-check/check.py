@@ -283,8 +283,9 @@ def latest_snapshotted_ancestor(
 
     Returns (effective_base_sha, run_id, scanned_count, latest_on_branch); the first
     two are None when no ancestor is found within the window. `latest_on_branch` is
-    the head_sha of the most recent successful run on `base_ref` (the first run
-    examined), regardless of ancestry — the latest *snapshotted* tip of the branch,
+    the head_sha of the run with the greatest start time on `base_ref` (so a
+    reordered API response cannot pin it to a stale commit), regardless of ancestry
+    — the latest *snapshotted* tip of the branch,
     used by the pre-existing dep filter (Maven drift is only visible at snapshotted
     commits), unioned with the PR's base-sha for natively-detected ecosystems. NOTE:
     because this is the latest *snapshotted* commit rather than the actual branch
@@ -294,10 +295,11 @@ def latest_snapshotted_ancestor(
     Raises ApiError on API failure so the caller can fail closed.
 
     `lookback` bounds how many runs are scanned (widened the default so an
-    active-main backlog of newer-than-base runs cannot push the nearest ancestor
-    out of the window). It is honored even beyond the API's 100-per-page cap by
-    following pagination. Worst case is `lookback` compare calls per resolution
-    (reached when no `identical` match short-circuits the scan).
+    active-main backlog of newer-than-base runs is much less likely to push the
+    nearest ancestor out of the window — a wide enough backlog can still starve it,
+    since the window is bounded). It is honored even beyond the API's 100-per-page
+    cap by following pagination. Worst case is `lookback` compare calls per
+    resolution (reached when no `identical` match short-circuits the compares).
     """
     per_page = min(lookback, 100)  # GitHub caps per_page at 100
     url = (
@@ -307,8 +309,10 @@ def latest_snapshotted_ancestor(
     )
     scanned = 0
     latest_on_branch: str | None = None
+    latest_created_at = ""  # start time of the run behind latest_on_branch
     candidates: list = []  # (run_sha, created_at, run_id, behind_base, status), scan order
     best: tuple | None = None  # (behind_base, -epoch, run_sha, run_id)
+    closest_found = False  # identical ancestor seen: stop comparing, keep scanning tip metadata
     done = False
     while url and scanned < lookback and not done:
         payload, headers = _http_get_json(url, token)
@@ -319,10 +323,15 @@ def latest_snapshotted_ancestor(
             run_sha = run.get("head_sha")
             if not run_sha:
                 continue
-            if latest_on_branch is None:
-                latest_on_branch = run_sha  # most recent snapshot on this branch
             scanned += 1
             created_at = run.get("created_at")
+            # Latest snapshot tip = greatest run start time, independent of API order
+            # (not reliably newest-first) and of the compare short-circuit below.
+            if latest_on_branch is None or _epoch(created_at) > _epoch(latest_created_at):
+                latest_on_branch = run_sha
+                latest_created_at = created_at or ""
+            if closest_found:
+                continue  # closest ancestor already known; only the tip metadata matters now
             # compare/{run_sha}...{base_sha}: "ahead" = base_sha is ahead of run_sha
             # = run_sha is an ancestor of base_sha; ahead_by = commits run is behind.
             status, behind_base = _compare_ancestry(repository, run_sha, base_sha, token)
@@ -333,10 +342,9 @@ def latest_snapshotted_ancestor(
             if best is None or key < (best[0], best[1]):
                 best = (behind_base, -_epoch(created_at), run_sha, run.get("id"))
             if behind_base == 0:
-                done = True  # base_sha is itself snapshotted — no closer ancestor exists
-                break
-        if done:
-            break
+                closest_found = True  # base_sha is itself snapshotted — no closer ancestor exists
+        if closest_found:
+            done = True  # stop paginating for compares; this page's tip metadata is scanned
         match = re.search(r'<([^>]+)>;\s*rel="next"', headers.get("Link", "") or "")
         url = match.group(1) if match else None
     _log_candidates(candidates, best[2] if best else None)
@@ -794,6 +802,14 @@ def _staleness_advice(
     a big single-PR dependency change) that rebasing will not fix, so the manual
     override label is the right escape hatch.
     """
+    short = effective_base[:12]
+    if behind_count is None and age_days is None:
+        # Probe failed: staleness is unknown, so do not claim the base is current.
+        return (
+            f"Could not determine how stale the effective base `{short}` is (the staleness "
+            f"probe failed). If this is a known GitHub compare-size limit or outage, add the "
+            f"`{override_label}` label and re-run to bypass (this never bypasses a real finding)."
+        )
     stale = (behind_count is not None and behind_count >= _STALE_BEHIND_COMMITS) or (
         age_days is not None and age_days >= _STALE_AGE_DAYS
     )
@@ -801,7 +817,6 @@ def _staleness_advice(
         f"{behind_count} commit(s)" if behind_count is not None else "an unknown number of commits"
     )
     age_txt = f"{int(age_days)} day(s) old" if age_days is not None else "of unknown age"
-    short = effective_base[:12]
     if stale:
         return (
             f"The effective base `{short}` is {behind_txt} behind this PR's base and {age_txt}, "
@@ -868,21 +883,20 @@ def fail_closed(repository, pr_number, token, override_label, reason, summary_pa
             )
         sys.exit(0)
 
-    msg = (
-        f"Vulnerability gate FAILED CLOSED: {reason}. Add the `{override_label}` label and "
-        f"re-run to bypass if this is a known GitHub outage. {_DEVOPS_TEAM}"
+    # One remediation only: on the 502 path `advice` already selects rebase-or-override,
+    # so it must not be stacked on top of the generic override instruction.
+    remediation = advice or (
+        f"If this is a known GitHub outage, add the `{override_label}` label and "
+        f"re-run the job to bypass."
     )
-    print(f"::error::{msg}")
-    if advice:
-        print(f"::warning::Diagnosis: {advice}")
-    advice_md = f"\n\n**Diagnosis:** {advice}" if advice else ""
+    print(f"::error::Vulnerability gate FAILED CLOSED: {reason}. {_DEVOPS_TEAM}")
+    print(f"::warning::{remediation}")
     _write_summary(
         summary_path,
         f"### 🚨 Vulnerability gate failed closed\n\n"
         f"**Reason:** {reason}\n\n"
         f"The gate blocks when it cannot confirm the PR introduces no new vulnerable "
-        f"dependencies. If this is a known GitHub outage, add the `{override_label}` label "
-        f"and re-run the job to bypass. {_DEVOPS_TEAM}{advice_md}",
+        f"dependencies. {remediation} {_DEVOPS_TEAM}",
     )
     if pr_number:
         _upsert_comment(
@@ -890,8 +904,7 @@ def fail_closed(repository, pr_number, token, override_label, reason, summary_pa
             f"## 🚨 Vulnerability Gate could not verify this PR\n\n"
             f"**Reason:** {reason}\n\n"
             f"The gate blocks when it cannot confirm this PR introduces no new vulnerable "
-            f"dependencies (fail-closed). If this is a known GitHub outage, add the "
-            f"`{override_label}` label and **re-run the job** to bypass. {_DEVOPS_TEAM}{advice_md}",
+            f"dependencies (fail-closed). {remediation} {_DEVOPS_TEAM}",
         )
     sys.exit(1)
 
