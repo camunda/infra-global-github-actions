@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.15 (2026-10-10)
+
+## What's Changed
+* chore(deps): update mikefarah/yq action to v4.54.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/845
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.132.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/846
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/847
+* chore: include the build-duration-milliseconds github runner monitoring in the reusable workflow by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/751
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/848
+* fix(submit-test-status): use $RUNNER_TEMP so container jobs work by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/850
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/851
+* chore(deps): update actions/download-artifact action to v8.0.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/855
+* chore(deps): update actions/upload-artifact action to v7.0.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/856
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.5.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/857
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.149.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/860
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/preview-env-1.0.14...preview-env-1.0.15
+
 ## 1.0.14 (2026-10-02)
 
 ## What's Changed
