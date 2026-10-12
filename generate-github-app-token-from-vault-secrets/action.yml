@@ -66,7 +66,7 @@ inputs:
     required: false
     type: string
   read-only:
-    description: "If `true`, the token can only read repository contents (`contents: read`), even when the GitHub App has more permissions. If `false` (default), the token has every permission granted to the GitHub App. Other values fail the action."
+    description: "If `true`, the token can only read repository contents (`contents: read`), even when the GitHub App has more permissions. If `false` (default), the token has every permission granted to the GitHub App."
     required: false
     default: false
     type: boolean
@@ -127,25 +127,6 @@ runs:
         echo "::error::Conflicting input(s) for vault-auth-method='${VAULT_AUTH_METHOD}': ${conflicting[*]} must not be set (provide only the inputs for the selected auth method)"
         exit 1
       fi
-
-  - name: Validate read-only input
-    id: permissions
-    shell: bash
-    env:
-      READ_ONLY: ${{ inputs.read-only }}
-    run: |
-      case "${READ_ONLY,,}" in
-        true)
-          echo "contents=read" >> "${GITHUB_OUTPUT}"
-          ;;
-        false | "")
-          echo "contents=" >> "${GITHUB_OUTPUT}"
-          ;;
-        *)
-          echo "::error::Unsupported read-only '${READ_ONLY}' (expected 'true' or 'false')"
-          exit 1
-          ;;
-      esac
 
   - name: Import the GitHub App ID from vault
     id: app-id
@@ -217,4 +198,4 @@ runs:
       skip-token-revoke: ${{ inputs.skip-token-revoke }}
       owner: ${{ inputs.owner }}
       repositories: ${{ env.repositories }}
-      permission-contents: ${{ steps.permissions.outputs.contents }}
+      permission-contents: ${{ inputs.read-only == 'true' && 'read' || '' }}
