@@ -434,6 +434,30 @@ def test_staleness_advice_stale_leads_with_rebase_override_fallback():
     assert advice.lower().index("rebase") < advice.index("ci:vuln-gate-override")  # rebase first
 
 
+def test_staleness_advice_stale_but_already_freshest_snapshot_recommends_override():
+    # Base is stale by age but IS the latest snapshot on the branch → there is nothing
+    # newer to rebase onto, so advise override rather than a futile rebase.
+    advice = check._staleness_advice(
+        "6d3cb6c5abcd", "main", 10, 5.0, "ci:vuln-gate-override",
+        latest_on_branch="6d3cb6c5abcd",
+    )
+    assert "already the freshest snapshot" in advice
+    assert "ci:vuln-gate-override" in advice
+    assert "Rebase this PR" not in advice
+
+
+def test_staleness_advice_stacked_fallback_does_not_recommend_base_ref_rebase():
+    # On the stacked fallback the base came from fallback_ref, so rebasing onto the
+    # (snapshot-less) base_ref can't help and the inflated behind count is not staleness.
+    advice = check._staleness_advice(
+        "aaaa1111bbbb", "feature/parent", 5000, 1.0, "ci:vuln-gate-override",
+        latest_on_branch="aaaa1111bbbb", stacked_pr_fallback=True, fallback_ref="main",
+    )
+    assert "no dependency snapshots" in advice
+    assert "Rebasing onto `feature/parent` will not help" in advice
+    assert "ci:vuln-gate-override" in advice
+
+
 def test_staleness_advice_current_recommends_override():
     # A current base (few commits behind, fresh) → advise override, since rebasing
     # cannot shrink the diff.

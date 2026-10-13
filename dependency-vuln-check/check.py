@@ -793,6 +793,8 @@ def _probe_base_staleness(
 def _staleness_advice(
     effective_base: str, base_ref: str, behind_count: int | None,
     age_days: float | None, override_label: str,
+    latest_on_branch: str | None = None, stacked_pr_fallback: bool = False,
+    fallback_ref: str = "main",
 ) -> str:
     """Pick rebase-vs-override guidance for a dependency-graph/compare 502.
 
@@ -803,8 +805,24 @@ def _staleness_advice(
     the diff is too large even at the freshest snapshot. A current base means the diff
     is large for another reason (e.g. a big single-PR dependency change) that rebasing
     will not fix, so the manual override label is the right escape hatch.
+
+    Two cases override the rebase advice because rebasing cannot help: on the stacked
+    fallback the base came from `fallback_ref` (so `base_ref` has no snapshot to rebase
+    onto, and the probed `behind_count` spans the whole stack, not real staleness); and
+    when `effective_base` is already the freshest snapshot on the branch
+    (`latest_on_branch == effective_base`) there is no newer snapshot to rebase onto.
     """
     short = effective_base[:12]
+    if stacked_pr_fallback:
+        # base_ref has no snapshots, so the base was resolved on fallback_ref; the diff
+        # spans the whole branch stack and rebasing onto base_ref cannot shrink it.
+        return (
+            f"`{base_ref}` has no dependency snapshots, so the effective base `{short}` was taken "
+            f"from `{fallback_ref}` — the diff spans your whole branch stack and likely exceeded "
+            f"GitHub's compare-size limit. Rebasing onto `{base_ref}` will not help; this clears "
+            f"once `{base_ref}` has its own snapshot (e.g. the parent PR merges). To bypass now, "
+            f"add the `{override_label}` label and re-run (this never bypasses a real finding)."
+        )
     if behind_count is None and age_days is None:
         # Probe failed: staleness is unknown, so do not claim the base is current.
         return (
@@ -819,13 +837,24 @@ def _staleness_advice(
         f"{behind_count} commit(s)" if behind_count is not None else "an unknown number of commits"
     )
     age_txt = f"{int(age_days)} day(s) old" if age_days is not None else "of unknown age"
-    if stale:
+    # Rebase only helps if a newer snapshot exists; if the base is already the freshest
+    # snapshot on the branch, there is nothing closer to rebase onto.
+    no_fresher_snapshot = latest_on_branch is not None and latest_on_branch == effective_base
+    if stale and not no_fresher_snapshot:
         return (
             f"The effective base `{short}` is {behind_txt} behind this PR's base and {age_txt}, "
             f"so the dependency diff is large and likely exceeded GitHub's compare-size limit. "
             f"**Rebase this PR onto the latest `{base_ref}` (or merge it in)** to move to a fresher "
             f"snapshot, shrink the diff, and clear the 502. If the diff is still too large even at "
             f"the freshest snapshot, add the `{override_label}` label and re-run to bypass (this "
+            f"never bypasses a real finding)."
+        )
+    if stale and no_fresher_snapshot:
+        return (
+            f"The effective base `{short}` is {behind_txt} behind this PR's base and {age_txt}, but "
+            f"it is already the freshest snapshot on `{base_ref}`, so rebasing will not move to a "
+            f"newer one — one appears only once `{base_ref}` next runs the snapshot workflow on a "
+            f"qualifying change. To bypass now, add the `{override_label}` label and re-run (this "
             f"never bypasses a real finding)."
         )
     return (
@@ -1045,7 +1074,10 @@ def main() -> None:
             behind = age_days = None
             if e.status == 502:
                 behind, age_days = _probe_base_staleness(repository, effective_base, base_sha, token)
-                advice = _staleness_advice(effective_base, base_ref, behind, age_days, override_label)
+                advice = _staleness_advice(
+                    effective_base, base_ref, behind, age_days, override_label,
+                    latest_on_branch, stacked_pr_fallback, fallback_ref,
+                )
             outcome = "502" if e.status == 502 else "err"
             _emit_compare_observation(
                 summary_path, outcome, latency_ms, None, effective_base, head_sha,
