@@ -38,7 +38,7 @@ version shows up as `added` in the diff and is evaluated normally.
     snapshot-workflow: maven-dependency-snapshot.yml
     # optional — defaults shown
     fallback-base-ref: main
-    max-snapshot-lookback: "30"
+    max-snapshot-lookback: "50"
     override-label: ci:vuln-gate-override
     config-file: .github/dependency-review-config.json
     fail-on-severity: high
@@ -56,7 +56,7 @@ version shows up as `added` in the diff and is evaluated normally.
 | `fallback-base-ref` | no | `main` | Branch to fall back to when `base-ref` has no dependency snapshots (e.g. stacked PRs targeting a feature branch). The gate searches this branch for the nearest snapshotted ancestor of `base-sha` instead of failing closed, and posts a notice to the PR comment |
 | `snapshot-workflow` | yes | — | Filename of the workflow that submits the base snapshot (e.g. `maven-dependency-snapshot.yml`). Its successful push-event runs are scanned to resolve the effective base |
 | `head-snapshot-succeeded` | no | `""` | Whether the job that submits the PR **head** snapshot succeeded. Pass `'true'`/`'success'` (e.g. `needs.pr-maven-snapshot.result == 'success'`). **Any other value** (`'false'`, or a raw result like `'failure'`/`'cancelled'`/`'skipped'`) **fails closed** — an un-submitted head SBOM leaves the head side empty → a real new vuln would silently pass, so an unverified head must block, not no-op. Unset skips the check (backward compatible) |
-| `max-snapshot-lookback` | no | `30` | How many recent successful snapshot runs to scan when resolving the effective base |
+| `max-snapshot-lookback` | no | `50` | How many recent successful snapshot runs to scan when resolving the effective base. The whole window is scanned to pick the **newest** ancestor (fewest commits behind `base-sha`), independent of API ordering; a busy branch with more than this many newer-than-base runs could still push the nearest ancestor out of the window |
 | `override-label` | no | `ci:vuln-gate-override` | PR label that bypasses the gate **only** when it cannot verify the PR (outage / no-ancestor). Never bypasses a real finding |
 | `config-file` | no | `.github/dependency-review-config.json` | Path to the JSON config holding `allow-ghsas` |
 | `fail-on-severity` | no | `high` | Min severity (`low`/`moderate`/`high`/`critical`) that blocks when **no fix** is available |
@@ -94,12 +94,33 @@ tree as `added` (pre-existing dependencies falsely surface as new). To avoid thi
 resolves `base.sha` to the most recent commit on `base-ref` that has a submitted snapshot and
 is an **ancestor-or-equal** of `base.sha`, then diffs from there.
 
+Among the snapshot runs in the `max-snapshot-lookback` window the resolver picks the **newest**
+ancestor — the one fewest commits behind `base.sha` — rather than blindly trusting the first run
+the API returns. GitHub does not guarantee the runs come back strictly newest-first, and a
+transient server-side reorder that put an old run at the top would otherwise resolve a months-old
+base, producing a huge diff that trips GitHub's `dependency-graph/compare` size limit (a 502).
+The snapshot run's start time is used only as a tiebreak between equidistant ancestors, never to
+trade away ancestry. The raw candidate list (sha, run id, commits-behind) is logged every run. The
+selection is independent of the order the API returns runs in — every run in the window is compared
+and the fewest-commits-behind ancestor wins — but the window is bounded by `max-snapshot-lookback`,
+so a backlog of more than that many newer-than-base runs can still push the nearest ancestor out of
+view; widen `max-snapshot-lookback` if a very old base must be resolved.
+
+When the `dependency-graph/compare` call still returns a **502** (its diff exceeded GitHub's
+compare-size limit), the gate fails closed and attaches targeted guidance: if the effective base
+is stale (far behind `base.sha` or old), it tells the author to **rebase** onto the latest
+`base-ref` to move to a fresher snapshot and shrink the diff — and, as a fallback, points to the
+`override-label` for the rare case the diff is too large even at the freshest snapshot; if the base
+is current, rebasing cannot help, so it points straight to the `override-label` escape hatch. The
+502 always fails the gate — this only picks the most actionable message.
+
 The gate **fails closed** when it cannot verify a PR:
 
 | Situation | Result |
 |-----------|--------|
 | GitHub API error, transient | retried (3 attempts, exponential backoff) |
 | API error survives retries | **fail closed** (block), reason named in the log |
+| `dependency-graph/compare` returns 502 (diff exceeded GitHub's compare-size limit) | **fail closed** (block) with rebase-vs-override guidance based on how stale the effective base is |
 | No snapshotted ancestor on `base-ref`; `base-ref` differs from `fallback-base-ref` | retry on `fallback-base-ref`; notice posted to PR comment |
 | No snapshotted ancestor on either branch within `max-snapshot-lookback` | **fail closed** (block) |
 | `head-snapshot-succeeded` reported as `'false'` (head SBOM submission failed) | **fail closed** (block) |
@@ -109,6 +130,19 @@ The gate **fails closed** when it cannot verify a PR:
 
 Every run writes a summary trail (resolved base, runs scanned, verdict). Failure reasons are
 named explicitly in the log (rate-limit vs 5xx vs timeout vs permissions vs not-found).
+
+Every run that reaches the dependency compare also emits one grep-stable observability line (to
+the log and the step summary) to trend the head-graph compare toward GitHub's ~10s ceiling —
+forensics, not alerting. Runs that fail closed before the compare (no ancestor resolved, head
+submission failed) exit earlier and do not emit it:
+
+```
+VULN_GATE_COMPARE outcome=<200|502|err> latency_ms=<int> changed_deps=<int|na> effective_base=<sha> head=<sha> base=<pr_base_sha> effective_base_age_days=<float|na> behind=<int|na>
+```
+
+`latency_ms` and `changed_deps` (the number of changed dependency entries in the compare) come
+free from the call the gate already makes; `effective_base_age_days`/`behind` are populated only
+on the 502 path, where the staleness probe already computed them (never with an extra request).
 
 ### Head-side verification
 
