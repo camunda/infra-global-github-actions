@@ -4,7 +4,7 @@ This composite Github Action (GHA) is intended to be used by Camunda teams for s
 
 ## Usage
 
-This composite GHA can be used in any repository that was set up to provide credentials for accessing the central Google Big Query (BQ) database (credentials via Vault).
+This composite GHA can be used in any repository set up to access the central Google Big Query (BQ) database through Workload Identity Federation (WIF) or service account JSON credentials.
 
 ### Inputs
 
@@ -14,10 +14,20 @@ This composite GHA can be used in any repository that was set up to provide cred
 | build_duration_millis | Optional non-negative build duration in milliseconds. Overrides the automatic duration from `start-build-monitor`. |
 | user_reason          | Optional string (200 chars max) the user can submit to indicate the reason why a build has ended with a certain build status , e.g. `"flaky-tests"` |
 | user_description     | Optional string (1000 chars max) the user can submit to provide details on the user_reason, e.g. a list of flaky tests |
-| gcp_credentials_json | Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file |
+| gcp_credentials_json | Optional service account JSON credentials allowed to publish to Big Query. When non-empty, takes precedence over WIF. |
+| gcp_workload_identity_provider | Optional full Workload Identity Provider resource name. Defaults to the shared Camunda CI provider; ignored when JSON credentials are supplied. |
+| gcp_service_account | Optional service account email to impersonate for WIF. Defaults to the production CI Analytics writer; ignored when JSON credentials are supplied. |
 | job_name_override    | Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB`, useful e.g. for matrix builds |
+| big_query_table_name | Optional destination in `project:dataset.table` format for infrastructure testing. Defaults to `ci-30-162810:prod_ci_analytics.build_status_v2`. |
 
-Please check out Camunda's [Github Actions Recipes](https://github.com/camunda/github-actions-recipes#secrets=) for how to retrieve secrets from Vault.
+### Authentication
+
+Authentication is selected by whether `gcp_credentials_json` is non-empty:
+
+- **JSON credentials:** pass `gcp_credentials_json`. Both WIF inputs are ignored, including defaults and caller overrides. Existing callers require no changes and do not need `id-token: write` for Google authentication. See Camunda's [Github Actions Recipes](https://github.com/camunda/github-actions-recipes#secrets=) for retrieving credentials from Vault.
+- **Workload Identity Federation (default):** omit `gcp_credentials_json` and grant the calling job `id-token: write`. The defaults use the shared Camunda CI provider and production CI Analytics writer account. Override `gcp_workload_identity_provider` and `gcp_service_account` for custom WIF configuration. The provider must trust the calling GitHub repository, and its federated identity must have `roles/iam.workloadIdentityUser` on the service account. The service account also needs permission to insert rows into the target BigQuery table.
+
+The default WIF configuration is for Camunda repositories. WIF uses service account impersonation to generate the access token for the BigQuery request. Authentication failures do not trigger a fallback to the other method.
 
 ### Behavior
 
@@ -66,6 +76,8 @@ It is the task of the user to integrate this action into their GHA workflows by 
 
 Since there are multiple ways of integrating and using the `submit-build-status` into your workflows depending on your requirements, the below is just a simple example:
 
+#### JSON credentials
+
 ```yaml
 ---
 name: ci
@@ -97,4 +109,44 @@ jobs:
         gcp_credentials_json: "${{ secrets.YOUR_GCP_CREDENTIALS }}"
         # user_reason: "maybe-flaky-tests"
         # user_description: "test1,test2,test23,test42"
+```
+
+#### Workload Identity Federation
+
+Use the default WIF configuration without supplying Google credentials:
+
+```yaml
+---
+name: ci
+
+on: [pull_request]
+
+jobs:
+  successful-job:
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+    - uses: camunda/infra-global-github-actions/start-build-monitor@main
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Testing
+      run: echo Hello World
+
+    - uses: camunda/infra-global-github-actions/submit-build-status@main
+      if: always()
+      continue-on-error: true
+      with:
+        build_status: "${{ job.status }}"
+```
+
+For custom WIF configuration, override the inputs in the submission step. For testing, also override `big_query_table_name`: changing the identity alone does not change the destination.
+
+```yaml
+with:
+  build_status: "${{ job.status }}"
+  gcp_workload_identity_provider: "${{ vars.TEST_WIF_PROVIDER }}"
+  gcp_service_account: "${{ vars.TEST_SERVICE_ACCOUNT }}"
+  big_query_table_name: 'test-project:test_dataset.build_status_v2'
 ```

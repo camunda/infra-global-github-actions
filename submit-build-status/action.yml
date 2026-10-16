@@ -20,8 +20,16 @@ inputs:
     default: ''
 
   gcp_credentials_json:
-    description: Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file.
-    required: true
+    description: Optional credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file. Takes precedence over WIF.
+    required: false
+  gcp_workload_identity_provider:
+    description: Full Workload Identity Provider resource name. Used only when gcp_credentials_json is empty.
+    required: false
+    default: 'projects/502682377344/locations/global/workloadIdentityPools/ci-gha-workload-pool/providers/gha-provider'
+  gcp_service_account:
+    description: Google Cloud service account email to impersonate for WIF; must be allowed to publish to Big Query. Used only when gcp_credentials_json is empty.
+    required: false
+    default: 'prod-ci-analytics-writer@ci-30-162810.iam.gserviceaccount.com'
 
   job_name_override:
     description: Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB` useful e.g. for matrix builds
@@ -60,6 +68,9 @@ runs:
       BUILD_DURATION_MILLIS: "${{ inputs.build_duration_millis }}"
       USER_REASON: "${{ inputs.user_reason }}"
       USER_DESCRIPTION: "${{ inputs.user_description }}"
+      HAS_GCP_CREDENTIALS_JSON: "${{ inputs.gcp_credentials_json != '' }}"
+      GCP_WORKLOAD_IDENTITY_PROVIDER: "${{ inputs.gcp_workload_identity_provider }}"
+      GCP_SERVICE_ACCOUNT: "${{ inputs.gcp_service_account }}"
     run: |
       if [ "$BUILD_STATUS" == "" ]; then
         echo "Need to specify a build status that is not empty!"
@@ -75,6 +86,23 @@ runs:
         echo "Specified user description has more than 1000 characters!"
         exit 1
       fi
+
+      if [ "$HAS_GCP_CREDENTIALS_JSON" = "true" ]; then
+        GCP_WORKLOAD_IDENTITY_PROVIDER=""
+        GCP_SERVICE_ACCOUNT=""
+      else
+        if [[ -z "${GCP_WORKLOAD_IDENTITY_PROVIDER//[[:space:]]/}" ||
+              -z "${GCP_SERVICE_ACCOUNT//[[:space:]]/}" ]]; then
+          echo "::error::gcp_workload_identity_provider and gcp_service_account must be non-empty when gcp_credentials_json is not provided."
+          exit 1
+        fi
+        if [[ "$GCP_WORKLOAD_IDENTITY_PROVIDER$GCP_SERVICE_ACCOUNT" == *$'\n'* ||
+              "$GCP_WORKLOAD_IDENTITY_PROVIDER$GCP_SERVICE_ACCOUNT" == *$'\r'* ]]; then
+          echo "::error::gcp_workload_identity_provider and gcp_service_account must be single-line values."
+          exit 1
+        fi
+      fi
+
       if [ -n "$BUILD_DURATION_MILLIS" ]; then
         MAX_BUILD_DURATION_MILLIS=259200000  # 72 hours
         if ! [[ "$BUILD_DURATION_MILLIS" =~ ^[0-9]+$ ]]; then
@@ -93,13 +121,19 @@ runs:
           fi
         fi
       fi
-      printf 'build_duration_millis=%s\n' "$BUILD_DURATION_MILLIS" >> "$GITHUB_OUTPUT"
+      {
+        printf 'build_duration_millis=%s\n' "$BUILD_DURATION_MILLIS"
+        printf 'workload_identity_provider=%s\n' "$GCP_WORKLOAD_IDENTITY_PROVIDER"
+        printf 'service_account=%s\n' "$GCP_SERVICE_ACCOUNT"
+      } >> "$GITHUB_OUTPUT"
 
   - name: Login to Google Cloud
     id: auth
     uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
     with:
       credentials_json: '${{ inputs.gcp_credentials_json }}'
+      workload_identity_provider: '${{ steps.validate.outputs.workload_identity_provider }}'
+      service_account: '${{ steps.validate.outputs.service_account }}'
       token_format: 'access_token'
 
   - name: Collect resource usage metrics
