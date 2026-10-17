@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.14 (2026-10-17)
+
+## What's Changed
+* chore(deps): update actions/setup-node action to v7.1.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/858
+* feat(generate-github-app-token-from-vault-secrets): let callers request a read-only contents token by @slolatte in https://github.com/camunda/infra-global-github-actions/pull/853
+* fix(dependency-vuln-check): pick newest snapshotted ancestor and diagnose compare 502s by @liliancavalet in https://github.com/camunda/infra-global-github-actions/pull/854
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.5.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/863
+* chore(deps): update actions/create-github-app-token action to v3.3.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/864
+* chore(deps): update dependency pre-commit to v4.7.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/865
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/866
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.166.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/867
+
+## New Contributors
+* @slolatte made their first contribution in https://github.com/camunda/infra-global-github-actions/pull/853
+* @liliancavalet made their first contribution in https://github.com/camunda/infra-global-github-actions/pull/854
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/argocd-sync-applications-1.0.13...argocd-sync-applications-1.0.14
+
 ## 1.0.13 (2026-10-10)
 
 ## What's Changed
