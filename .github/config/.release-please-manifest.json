@@ -20,7 +20,7 @@
   "previous-version": "1.0.0",
   "renovate-pr-maintainer": "1.2.0",
   "rerun-failed-run": "1.1.4",
-  "rerun-failed-run/check-annotations-and-logs": "1.0.0",
+  "rerun-failed-run/check-annotations-and-logs": "1.0.1",
   "sanitize-branch-name": "1.0.0",
   "setup-gh-cli": "1.0.0",
   "setup-yarn-cache": "1.0.2",
