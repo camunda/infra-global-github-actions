@@ -15,12 +15,23 @@ ATTEMPT_GH_CLI_FLAG="${ATTEMPT:+--attempt $ATTEMPT}"
 
 # Fetch failed logs of the workflow run, i.e. with an exit status != 0
 
-# shellcheck disable=SC2086
-logs=$(
-  gh run view "$RUN_ID" \
-    ${ATTEMPT_GH_CLI_FLAG} \
-    --exit-status --log-failed || true
-)
+# `--exit-status` makes gh exit non-zero for any failed run, so the exit code cannot tell a
+# download error apart. Retry on gh's own download error instead: swallowing it leaves the
+# logs empty and silently skips the retry (e.g. "stream error: ... CANCEL" on large logs).
+log_errors=$(mktemp)
+trap 'rm -f "$log_errors"' EXIT
+for log_attempt in 1 2 3; do
+  # shellcheck disable=SC2086
+  logs=$(
+    gh run view "$RUN_ID" \
+      ${ATTEMPT_GH_CLI_FLAG} \
+      --exit-status --log-failed 2>"$log_errors" || true
+  )
+  cat "$log_errors" >&2
+  grep -q "failed to get run log" "$log_errors" || break
+  echo "Failed to download the logs (attempt ${log_attempt}/3), retrying..." >&2
+  sleep $((log_attempt * 5))
+done
 
 # Fetch annotations of the workflow run (related jobs)
 # Id of the WorkflowRun object is needed to fetch annotations from GitHub GraphQL API
