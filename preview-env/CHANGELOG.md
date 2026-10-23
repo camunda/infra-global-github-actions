@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.0 (2026-10-23)
+
+## What's Changed
+* fix(rerun-failed-run): retry the failed-logs download instead of swallowing it by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/868
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/869
+* feat(preview-env): add troubleshooting_tips input and mention registry retention by @wollefitz in https://github.com/camunda/infra-global-github-actions/pull/871
+* chore: include new support for workload identity federation on submit-build-status by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/870
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/preview-env-1.0.16...preview-env-1.1.0
+
 ## 1.0.16 (2026-10-17)
 
 ## What's Changed
