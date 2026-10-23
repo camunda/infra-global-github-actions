@@ -23,3 +23,4 @@ If such GitHub token is not provided then the available troubleshooting informat
 | `argocd_arguments`| List of arguments to pass to Argocd command for creating the new application                                   | Yes      | -                       |
 | `argocd_wait_for_sync_timeout`| The time (in seconds) that the action waits for the app to become healthy                          | No       | `1800`                  |
 | `github_token`    | GitHub token is used to authenticate with Teleport to gain additional troubleshooting insights from the cluster | No       | -                       |
+| `troubleshooting_tips`| Markdown that is added to the troubleshooting tips of the failure comment, for hints that only apply to the calling product | No       | -                       |
