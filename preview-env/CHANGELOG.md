@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.1 (2026-10-24)
+
+## What's Changed
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.5.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/873
+* chore(deps): update docker/login-action action to v4.7.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/875
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.181.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/876
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/preview-env-1.1.0...preview-env-1.1.1
+
 ## 1.1.0 (2026-10-23)
 
 ## What's Changed
