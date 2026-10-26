@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.0.15 (2026-10-24)
+
+## What's Changed
+* fix(rerun-failed-run): retry the failed-logs download instead of swallowing it by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/868
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/869
+* feat(preview-env): add troubleshooting_tips input and mention registry retention by @wollefitz in https://github.com/camunda/infra-global-github-actions/pull/871
+* chore: include new support for workload identity federation on submit-build-status by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/870
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/872
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.5.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/873
+* chore(deps): update docker/login-action action to v4.7.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/875
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.181.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/876
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/argocd-sync-applications-1.0.14...argocd-sync-applications-1.0.15
+
 ## 1.0.14 (2026-10-17)
 
 ## What's Changed

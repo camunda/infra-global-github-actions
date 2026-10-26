@@ -1,5 +1,51 @@
 # Changelog
 
+## 1.0.7 (2026-10-24)
+
+## What's Changed
+* fix: stamp CI Analytics report_time in UTC by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/835
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/836
+* chore(deps): update dependency ubuntu to v26 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/832
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.115.9 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/839
+* chore(deps): update argocd cli to v3.5.3 by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/842
+* fix(fossa): retry transient GitHub API errors when fetching job info by @yanavasileva in https://github.com/camunda/infra-global-github-actions/pull/843
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/844
+* chore(deps): update mikefarah/yq action to v4.54.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/845
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.132.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/846
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/847
+* chore: include the build-duration-milliseconds github runner monitoring in the reusable workflow by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/751
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/848
+* fix(submit-test-status): use $RUNNER_TEMP so container jobs work by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/850
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/851
+* chore(deps): update actions/download-artifact action to v8.0.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/855
+* chore(deps): update actions/upload-artifact action to v7.0.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/856
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.5.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/857
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.149.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/860
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/859
+* chore(deps): update actions/setup-node action to v7.1.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/858
+* feat(generate-github-app-token-from-vault-secrets): let callers request a read-only contents token by @slolatte in https://github.com/camunda/infra-global-github-actions/pull/853
+* fix(dependency-vuln-check): pick newest snapshotted ancestor and diagnose compare 502s by @liliancavalet in https://github.com/camunda/infra-global-github-actions/pull/854
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.5.5 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/863
+* chore(deps): update actions/create-github-app-token action to v3.3.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/864
+* chore(deps): update dependency pre-commit to v4.7.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/865
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/866
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.166.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/867
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/862
+* fix(rerun-failed-run): retry the failed-logs download instead of swallowing it by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/868
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/869
+* feat(preview-env): add troubleshooting_tips input and mention registry retention by @wollefitz in https://github.com/camunda/infra-global-github-actions/pull/871
+* chore: include new support for workload identity federation on submit-build-status by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/870
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/872
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.5.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/873
+* chore(deps): update docker/login-action action to v4.7.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/875
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.181.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/876
+
+## New Contributors
+* @slolatte made their first contribution in https://github.com/camunda/infra-global-github-actions/pull/853
+* @liliancavalet made their first contribution in https://github.com/camunda/infra-global-github-actions/pull/854
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/build-docker-image-1.0.6...build-docker-image-1.0.7
+
 ## 1.0.6 (2026-09-21)
 
 ## What's Changed
