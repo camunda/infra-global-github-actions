@@ -134,6 +134,9 @@
     "wait-for-required-checks": {
       "package-name": "wait-for-required-checks"
     },
+    "workflow-policy": {
+      "package-name": "workflow-policy"
+    },
     "workflow-run-stats": {
       "package-name": "workflow-run-stats"
     },

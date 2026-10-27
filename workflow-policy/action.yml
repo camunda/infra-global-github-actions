@@ -1,0 +1,80 @@
+---
+name: Workflow policy check
+description: Check the caller repository's workflow jobs for configured required actions
+
+inputs:
+  config-path:
+    description: Policy configuration path relative to the caller checkout
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: '3.13'
+
+    - name: Install Python dependency
+      env:
+        ACTION_DIRECTORY: ${{ github.action_path }}
+      shell: bash
+      run: |
+        python -m pip install --disable-pip-version-check \
+          --requirement "${ACTION_DIRECTORY}/requirements.txt"
+
+    - name: Install Conftest
+      id: tooling
+      env:
+        # renovate: datasource=github-tags depName=open-policy-agent/conftest
+        CONFTEST_VERSION: '0.71.1'
+      shell: bash
+      run: |
+        case "$(uname -s)" in
+          Linux) os=Linux ;;
+          Darwin) os=Darwin ;;
+          *) echo "workflow-policy: unsupported operating system" >&2; exit 1 ;;
+        esac
+        case "$(uname -m)" in
+          x86_64 | amd64) arch=x86_64 ;;
+          arm64 | aarch64) arch=arm64 ;;
+          *) echo "workflow-policy: unsupported architecture" >&2; exit 1 ;;
+        esac
+
+        tooling="$(mktemp -d "${RUNNER_TEMP}/workflow-policy.XXXXXX")"
+        asset="conftest_${CONFTEST_VERSION}_${os}_${arch}.tar.gz"
+        release="https://github.com/open-policy-agent/conftest/releases/download/v${CONFTEST_VERSION}"
+        for file in "${asset}" checksums.txt; do
+          curl --fail --silent --show-error --location \
+            --proto '=https' --proto-redir '=https' \
+            --connect-timeout 10 --max-time 60 \
+            --retry 5 --retry-delay 2 --retry-max-time 60 --retry-all-errors \
+            --output "${tooling}/${file}" "${release}/${file}"
+        done
+
+        if command -v sha256sum >/dev/null 2>&1; then
+          verifier=(sha256sum)
+        else
+          verifier=(shasum -a 256)
+        fi
+        (
+          cd "${tooling}" || exit 1
+          awk -v asset="${asset}" '
+            $2 == asset && length($1) == 64 && $1 ~ /^[[:xdigit:]]+$/ { print; found = 1 }
+            END { exit !found }
+          ' checksums.txt | "${verifier[@]}" -c -
+        )
+        mkdir "${tooling}/bin"
+        tar -xzf "${tooling}/${asset}" -C "${tooling}/bin" conftest
+        printf 'directory=%s\n' "${tooling}" >> "${GITHUB_OUTPUT}"
+
+    - name: Validate caller workflows
+      env:
+        ACTION_DIRECTORY: ${{ github.action_path }}
+        TOOLING_DIRECTORY: ${{ steps.tooling.outputs.directory }}
+        CONFIG_PATH: ${{ inputs.config-path }}
+      shell: bash
+      run: |
+        export PATH="${TOOLING_DIRECTORY}/bin:${PATH}"
+        python "${ACTION_DIRECTORY}/check.py" \
+          --root "${GITHUB_WORKSPACE}" --config "${CONFIG_PATH}"
