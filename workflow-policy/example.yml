@@ -1,0 +1,13 @@
+---
+required-actions:
+  #- actions/checkout
+  - start-build-monitoring
+  - submit-build-status
+
+exceptions:
+  - workflow: "*"
+    jobs:
+      - notify
+      - notify-on-failure
+      - notify-on-success
+    reason: Notification-only jobs do not require checkout
