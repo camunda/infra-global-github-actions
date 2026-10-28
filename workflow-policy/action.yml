@@ -6,6 +6,18 @@ inputs:
   config-path:
     description: Policy configuration path relative to the caller checkout
     required: true
+  write-summary:
+    description: Append the job table to the GitHub job summary, including on failure
+    default: 'true'
+    required: false
+
+outputs:
+  report-path:
+    description: Path to the JSON report on the current runner
+    value: ${{ steps.check.outputs.report-path }}
+  summary-path:
+    description: Path to the Markdown table on the current runner
+    value: ${{ steps.check.outputs.summary-path }}
 
 runs:
   using: composite
@@ -69,6 +81,7 @@ runs:
         printf 'directory=%s\n' "${tooling}" >> "${GITHUB_OUTPUT}"
 
     - name: Validate caller workflows
+      id: check
       env:
         ACTION_DIRECTORY: ${{ github.action_path }}
         TOOLING_DIRECTORY: ${{ steps.tooling.outputs.directory }}
@@ -76,5 +89,19 @@ runs:
       shell: bash
       run: |
         export PATH="${TOOLING_DIRECTORY}/bin:${PATH}"
+        report_directory="${TOOLING_DIRECTORY}/report"
+        printf 'report-path=%s/report.json\n' "${report_directory}" >> "${GITHUB_OUTPUT}"
+        printf 'summary-path=%s/summary.md\n' "${report_directory}" >> "${GITHUB_OUTPUT}"
         python "${ACTION_DIRECTORY}/check.py" \
-          --root "${GITHUB_WORKSPACE}" --config "${CONFIG_PATH}"
+          --root "${GITHUB_WORKSPACE}" --config "${CONFIG_PATH}" \
+          --report-dir "${report_directory}"
+
+    - name: Write job summary
+      if: ${{ always() && inputs.write-summary == 'true' && steps.check.outputs.summary-path != '' }}
+      env:
+        SUMMARY_PATH: ${{ steps.check.outputs.summary-path }}
+      shell: bash
+      run: |
+        if [[ -f "${SUMMARY_PATH}" ]]; then
+          cat "${SUMMARY_PATH}" >> "${GITHUB_STEP_SUMMARY}"
+        fi
