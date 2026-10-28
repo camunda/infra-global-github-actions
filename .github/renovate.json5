@@ -83,7 +83,6 @@
         "argoproj/argo-cd",
         "kubernetes-sigs/gateway-api",
         "public.ecr.aws/gravitational/teleport-ent-distroless",
-        "fossas/fossa-cli",
         // the pre-commit tool itself (.tool-versions), resolved by Renovate's
         // asdf manager via the github-tags datasource with this packageName,
         // not the bare "pre-commit" string
@@ -105,6 +104,22 @@
       matchPackageNames: [
         "actions/setup-python",
       ],
+      addLabels: ["automerge"],
+      automerge: true,
+    },
+    // Gated by .github/workflows/test-fossa.yml
+    {
+      matchUpdateTypes: ["minor", "patch"],
+      matchPackageNames: [
+        "fossas/fossa-cli",
+      ],
+      addLabels: ["automerge"],
+      automerge: true,
+    },
+    // Smoketest fixture, gated by .github/workflows/test-fossa.yml
+    {
+      matchFileNames: ["fossa/smoketest/**"],
+      matchUpdateTypes: ["major", "minor", "patch"],
       addLabels: ["automerge"],
       automerge: true,
     },

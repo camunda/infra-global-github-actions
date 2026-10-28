@@ -1,0 +1,8 @@
+{
+  "name": "fossa-smoketest-fixture",
+  "private": true,
+  "description": "Fixture scanned by .github/workflows/test-fossa.yml; one MIT dependency, zero transitives",
+  "dependencies": {
+    "ms": "2.1.3"
+  }
+}
