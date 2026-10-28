@@ -89,7 +89,6 @@ jobs:
       with:
         api-key: ${{ steps.fossa-login.outputs.api-key }}
         branch: ${{ steps.info.outputs.base-ref }}
-        configuration-file: ${{ steps.base.outputs.path }}/.fossa.yml
         path: ${{ steps.base.outputs.path }}
         revision-id: ${{ steps.info.outputs.base-revision }}
     - name: Analyze head revision
@@ -97,7 +96,6 @@ jobs:
       with:
         api-key: ${{ steps.fossa-login.outputs.api-key }}
         branch: ${{ steps.info.outputs.head-ref }}
-        configuration-file: ${{ env.FIXTURE_PATH }}/.fossa.yml
         path: ${{ env.FIXTURE_PATH }}
         revision-id: ${{ steps.info.outputs.head-revision }}
     - name: Wait for base scan
@@ -122,7 +120,6 @@ jobs:
         api-key: ${{ steps.fossa-login.outputs.api-key }}
         base-ref: ${{ steps.info.outputs.base-ref }}
         base-revision: ${{ steps.info.outputs.base-revision }}
-        configuration-file: ${{ env.FIXTURE_PATH }}/.fossa.yml
         path: ${{ env.FIXTURE_PATH }}
         project: ${{ env.PROJECT_LOCATOR }}
         revision: ${{ steps.info.outputs.head-revision }}
