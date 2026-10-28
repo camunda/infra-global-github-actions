@@ -1,0 +1,155 @@
+---
+# End-to-end smoketest of the fossa/* actions against fossa/smoketest; gates Renovate automerge.
+name: Test FOSSA
+
+on:
+  pull_request:
+    paths:
+    - 'fossa/**'
+    - '.github/workflows/test-fossa.yml'
+
+permissions: {}
+
+env:
+  FIXTURE_PATH: fossa/smoketest
+  # custom+<FOSSA org ID>/<project.id from fossa/smoketest/.fossa.yml>
+  PROJECT_LOCATOR: custom+50756/camunda/infra-global-github-actions-fossa-smoketest
+
+jobs:
+  test-fossa-setup:
+    strategy:
+      fail-fast: false
+      matrix:
+        label: ["ubuntu-26.04", "ubuntu-24.04-arm"]  # no 26.04 GitHub-hosted arm64 image exists
+    runs-on: ${{ matrix.label }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Install FOSSA CLI
+      uses: ./fossa/setup
+    - name: Check that the default version is installed
+      run: |
+        expected=$(yq '.inputs.version.default' fossa/setup/action.yml)
+        actual=$(fossa --version)
+        echo "${actual}"
+        if [[ "${actual}" != *"version ${expected} "* ]]; then
+          echo "::error::Expected FOSSA CLI ${expected}, got: ${actual}"
+          exit 1
+        fi
+
+  test-fossa-scan:
+    # Forked pull requests get no OIDC token, so they cannot log in to FOSSA
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-26.04
+    timeout-minutes: 30
+    permissions:
+      actions: read  # fossa/info lists workflow runs and jobs
+      contents: read
+      id-token: write  # GitHub OIDC token for the FOSSA token exchange
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Check out base revision
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        ref: ${{ github.event.pull_request.base.sha }}
+        path: base
+        persist-credentials: false
+        sparse-checkout: ${{ env.FIXTURE_PATH }}
+    - name: Log in to FOSSA
+      id: fossa-login
+      uses: ./fossa/oidc-login
+      with:
+        provider-id: '81'
+        username: ci-camunda-infra
+        # wait-for-scan, pr-check and get-issues call the FOSSA API
+        push-only: 'false'
+    - name: Install FOSSA CLI
+      uses: ./fossa/setup
+    - name: Get context info
+      id: info
+      uses: ./fossa/info
+
+    # pr-check needs a scanned base revision; a base without the fixture scans the PR's fixture.
+    - name: Select base fixture
+      id: base
+      run: |
+        if [[ -f "base/${FIXTURE_PATH}/.fossa.yml" ]]; then
+          echo "path=base/${FIXTURE_PATH}" >> "$GITHUB_OUTPUT"
+        else
+          echo "path=${FIXTURE_PATH}" >> "$GITHUB_OUTPUT"
+        fi
+    - name: Analyze base revision
+      uses: ./fossa/analyze
+      with:
+        api-key: ${{ steps.fossa-login.outputs.api-key }}
+        branch: ${{ steps.info.outputs.base-ref }}
+        path: ${{ steps.base.outputs.path }}
+        revision-id: ${{ steps.info.outputs.base-revision }}
+    - name: Analyze head revision
+      uses: ./fossa/analyze
+      with:
+        api-key: ${{ steps.fossa-login.outputs.api-key }}
+        branch: ${{ steps.info.outputs.head-ref }}
+        path: ${{ env.FIXTURE_PATH }}
+        revision-id: ${{ steps.info.outputs.head-revision }}
+    - name: Wait for base scan
+      uses: ./fossa/wait-for-scan
+      with:
+        api-key: ${{ steps.fossa-login.outputs.api-key }}
+        project-id: ${{ env.PROJECT_LOCATOR }}
+        branch: ${{ steps.info.outputs.base-ref }}
+        revision-id: ${{ steps.info.outputs.base-revision }}
+        poll-interval: '10'
+    - name: Wait for head scan
+      uses: ./fossa/wait-for-scan
+      with:
+        api-key: ${{ steps.fossa-login.outputs.api-key }}
+        project-id: ${{ env.PROJECT_LOCATOR }}
+        branch: ${{ steps.info.outputs.head-ref }}
+        revision-id: ${{ steps.info.outputs.head-revision }}
+        poll-interval: '10'
+    - name: Check Pull Request for new License Issues
+      uses: ./fossa/pr-check
+      with:
+        api-key: ${{ steps.fossa-login.outputs.api-key }}
+        base-ref: ${{ steps.info.outputs.base-ref }}
+        base-revision: ${{ steps.info.outputs.base-revision }}
+        path: ${{ env.FIXTURE_PATH }}
+        project: ${{ env.PROJECT_LOCATOR }}
+        revision: ${{ steps.info.outputs.head-revision }}
+        timeout: '10'
+        timeout-start-time: ${{ steps.info.outputs.job-start-time }}
+    - name: Get issues
+      id: issues
+      uses: ./fossa/get-issues
+      with:
+        api-key: ${{ steps.fossa-login.outputs.api-key }}
+        project-locator: ${{ env.PROJECT_LOCATOR }}
+        revision-ids: ${{ steps.info.outputs.head-revision }}
+    # The fixture must have zero licensing issues in total.
+    - name: Check that the head revision has no licensing issues
+      env:
+        ISSUES: ${{ steps.issues.outputs.issues }}
+      run: |
+        echo "${ISSUES}" | jq .
+        if ! echo "${ISSUES}" | jq -e '.[0].issues.licensing == 0' > /dev/null; then
+          echo "::error::Expected 0 licensing issues for the fixture, see the output above."
+          exit 1
+        fi
+    - name: Create release (dry-run)
+      uses: ./fossa/release
+      with:
+        api-key: ${{ steps.fossa-login.outputs.api-key }}
+        attribution-release-group-id: '0'
+        sbom-release-group-id: '0'
+        release-number: smoketest
+        project-id: ${{ env.PROJECT_LOCATOR }}
+        branch: ${{ steps.info.outputs.head-ref }}
+        revision-id: ${{ steps.info.outputs.head-revision }}
+        dry-run: 'true'

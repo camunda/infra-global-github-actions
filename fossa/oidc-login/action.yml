@@ -1,0 +1,84 @@
+name: fossa oidc-login
+
+description: |
+  Exchange the job's GitHub OIDC token for a short-lived FOSSA API token. Requires `id-token: write` on the calling job and a FOSSA OIDC provider with a trust relationship to the service account.
+
+inputs:
+  provider-id:
+    description: Numeric ID of the FOSSA OIDC provider (Integrations > OIDC Providers)
+    required: true
+  username:
+    description: Username of the FOSSA service account to obtain a token for
+    required: true
+  audience:
+    description: Audience of the GitHub OIDC token, must be accepted by the trust relationship
+    required: false
+    default: app.fossa.com
+  expires-in:
+    description: Token lifetime in seconds (900 to 43200)
+    required: false
+    default: '3600'
+  push-only:
+    description: |
+      Request a push-only token (enough for 'fossa analyze').
+      Set to 'false' for steps calling the FOSSA API (e.g. pr-check, wait-for-scan, get-issues).
+    required: false
+    default: 'true'
+
+outputs:
+  api-key:
+    description: The FOSSA API token (masked)
+    value: ${{ steps.exchange.outputs.api-key }}
+
+runs:
+  using: composite
+  steps:
+  - name: Exchange GitHub OIDC token for FOSSA API token
+    id: exchange
+    env:
+      AUDIENCE: ${{ inputs.audience }}
+      EXPIRES_IN: ${{ inputs.expires-in }}
+      PROVIDER_ID: ${{ inputs.provider-id }}
+      PUSH_ONLY: ${{ inputs.push-only }}
+      USERNAME: ${{ inputs.username }}
+    run: |
+      set -euo pipefail
+
+      if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]]; then
+        echo "::error::No GitHub OIDC token available. Grant 'id-token: write' to the job."
+        exit 1
+      fi
+
+      jwt=$(curl --fail --silent --show-error --retry 3 \
+        --header "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+        --get --data-urlencode "audience=${AUDIENCE}" \
+        --url "${ACTIONS_ID_TOKEN_REQUEST_URL}" | jq -r '.value')
+      echo "::add-mask::${jwt}"
+
+      body=$(jq -n \
+        --arg token "${jwt}" \
+        --argjson providerId "${PROVIDER_ID}" \
+        --arg username "${USERNAME}" \
+        --argjson expiresIn "${EXPIRES_IN}" \
+        --argjson isPushOnly "${PUSH_ONLY}" \
+        '{token: $token, providerId: $providerId, username: $username, expiresIn: $expiresIn, isPushOnly: $isPushOnly}')
+
+      response=$(curl --silent --show-error --retry 3 --write-out '\n%{http_code}' \
+        --request POST \
+        --header "accept: application/json" \
+        --header "content-type: application/json" \
+        --data "${body}" \
+        --url "https://app.fossa.com/api/oidc/token-exchange")
+      status=$(tail -n1 <<< "${response}")
+      token=$(sed '$d' <<< "${response}" | jq -r '.credential.token // empty')
+
+      if [[ "${status}" != "200" || -z "${token}" ]]; then
+        echo "::error::FOSSA token exchange failed with HTTP status ${status}." \
+          "Check provider-id, username and the trust relationship (audience, sub claim)."
+        sed '$d' <<< "${response}" >&2
+        exit 1
+      fi
+
+      echo "::add-mask::${token}"
+      echo "api-key=${token}" >> "$GITHUB_OUTPUT"
+    shell: bash
