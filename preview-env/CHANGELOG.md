@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.1.2 (2026-10-28)
+
+## What's Changed
+* chore(deps): update s4u/setup-maven-action action to v1.22.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/878
+* chore(deps): update actions/setup-python action to v7.1.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/874
+* feat(fossa): add oidc-login action and end-to-end smoketest by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/880
+* chore(deps): update dependency fossas/fossa-cli to v3.20.8 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/838
+* chore(deps): update teleport-actions/setup action to v2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/861
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/preview-env-1.1.1...preview-env-1.1.2
+
 ## 1.1.1 (2026-10-24)
 
 ## What's Changed
