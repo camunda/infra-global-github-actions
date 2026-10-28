@@ -4,6 +4,7 @@ version: 3
 project:
   id: camunda/infra-global-github-actions-fossa-smoketest
   name: infra-global-github-actions-fossa-smoketest
+  team: Infra Team
 
 targets:
   only:

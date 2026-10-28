@@ -96,6 +96,7 @@ Add the repository to the [existing setup](#-existing-setup) table.
 
 ## ⚠️ Traps
 
+- **New projects need a team.** A service account can only create projects for its own team, so set `project.team` in `.fossa.yml` (e.g. `team: Infra Team`), otherwise `fossa analyze` fails with "Invalid project permission".
 - **Service accounts can be missing from the user list.** Organization → Users does not show every service account (e.g. `ci-infra`), and FOSSA rejects such a name as taken. Check Integrations → API Service Accounts before picking a username.
 - **Buttons render disabled until permissions load.** "Add an OIDC provider" shows a missing-permission overlay for a few seconds after page load. Wait, then click.
 - **Trust relationships cannot be broader than their provider.** A team-scoped provider only binds service accounts of that team, so each team needs its own provider.
