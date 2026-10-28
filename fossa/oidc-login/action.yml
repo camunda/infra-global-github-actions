@@ -51,7 +51,8 @@ runs:
 
       jwt=$(curl --fail --silent --show-error --retry 3 \
         --header "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-        --url "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${AUDIENCE}" | jq -r '.value')
+        --get --data-urlencode "audience=${AUDIENCE}" \
+        --url "${ACTIONS_ID_TOKEN_REQUEST_URL}" | jq -r '.value')
       echo "::add-mask::${jwt}"
 
       body=$(jq -n \
