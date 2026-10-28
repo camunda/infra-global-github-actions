@@ -9,6 +9,9 @@ deny contains violation if {
 	not has_action(job, action)
 	violation := {
 		"msg": sprintf("job %s is missing required action %s", [job_id, action]),
+		"kind": "missing-action",
+		"job": job_id,
+		"action": action,
 		"_loc": {"file": selected.path, "line": 1},
 	}
 }
@@ -22,6 +25,8 @@ deny contains violation if {
 			"job %s calls a reusable workflow; inspect it separately and add an explicit exception",
 			[job_id],
 		),
+		"kind": "reusable-workflow",
+		"job": job_id,
 		"_loc": {"file": selected.path, "line": 1},
 	}
 }

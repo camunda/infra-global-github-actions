@@ -17,7 +17,7 @@ from ruamel.yaml import YAML
 CHECK = Path(__file__).with_name("check.py")
 
 
-def run_check(tmp_path, workflows, config, *args):
+def run_check(tmp_path, workflows, config, *args, env=None):
     for filename, contents in workflows.items():
         path = tmp_path / ".github" / "workflows" / filename
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -32,6 +32,7 @@ def run_check(tmp_path, workflows, config, *args):
         capture_output=True,
         text=True,
         check=False,
+        env=env,
     )
 
 
@@ -51,7 +52,108 @@ def test_missing_required_action_fails_with_workflow_and_job(tmp_path):
 
     assert result.returncode == 1, result.stderr
     assert "::error file=.github/workflows/ci.yml,line=1::" in result.stdout
-    assert "job build is missing required action actions/checkout" in result.stdout
+    assert result.stdout.count("job build is missing required action actions/checkout") == 1
+    assert "ORIGINATING FROM" not in result.stdout
+    assert "workflow-policy-" not in result.stdout
+
+
+def test_reports_count_action_checks_and_include_every_job(tmp_path):
+    reports = tmp_path / "reports"
+    result = run_check(
+        tmp_path,
+        {
+            "ci.yml": """
+                jobs:
+                  build:
+                    steps:
+                      - uses: actions/checkout@v7
+                      - uses: acme/tool@main
+                  test:
+                    steps:
+                      - uses: actions/checkout@v7
+                  notify:
+                    steps: []
+            """,
+            "release.yml": """
+                jobs:
+                  shared:
+                    uses: acme/shared/.github/workflows/build.yml@main
+            """,
+        },
+        """
+            required-actions: [actions/checkout, acme/tool, acme/tool]
+            exceptions:
+              - workflow: "*"
+                jobs: [notify]
+                reason: "Notifications | <only>"
+        """,
+        "--report-dir", str(reports),
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
+    assert report["status"] == "failed"
+    assert report["summary"] == {
+        "workflows": 2,
+        "selected_jobs": 3,
+        "excluded_jobs": 1,
+        "required_actions": 2,
+        "action_checks": 4,
+        "passed_checks": 3,
+        "failed_checks": 1,
+        "passed_jobs": 1,
+        "failed_jobs": 2,
+        "uninspectable_jobs": 1,
+    }
+    jobs = {job["job"]: job for job in report["jobs"]}
+    assert jobs["build"]["status"] == "passed"
+    assert jobs["test"]["missing_actions"] == ["acme/tool"]
+    assert jobs["notify"]["status"] == "excluded"
+    assert jobs["shared"]["status"] == "uninspectable"
+    assert "Action checks: 4 (3 passed, 1 failed)" in result.stdout
+    assert "3 selected jobs" in result.stdout
+    assert "policies in namespace" not in result.stdout
+    markdown = (reports / "summary.md").read_text(encoding="utf-8")
+    assert "| Workflow | Job | Result | Action checks | Details |" in markdown
+    assert "Notifications &#124; &lt;only&gt;" in markdown
+    assert "acme/tool" in markdown
+    assert "Uninspectable" in markdown
+
+
+@pytest.mark.parametrize("error", [
+    "configuration", "missing-conftest", "empty-results", "invalid-results",
+])
+def test_report_errors_do_not_claim_success(tmp_path, error):
+    reports = tmp_path / "reports"
+    env = None
+    if error == "missing-conftest":
+        env = {**os.environ, "PATH": ""}
+    elif error in {"empty-results", "invalid-results"}:
+        commands = tmp_path / "commands"
+        commands.mkdir()
+        conftest = commands / "conftest"
+        conftest.write_text(
+            "#!/bin/sh\nprintf '%s\\n' "
+            + ("'[]'\n" if error == "empty-results" else "'[null]'\n"),
+            encoding="utf-8",
+        )
+        conftest.chmod(0o755)
+        env = {**os.environ, "PATH": str(commands)}
+    result = run_check(
+        tmp_path,
+        {"ci.yml": "jobs: {build: {steps: []}}"},
+        "{}" if error == "configuration" else "required-actions: [actions/checkout]",
+        "--report-dir", str(reports),
+        env=env,
+    )
+
+    assert result.returncode == 2, result.stdout + result.stderr
+    report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
+    assert report["status"] == "error"
+    assert report["errors"]
+    assert report["summary"]["passed_checks"] == 0
+    assert report["summary"]["action_checks"] == 0
+    assert "ERROR" in (reports / "summary.md").read_text(encoding="utf-8")
 
 
 def test_shared_notification_exception_applies_across_workflows(tmp_path):
@@ -202,10 +304,16 @@ def test_all_jobs_can_be_explicitly_excluded(tmp_path):
                 jobs: ["*"]
                 reason: Repository only sends notifications
         """,
+        "--report-dir", str(tmp_path / "reports"),
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "all jobs are explicitly excluded" in result.stderr
+    report = json.loads((tmp_path / "reports/report.json").read_text(encoding="utf-8"))
+    assert report["status"] == "passed"
+    assert report["summary"]["selected_jobs"] == 0
+    assert report["summary"]["excluded_jobs"] == 1
+    assert report["summary"]["action_checks"] == 0
 
 
 def test_unused_exception_fails_instead_of_hiding_a_typo(tmp_path):
@@ -364,7 +472,8 @@ def test_composite_action_runs_bundled_checker_with_literal_caller_config(
     action = YAML(typ="safe", pure=True).load(
         CHECK.with_name("action.yml").read_text(encoding="utf-8"),
     )
-    command = action["runs"]["steps"][-1]["run"]
+    command = next(step for step in action["runs"]["steps"] if step.get("id") == "check")["run"]
+    output = tmp_path / "output"
     tooling = tmp_path / "tooling"
     tooling.mkdir()
     caller = tmp_path / "caller"
@@ -394,6 +503,7 @@ def test_composite_action_runs_bundled_checker_with_literal_caller_config(
             "ACTION_DIRECTORY": str(CHECK.parent),
             "TOOLING_DIRECTORY": str(tooling),
             "CONFIG_PATH": config,
+            "GITHUB_OUTPUT": str(output),
         },
         capture_output=True,
         text=True,
@@ -405,6 +515,25 @@ def test_composite_action_runs_bundled_checker_with_literal_caller_config(
     assert not (caller / "injected").exists()
     if not has_checkout:
         assert "job build is missing required action actions/checkout" in result.stdout
+    outputs = dict(line.split("=", 1) for line in output.read_text(encoding="utf-8").splitlines())
+    report = json.loads(Path(outputs["report-path"]).read_text(encoding="utf-8"))
+    assert report["status"] == ("passed" if has_checkout else "failed")
+    summary = tmp_path / "job-summary"
+    summary.write_text("Existing summary\n", encoding="utf-8")
+    summary_step = next(step for step in action["runs"]["steps"] if step["name"] == "Write job summary")
+    subprocess.run(
+        ["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c", summary_step["run"]],
+        env={
+            **os.environ,
+            "SUMMARY_PATH": outputs["summary-path"],
+            "GITHUB_STEP_SUMMARY": str(summary),
+        },
+        check=True,
+    )
+    markdown = summary.read_text(encoding="utf-8")
+    assert markdown.startswith("Existing summary\n")
+    assert "| Workflow | Job | Result | Action checks | Details |" in markdown
+    assert ("Status: PASSED" if has_checkout else "Status: FAILED") in markdown
 
 
 @pytest.mark.parametrize("checksum", ["valid", "mismatched", "missing", "malformed"])
