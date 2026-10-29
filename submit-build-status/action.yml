@@ -167,11 +167,11 @@ runs:
       BUILD_BASE_REF: "${{ github.base_ref && format('refs/heads/{0}', github.base_ref) || github.event.merge_group.base_ref }}"
       BUILD_HEAD_REF: "${{ github.head_ref && format('refs/heads/{0}', github.head_ref) || github.event.merge_group.head_ref }}"
       BUILD_DURATION_MILLIS: "${{ steps.duration.outputs.build_duration_millis }}"
+      # Build monitor JSON fragment (might be empty); keep it in env so Bash never parses its quotes.
+      MONITOR_FIELDS: "${{ steps.monitor.outputs.monitor_fields }}"
       ACCESS_TOKEN: "${{ steps.auth.outputs.access_token }}"
       RUNNER_INFO_RUNS_ON_FILE: "/home/runner/.camunda-arc-runner-info/runs-on"
     run: |
-      # ── Build monitor: get resource usage metrics (might be empty) ──
-      MONITOR_FIELDS="${{ steps.monitor.outputs.monitor_fields }}"
       BUILD_DURATION_FIELD=""
       if [ -n "$BUILD_DURATION_MILLIS" ]; then
         BUILD_DURATION_FIELD=$(printf ', "build_duration_milliseconds": "%s"' "$BUILD_DURATION_MILLIS")
