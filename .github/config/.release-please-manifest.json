@@ -11,7 +11,7 @@
   "dependency-vuln-check": "1.0.1",
   "download-center-upload": "1.0.2",
   "ensure-pr-passes-merge-queue": "1.0.0",
-  "fossa": "1.1.0",
+  "fossa": "1.1.1",
   "generate-github-app-token-from-vault-secrets": "1.2.0",
   "is-cache-enabled": "1.0.0",
   "kubernetes-image-replace": "1.0.0",
