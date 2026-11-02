@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.1 (2026-10-31)
+
+## What's Changed
+* chore(deps): update dependency fossas/fossa-cli to v3.20.10 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/882
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/883
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.1.0...fossa-1.1.1
+
 ## 1.1.0 (2026-10-28)
 
 ## What's Changed
