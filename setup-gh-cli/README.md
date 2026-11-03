@@ -13,6 +13,8 @@ This composite GitHub Action installs the GitHub CLI (`gh`) if it's not already 
 
 - Checks if GitHub CLI is already installed
 - If not installed, installs it using the official GitHub CLI installation method
+- Refreshes only the GitHub CLI apt source, so an unrelated broken apt repository on the runner cannot block the install
+- Fails the step if `gh` is still not available after the install
 - Works on both GitHub-hosted and self-hosted runners
 - Supports Ubuntu/Debian-based systems
 

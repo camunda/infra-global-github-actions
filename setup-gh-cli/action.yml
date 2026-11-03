@@ -8,17 +8,33 @@ runs:
   - name: Install GH CLI
     shell: bash
     run: |
+      set -euo pipefail
+
       # Check if gh is already installed
       if command -v gh &> /dev/null; then
         echo "GitHub CLI is already installed: $(gh --version)"
         exit 0
       fi
 
+      keyring=/usr/share/keyrings/githubcli-archive-keyring.gpg
+      sources_list=/etc/apt/sources.list.d/github-cli.list
+
       # Install via official installation script (works on both hosted and self-hosted runners)
-      curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
-      && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
-      && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-      && sudo apt update \
-      && sudo apt install gh -y
+      curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of="$keyring" status=none
+      sudo chmod go+r "$keyring"
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=$keyring] https://cli.github.com/packages stable main" | sudo tee "$sources_list" > /dev/null
+
+      # Refresh only the GitHub CLI source, so an unrelated broken repository on the
+      # runner (e.g. a third-party PPA returning 503) cannot block the install.
+      sudo apt-get update \
+        -o Dir::Etc::sourcelist="$sources_list" \
+        -o Dir::Etc::sourceparts=- \
+        -o APT::Get::List-Cleanup=0
+      sudo apt-get install -y gh
+
+      if ! command -v gh &> /dev/null; then
+        echo "::error::GitHub CLI installation failed: gh is not available on PATH"
+        exit 1
+      fi
 
       echo "GitHub CLI installed successfully: $(gh --version)"
