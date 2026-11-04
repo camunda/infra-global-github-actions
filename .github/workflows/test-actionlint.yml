@@ -7,6 +7,31 @@ on:
     - 'actionlint/**'
     - '.github/workflows/test-actionlint.yml'
 
+  # `main` requires no status check — its ruleset carries `deletion`,
+  # `non_fast_forward` and `copilot_code_review`, nothing else — so a pull
+  # request can merge red, and two that are green apart can land a broken
+  # combination. Running on the merged result is what says whether main holds.
+  push:
+    branches:
+    - main
+    paths:
+    - 'actionlint/**'
+    - '.github/workflows/test-actionlint.yml'
+
+  # Both triggers above depend on the path filter still matching. A rename or a
+  # move stops them firing and says nothing, which is a check that quietly stops
+  # checking. The weekly run carries no filter.
+  #
+  # It also covers something the filters cannot: this action downloads a release
+  # asset and verifies it against the checksums published beside it, and neither
+  # of those is in this repository. An asset withdrawn upstream, or a release
+  # re-cut, surfaces here rather than in whichever repository next calls the
+  # action.
+  schedule:
+  - cron: '41 5 * * 1'
+
+  workflow_dispatch:
+
 permissions:
   contents: read
 
