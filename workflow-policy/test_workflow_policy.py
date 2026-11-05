@@ -57,7 +57,7 @@ def test_missing_required_action_fails_with_workflow_and_job(tmp_path):
     assert "workflow-policy-" not in result.stdout
 
 
-def test_reports_count_action_checks_and_include_every_job(tmp_path):
+def test_reports_count_rule_checks_and_include_every_job(tmp_path):
     reports = tmp_path / "reports"
     result = run_check(
         tmp_path,
@@ -93,13 +93,14 @@ def test_reports_count_action_checks_and_include_every_job(tmp_path):
     assert result.returncode == 1, result.stdout + result.stderr
     report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
     assert report["status"] == "failed"
+    assert report["rules"] == ["required-actions"]
     assert report["summary"] == {
         "workflows": 2,
         "selected_jobs": 3,
         "excluded_jobs": 1,
-        "required_actions": 2,
-        "action_checks": 4,
-        "passed_checks": 3,
+        "rules": 1,
+        "checks": 2,
+        "passed_checks": 1,
         "failed_checks": 1,
         "passed_jobs": 1,
         "failed_jobs": 2,
@@ -107,36 +108,45 @@ def test_reports_count_action_checks_and_include_every_job(tmp_path):
     }
     jobs = {job["job"]: job for job in report["jobs"]}
     assert jobs["build"]["status"] == "passed"
-    assert jobs["test"]["missing_actions"] == ["acme/tool"]
+    assert jobs["test"]["findings"] == [{
+        "workflow": ".github/workflows/ci.yml", "job": "test", "rule": "required-actions",
+        "message": "job test is missing required action acme/tool", "action": "acme/tool",
+    }]
     assert jobs["notify"]["status"] == "excluded"
     assert jobs["shared"]["status"] == "uninspectable"
-    assert "Action checks: 4 (3 passed, 1 failed)" in result.stdout
+    assert "Rule checks: 2 (1 passed, 1 failed)" in result.stdout
     assert "3 selected jobs" in result.stdout
     assert "policies in namespace" not in result.stdout
     markdown = (reports / "summary.md").read_text(encoding="utf-8")
-    assert "| Workflow | Job | Result | Action checks | Details |" in markdown
+    assert "| Workflow | Job | Result | Rule checks | Details |" in markdown
     assert "Notifications &#124; &lt;only&gt;" in markdown
     assert "acme/tool" in markdown
     assert "Uninspectable" in markdown
 
 
 @pytest.mark.parametrize("error", [
-    "configuration", "missing-conftest", "empty-results", "invalid-results",
+    "configuration", "missing-conftest", "empty-results", "invalid-results", "unevaluated-rule",
 ])
 def test_report_errors_do_not_claim_success(tmp_path, error):
     reports = tmp_path / "reports"
     env = None
     if error == "missing-conftest":
         env = {**os.environ, "PATH": ""}
-    elif error in {"empty-results", "invalid-results"}:
+    elif error in {"empty-results", "invalid-results", "unevaluated-rule"}:
         commands = tmp_path / "commands"
         commands.mkdir()
         conftest = commands / "conftest"
-        conftest.write_text(
-            "#!/bin/sh\nprintf '%s\\n' "
-            + ("'[]'\n" if error == "empty-results" else "'[null]'\n"),
-            encoding="utf-8",
-        )
+        output = {
+            "empty-results": "printf '%s\\n' '[]'",
+            "invalid-results": "printf '%s\\n' '[null]'",
+            # What Conftest returns for a namespace that holds no deny rules.
+            "unevaluated-rule": (
+                "for last; do :; done\n"
+                "printf '[{\"filename\":\"%s\",\"namespace\":"
+                "\"workflow_policy.required_actions\",\"successes\":0}]\\n' \"$last\""
+            ),
+        }[error]
+        conftest.write_text(f"#!/bin/sh\n{output}\n", encoding="utf-8")
         conftest.chmod(0o755)
         env = {**os.environ, "PATH": str(commands)}
     result = run_check(
@@ -152,8 +162,10 @@ def test_report_errors_do_not_claim_success(tmp_path, error):
     assert report["status"] == "error"
     assert report["errors"]
     assert report["summary"]["passed_checks"] == 0
-    assert report["summary"]["action_checks"] == 0
+    assert report["summary"]["checks"] == 0
     assert "ERROR" in (reports / "summary.md").read_text(encoding="utf-8")
+    if error == "unevaluated-rule":
+        assert "Conftest evaluated no policy for rule required-actions" in result.stderr
 
 
 def test_shared_notification_exception_applies_across_workflows(tmp_path):
@@ -230,17 +242,211 @@ def test_selection_manifest_matches_job_ids_not_display_names_or_prefixes(tmp_pa
 
     assert result.returncode == 0, result.stderr
     manifest = json.loads(result.stdout)
-    assert manifest["selection"] == {
-        "ci.yml": {
-            "path": ".github/workflows/ci.yml",
-            "jobs": ["build", "notify-and-deploy"],
-        },
-    }
-    assert manifest["excluded_jobs"] == [{
+    assert manifest["rules"] == ["required-actions"]
+    assert manifest["workflows"] == [".github/workflows/ci.yml"]
+    assert [job["job"] for job in manifest["jobs"] if job["rules"]] == [
+        "build", "notify-and-deploy",
+    ]
+    assert [job for job in manifest["jobs"] if not job["rules"]] == [{
         "workflow": ".github/workflows/ci.yml",
         "job": "notify",
-        "reason": "Notification-only",
+        "inspectable": True,
+        "rules": [],
+        "exclusions": [{
+            "source": "config", "file": "policy.yml", "line": 4,
+            "reason": "Notification-only", "rule": None,
+        }],
     }]
+
+
+def test_inline_directives_exclude_only_the_job_they_annotate(tmp_path):
+    result = run_check(
+        tmp_path,
+        {"ci.yml": """
+            on: push
+            jobs:
+              build:
+                runs-on: ubuntu-latest
+                steps:
+                  - run: |
+                      # workflow-policy: skip script text is not a directive
+                      echo "# workflow-policy: skip"
+              # Sends Slack messages only.
+              # workflow-policy: skip notification-only job
+              notify:
+                steps: []
+              cleanup: # workflow-policy: skip  housekeeping only
+                steps: []
+              deploy:
+                steps:
+                  - run: "echo
+                      # workflow-policy: skip quoted text"
+              lint: {steps: []}  # workflow-policy: skip flow-style job
+        """},
+        "required-actions: [actions/checkout]",
+        "--select-only",
+    )
+
+    assert result.returncode == 0, result.stderr
+    manifest = json.loads(result.stdout)
+    assert [job["job"] for job in manifest["jobs"] if job["rules"]] == ["build", "deploy"]
+    assert [
+        {key: job[key] for key in ("job", "exclusions")}
+        for job in manifest["jobs"] if not job["rules"]
+    ] == [
+        {
+            "job": job,
+            "exclusions": [{
+                "source": "inline", "file": ".github/workflows/ci.yml",
+                "line": line, "reason": reason, "rule": None,
+            }],
+        }
+        for job, line, reason in [
+            ("notify", 11, "notification-only job"),
+            ("cleanup", 14, "housekeeping only"),
+            ("lint", 20, "flow-style job"),
+        ]
+    ]
+    assert (
+        "SKIP .github/workflows/ci.yml:notify: notification-only job "
+        "(inline, .github/workflows/ci.yml:11)"
+        in result.stderr
+    )
+
+
+def test_inline_and_config_exceptions_combine(tmp_path):
+    reports = tmp_path / "reports"
+    result = run_check(
+        tmp_path,
+        {
+            "ci.yml": """
+                jobs:
+                  build:
+                    steps:
+                      - uses: actions/checkout@v4
+                  notify: # workflow-policy: skip Slack only
+                    steps: []
+                  docs:
+                    steps: []
+            """,
+            "release.yml": """
+                jobs:
+                  # workflow-policy: skip steps live in the shared workflow
+                  shared:
+                    uses: acme/shared/.github/workflows/build.yml@main
+                  docs:
+                    steps: []
+            """,
+        },
+        """
+            required-actions: [actions/checkout]
+            exceptions:
+              - workflow: "*"
+                jobs: [docs, notify]
+                reason: Documentation and notification jobs
+        """,
+        "--report-dir", str(reports),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
+    assert report["summary"]["excluded_jobs"] == 4
+    assert report["summary"]["selected_jobs"] == 1
+    exclusions = {(job["workflow"], job["job"]): job["exclusions"] for job in report["jobs"]}
+    configured = {
+        "source": "config", "file": "policy.yml", "line": 4,
+        "reason": "Documentation and notification jobs", "rule": None,
+    }
+    assert exclusions[(".github/workflows/ci.yml", "notify")] == [
+        {
+            "source": "inline", "file": ".github/workflows/ci.yml",
+            "line": 6, "reason": "Slack only", "rule": None,
+        },
+        configured,
+    ]
+    assert exclusions[(".github/workflows/ci.yml", "docs")] == [configured]
+    assert exclusions[(".github/workflows/release.yml", "shared")] == [{
+        "source": "inline", "file": ".github/workflows/release.yml",
+        "line": 3, "reason": "steps live in the shared workflow", "rule": None,
+    }]
+    assert exclusions[(".github/workflows/ci.yml", "build")] == []
+    markdown = (reports / "summary.md").read_text(encoding="utf-8")
+    assert (
+        "Slack only (inline, .github/workflows/ci.yml:6)<br>"
+        "Documentation and notification jobs (config, policy.yml:4)"
+    ) in markdown
+
+
+@pytest.mark.parametrize("workflow,message", [
+    (
+        "jobs:\n  notify: # workflow-policy: skip\n    steps: []\n",
+        "ci.yml:2: expected '# workflow-policy: skip [rule=<rule>] <reason>'",
+    ),
+    (
+        "jobs:\n  notify: # workflow-policy: skip rule=required-actions\n    steps: []\n",
+        "ci.yml:2: expected '# workflow-policy: skip [rule=<rule>] <reason>'",
+    ),
+    (
+        "jobs:\n  notify: # workflow-policy: skip rule= no rule name\n    steps: []\n",
+        "ci.yml:2: expected '# workflow-policy: skip [rule=<rule>] <reason>'",
+    ),
+    (
+        "jobs:\n  notify: # workflow-policy: skip rule=build-monitoring Slack only\n"
+        "    steps: []\n",
+        "ci.yml:2: rule build-monitoring is not configured; configured rules: required-actions",
+    ),
+    (
+        "jobs:\n  notify: # workflow-policy skip missing colon\n    steps: []\n",
+        "ci.yml:2: expected '# workflow-policy: skip [rule=<rule>] <reason>'",
+    ),
+    (
+        "jobs:\n  notify: # Workflow-Policy: skip wrong case\n    steps: []\n",
+        "ci.yml:2: expected '# workflow-policy: skip [rule=<rule>] <reason>'",
+    ),
+    (
+        "# workflow-policy: skip-file legacy\njobs:\n  notify:\n    steps: []\n",
+        "ci.yml:1: expected '# workflow-policy: skip [rule=<rule>] <reason>'",
+    ),
+    (
+        "# workflow-policy: skip whole file\njobs:\n  notify:\n    steps: []\n",
+        "ci.yml:1: place the directive",
+    ),
+    (
+        "jobs:\n  notify:\n    steps:\n      # workflow-policy: skip step\n      - run: echo\n",
+        "ci.yml:4: place the directive",
+    ),
+    (
+        "jobs:\n  # workflow-policy: skip blank line\n\n  notify:\n    steps: []\n",
+        "ci.yml:2: place the directive",
+    ),
+    (
+        "jobs:\n    # workflow-policy: skip indentation\n  notify:\n    steps: []\n",
+        "ci.yml:2: place the directive",
+    ),
+    (
+        "jobs: # workflow-policy: skip jobs key\n  notify:\n    steps: []\n",
+        "ci.yml:1: place the directive",
+    ),
+    (
+        "jobs: {build: {steps: []}, notify: {steps: []}} # workflow-policy: skip which\n",
+        "ci.yml:1: place the directive",
+    ),
+    (
+        "jobs:\n  # workflow-policy: skip one\n  notify: # workflow-policy: skip two\n"
+        "    steps: []\n",
+        "ci.yml:3: job notify has more than one workflow-policy directive",
+    ),
+])
+def test_invalid_or_misplaced_inline_directives_fail(tmp_path, workflow, message):
+    result = run_check(
+        tmp_path,
+        {"ci.yml": workflow},
+        "required-actions: [actions/checkout]",
+    )
+
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert message in result.stderr
+    assert "Traceback" not in result.stderr
 
 
 @pytest.mark.parametrize("uses,exit_code", [
@@ -313,7 +519,173 @@ def test_all_jobs_can_be_explicitly_excluded(tmp_path):
     assert report["status"] == "passed"
     assert report["summary"]["selected_jobs"] == 0
     assert report["summary"]["excluded_jobs"] == 1
-    assert report["summary"]["action_checks"] == 0
+    assert report["summary"]["checks"] == 0
+
+
+MONITOR = "camunda/infra-global-github-actions/start-build-monitor@0123456789012345678901234567890123456789"
+SUBMIT = "camunda/infra-global-github-actions/submit-build-status@0123456789012345678901234567890123456789"
+
+
+def test_build_monitoring_preset_checks_jobs_and_applies_its_exceptions(tmp_path):
+    reports = tmp_path / "reports"
+    result = run_check(
+        tmp_path,
+        {"ci.yml": f"""
+            jobs:
+              build:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: {MONITOR}
+                  - run: make
+                  - uses: ./.github/actions/observe-build-status
+                    if: ${{{{ always() }}}}
+                    continue-on-error: true
+              deploy:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: actions/checkout@v5
+                  - uses: {MONITOR}
+                  - uses: {SUBMIT}
+              notify:
+                runs-on: ubuntu-latest
+                steps:
+                  - run: echo notify
+        """},
+        "extends: [build-monitoring]",
+        "--report-dir", str(reports),
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
+    assert report["rules"] == ["build-monitoring"]
+    jobs = {job["job"]: job for job in report["jobs"]}
+    assert jobs["build"]["status"] == "passed"
+    assert {finding["message"] for finding in jobs["deploy"]["findings"]} == {
+        "job deploy: first step must use camunda/infra-global-github-actions/start-build-monitor",
+        "job deploy: last step must set if: always() and continue-on-error: true",
+    }
+    assert jobs["notify"]["status"] == "excluded"
+    assert jobs["notify"]["exclusions"] == [{
+        "source": "preset", "file": "workflow-policy/presets/build-monitoring/preset.yml",
+        "line": 12, "reason": "Notification-only jobs are not monitored",
+        "rule": "build-monitoring",
+    }]
+    assert report["summary"]["checks"] == 2
+    assert report["summary"]["failed_checks"] == 1
+    assert (
+        "::error file=.github/workflows/ci.yml,line=1::job deploy: first step must use"
+        in result.stdout
+    )
+
+
+def test_preset_exceptions_may_match_no_job(tmp_path):
+    result = run_check(
+        tmp_path,
+        {"ci.yml": f"""
+            jobs:
+              build:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: {MONITOR}
+                  - uses: {SUBMIT}
+                    if: always()
+                    continue-on-error: true
+        """},
+        "extends: [build-monitoring]",
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Rule checks: 1 (1 passed, 0 failed)" in result.stdout
+
+
+def test_rule_scoped_exceptions_leave_other_rules_checked(tmp_path):
+    reports = tmp_path / "reports"
+    result = run_check(
+        tmp_path,
+        {"ci.yml": """
+            jobs:
+              lint:
+                runs-on: ubuntu-latest
+                steps:
+                  - run: make lint
+              notify:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: actions/checkout@v5
+        """},
+        """
+            required-actions: [actions/checkout]
+            extends: [build-monitoring]
+            exceptions:
+              - workflow: "*"
+                jobs: [lint]
+                rule: build-monitoring
+                reason: Too short to monitor
+        """,
+        "--report-dir", str(reports),
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
+    assert report["rules"] == ["required-actions", "build-monitoring"]
+    jobs = {job["job"]: job for job in report["jobs"]}
+    assert jobs["lint"]["status"] == "failed"
+    assert jobs["lint"]["rules"] == ["required-actions"]
+    assert [finding["rule"] for finding in jobs["lint"]["findings"]] == ["required-actions"]
+    assert jobs["notify"]["status"] == "passed"
+    assert jobs["notify"]["rules"] == ["required-actions"]
+    markdown = (reports / "summary.md").read_text(encoding="utf-8")
+    assert "build-monitoring: Too short to monitor (config, policy.yml:5)" in markdown
+    assert "build-monitoring: Notification-only jobs are not monitored (preset, " in markdown
+
+
+@pytest.mark.parametrize("has_checkout", [False, True])
+def test_inline_directive_can_skip_a_single_rule(tmp_path, has_checkout):
+    reports = tmp_path / "reports"
+    steps = "[{uses: actions/checkout@v5}]" if has_checkout else "[{run: make lint}]"
+    result = run_check(
+        tmp_path,
+        {"ci.yml": f"""
+            jobs:
+              lint: # workflow-policy: skip rule=build-monitoring too short to monitor
+                runs-on: ubuntu-latest
+                steps: {steps}
+        """},
+        """
+            required-actions: [actions/checkout]
+            extends: [build-monitoring]
+        """,
+        "--report-dir", str(reports),
+    )
+
+    assert result.returncode == (0 if has_checkout else 1), result.stdout + result.stderr
+    report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
+    [job] = report["jobs"]
+    assert job["rules"] == ["required-actions"]
+    assert job["exclusions"] == [{
+        "source": "inline", "file": ".github/workflows/ci.yml", "line": 3,
+        "reason": "too short to monitor", "rule": "build-monitoring",
+    }]
+    assert [finding["rule"] for finding in job["findings"]] == (
+        [] if has_checkout else ["required-actions"]
+    )
+    assert (
+        "SKIP .github/workflows/ci.yml:lint: build-monitoring: too short to monitor "
+        "(inline, .github/workflows/ci.yml:3)"
+    ) in result.stderr
+
+
+@pytest.mark.parametrize("policy", sorted(
+    path.parent for path in CHECK.parent.glob("presets/*/preset.yml")
+))
+def test_preset_policies_pass_their_rego_tests(policy):
+    assert list(policy.glob("*_test.rego")), f"{policy.name} has no Rego tests"
+    result = subprocess.run(
+        ["conftest", "verify", "--no-color", "--policy", str(policy)],
+        capture_output=True, text=True, check=False,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_unused_exception_fails_instead_of_hiding_a_typo(tmp_path):
@@ -336,7 +708,7 @@ def test_unused_exception_fails_instead_of_hiding_a_typo(tmp_path):
     )
 
     assert result.returncode == 2, result.stdout + result.stderr
-    assert "exception #1 does not match any job" in result.stderr
+    assert "policy.yml:4: exception #1 does not match any job" in result.stderr
 
 
 @pytest.mark.parametrize("config", [
@@ -356,6 +728,15 @@ def test_unused_exception_fails_instead_of_hiding_a_typo(tmp_path):
     """
         required-actions: [actions/checkout]
         exceptions: [{workflow: "*", jobs: ["notify-*"], reason: Notifications}]
+    """,
+    "extends: build-monitoring",
+    "extends: [missing]",
+    "extends: [../policy]",
+    "extends: [build-monitoring, build-monitoring]",
+    "extends: [required-actions]",
+    """
+        required-actions: [actions/checkout]
+        exceptions: [{workflow: "*", jobs: [notify], rule: build-monitoring, reason: Notify}]
     """,
 ])
 def test_invalid_configuration_fails_before_policy_evaluation(tmp_path, config):
@@ -402,21 +783,22 @@ def test_malformed_workflows_fail_even_with_a_whole_file_exception(tmp_path, wor
     assert "Traceback" not in result.stderr
 
 
-@pytest.mark.parametrize("excluded", [False, True])
+@pytest.mark.parametrize("excluded", [False, "config", "inline"])
 def test_reusable_workflow_jobs_require_an_explicit_exception(tmp_path, excluded):
     config = "required-actions: [actions/checkout]\n"
-    if excluded:
+    if excluded == "config":
         config += textwrap.dedent("""
             exceptions:
               - workflow: "*"
                 jobs: [shared-build]
                 reason: Required steps are managed in the shared workflow
         """)
+    directive = " # workflow-policy: skip shared workflow" if excluded == "inline" else ""
     result = run_check(
         tmp_path,
-        {"ci.yml": """
+        {"ci.yml": f"""
             jobs:
-              shared-build:
+              shared-build:{directive}
                 uses: acme/shared/.github/workflows/build.yml@main
         """},
         config,
@@ -532,7 +914,7 @@ def test_composite_action_runs_bundled_checker_with_literal_caller_config(
     )
     markdown = summary.read_text(encoding="utf-8")
     assert markdown.startswith("Existing summary\n")
-    assert "| Workflow | Job | Result | Action checks | Details |" in markdown
+    assert "| Workflow | Job | Result | Rule checks | Details |" in markdown
     assert ("Status: PASSED" if has_checkout else "Status: FAILED") in markdown
 
 
