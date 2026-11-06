@@ -12,8 +12,13 @@ deny contains finding(job_id, action) if {
 has_action(job, action) if {
 	some step in job.steps
 	is_string(step.uses)
-	split(step.uses, "@")[0] == action
+	matches(action, split(step.uses, "@")[0])
 }
+
+# `*` matches one path segment, `**` any number including none (OPA 1.21+ needs `/**/` as `/`).
+matches(pattern, path) if glob.match(pattern, ["/"], path)
+
+matches(pattern, path) if glob.match(replace(pattern, "/**/", "/"), ["/"], path)
 
 finding(job_id, action) := {
 	"rule": "required-actions",

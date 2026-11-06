@@ -1,6 +1,6 @@
 ---
 name: Workflow policy check
-description: Check the caller repository's workflow jobs for configured required actions
+description: Check the caller repository's workflow jobs against configured presets
 
 inputs:
   config-path:

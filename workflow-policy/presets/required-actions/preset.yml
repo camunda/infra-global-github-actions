@@ -1,0 +1,7 @@
+description: >-
+  Every job uses each listed action, matched by path whatever its ref.
+
+params:
+  actions: []
+
+overridable: [actions]
