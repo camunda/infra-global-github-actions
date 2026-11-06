@@ -47,7 +47,7 @@ def test_missing_required_action_fails_with_workflow_and_job(tmp_path):
                 steps:
                   - uses: actions/setup-node@v4
         """},
-        "required-actions: [actions/checkout]",
+        "extends: [{name: required-actions, params: {actions: [actions/checkout]}}]",
     )
 
     assert result.returncode == 1, result.stderr
@@ -81,7 +81,7 @@ def test_reports_count_rule_checks_and_include_every_job(tmp_path):
             """,
         },
         """
-            required-actions: [actions/checkout, acme/tool, acme/tool]
+            extends: [{name: required-actions, params: {actions: [actions/checkout, acme/tool, acme/tool]}}]
             exceptions:
               - workflow: "*"
                 jobs: [notify]
@@ -159,7 +159,7 @@ def test_report_errors_do_not_claim_success(tmp_path, error):
     result = run_check(
         tmp_path,
         {"ci.yml": "jobs: {build: {steps: []}}"},
-        "{}" if error == "configuration" else "required-actions: [actions/checkout]",
+        "{}" if error == "configuration" else "extends: [{name: required-actions, params: {actions: [actions/checkout]}}]",
         "--report-dir", str(reports),
         env=env,
     )
@@ -207,7 +207,7 @@ def test_shared_notification_exception_applies_across_workflows(tmp_path):
             """,
         },
         """
-            required-actions: [actions/checkout]
+            extends: [{name: required-actions, params: {actions: [actions/checkout]}}]
             exceptions:
               - workflow: "*"
                 jobs: [notify, notify-on-failure]
@@ -238,7 +238,7 @@ def test_selection_manifest_matches_job_ids_not_display_names_or_prefixes(tmp_pa
                 steps: []
         """},
         """
-            required-actions: [actions/checkout]
+            extends: [{name: required-actions, params: {actions: [actions/checkout]}}]
             exceptions:
               - workflow: "*"
                 jobs: [notify]
@@ -290,7 +290,7 @@ def test_inline_directives_exclude_only_the_job_they_annotate(tmp_path):
                       # workflow-policy: skip-job quoted text"
               lint: {steps: []}  # workflow-policy: skip-job flow-style job
         """},
-        "required-actions: [actions/checkout]",
+        "extends: [{name: required-actions, params: {actions: [actions/checkout]}}]",
         "--select-only",
     )
 
@@ -345,7 +345,7 @@ def test_inline_and_config_exceptions_combine(tmp_path):
             """,
         },
         """
-            required-actions: [actions/checkout]
+            extends: [{name: required-actions, params: {actions: [actions/checkout]}}]
             exceptions:
               - workflow: "*"
                 jobs: [docs, notify]
@@ -405,7 +405,7 @@ def test_skip_workflow_directive_excludes_every_job_in_its_workflow(tmp_path):
                     uses: acme/shared/.github/workflows/cleanup.yml@main
             """,
         },
-        "required-actions: [actions/checkout]",
+        "extends: [{name: required-actions, params: {actions: [actions/checkout]}}]",
         "--report-dir", str(reports),
     )
 
@@ -445,8 +445,7 @@ def test_skip_workflow_and_skip_job_directives_combine(tmp_path):
                 steps: []
         """},
         """
-            required-actions: [actions/checkout]
-            extends: [build-monitoring]
+            extends: [{name: required-actions, params: {actions: [actions/checkout]}}, build-monitoring]
         """,
         "--report-dir", str(reports),
     )
@@ -489,8 +488,7 @@ def test_directives_for_different_rules_combine_on_the_same_job_or_workflow(tmp_
             """,
         },
         """
-            required-actions: [actions/checkout]
-            extends: [build-monitoring]
+            extends: [{name: required-actions, params: {actions: [actions/checkout]}}, build-monitoring]
         """,
         "--select-only",
     )
@@ -629,7 +627,7 @@ def test_invalid_or_misplaced_inline_directives_fail(tmp_path, workflow, message
     result = run_check(
         tmp_path,
         {"ci.yml": workflow},
-        "required-actions: [actions/checkout]",
+        "extends: [{name: required-actions, params: {actions: [actions/checkout]}}]",
     )
 
     assert result.returncode == 2, result.stdout + result.stderr
@@ -656,7 +654,7 @@ def test_all_required_actions_match_exact_subpaths_independently_of_ref(
                   - name: acme/tool/setup
                     uses: {uses}
         """},
-        "required-actions: [actions/checkout, acme/tool/setup]",
+        "extends: [{name: required-actions, params: {actions: [actions/checkout, acme/tool/setup]}}]",
     )
 
     assert result.returncode == exit_code, result.stdout + result.stderr
@@ -674,7 +672,7 @@ def test_whole_workflow_exception_does_not_exclude_same_job_elsewhere(tmp_path):
         tmp_path,
         {"ci.yml": workflow, "release.yaml": workflow},
         """
-            required-actions: [actions/checkout]
+            extends: [{name: required-actions, params: {actions: [actions/checkout]}}]
             exceptions:
               - workflow: .github/workflows/ci.yml
                 jobs: ["*"]
@@ -692,7 +690,7 @@ def test_all_jobs_can_be_explicitly_excluded(tmp_path):
         tmp_path,
         {"notify.yml": "jobs: {notify: {runs-on: ubuntu-latest, steps: []}}"},
         """
-            required-actions: [actions/checkout]
+            extends: [{name: required-actions, params: {actions: [actions/checkout]}}]
             exceptions:
               - workflow: "*"
                 jobs: ["*"]
@@ -730,6 +728,16 @@ def test_build_monitoring_preset_checks_jobs_and_applies_its_exceptions(tmp_path
                   - uses: ./.github/actions/observe-build-status
                     if: ${{{{ always() }}}}
                     continue-on-error: true
+              reap:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: {MONITOR}
+                  - uses: actions/checkout@v5
+                    with:
+                      path: tool
+                  - uses: ./tool/.github/actions/observe-build-status
+                    if: always()
+                    continue-on-error: true
               deploy:
                 runs-on: ubuntu-latest
                 steps:
@@ -749,7 +757,7 @@ def test_build_monitoring_preset_checks_jobs_and_applies_its_exceptions(tmp_path
     report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
     assert report["rules"] == ["build-monitoring"]
     jobs = {job["job"]: job for job in report["jobs"]}
-    assert jobs["build"]["status"] == "passed"
+    assert jobs["build"]["status"] == jobs["reap"]["status"] == "passed"
     assert {finding["message"] for finding in jobs["deploy"]["findings"]} == {
         "job deploy: first step must use camunda/infra-global-github-actions/start-build-monitor",
         "job deploy: last step must set if: always() and continue-on-error: true",
@@ -757,10 +765,10 @@ def test_build_monitoring_preset_checks_jobs_and_applies_its_exceptions(tmp_path
     assert jobs["notify"]["status"] == "excluded"
     assert jobs["notify"]["exclusions"] == [{
         "source": "preset", "file": "workflow-policy/presets/build-monitoring/preset.yml",
-        "line": 12, "reason": "Notification-only jobs are not monitored",
+        "line": 14, "reason": "Notification-only jobs are not monitored",
         "rule": "build-monitoring",
     }]
-    assert report["summary"]["checks"] == 2
+    assert report["summary"]["checks"] == 3
     assert report["summary"]["failed_checks"] == 1
     assert (
         "::error file=.github/workflows/ci.yml,line=1::job deploy: first step must use"
@@ -788,6 +796,130 @@ def test_preset_exceptions_may_match_no_job(tmp_path):
     assert "Rule checks: 1 (1 passed, 0 failed)" in result.stdout
 
 
+def test_preset_params_override_replaces_the_default_last_step(tmp_path):
+    reports = tmp_path / "reports"
+    result = run_check(
+        tmp_path,
+        {"ci.yml": f"""
+            jobs:
+              build:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: {MONITOR}
+                  - uses: ./.github/actions/my-observer
+                    if: always()
+                    continue-on-error: true
+              deploy:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: {MONITOR}
+                  - uses: {SUBMIT}
+                    if: always()
+                    continue-on-error: true
+        """},
+        """
+            extends:
+              - name: build-monitoring
+                params:
+                  last-step-any-of: [./.github/actions/my-observer]
+        """,
+        "--report-dir", str(reports),
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
+    assert report["rules"] == ["build-monitoring"]
+    jobs = {job["job"]: job for job in report["jobs"]}
+    assert jobs["build"]["status"] == "passed"
+    # The default list is replaced, not extended, and the message names the effective list.
+    assert [finding["message"] for finding in jobs["deploy"]["findings"]] == [
+        "job deploy: last step must use one of ./.github/actions/my-observer",
+    ]
+    assert report["overrides"] == [{
+        "rule": "build-monitoring", "param": "last-step-any-of",
+        "value": ["./.github/actions/my-observer"], "file": "policy.yml", "line": 5,
+    }]
+    override = "build-monitoring: last-step-any-of = ./.github/actions/my-observer (policy.yml:5)"
+    assert f"Override: {override}" in result.stdout
+    markdown = (reports / "summary.md").read_text(encoding="utf-8")
+    assert f"Parameter overrides:\n\n- <code>{override}</code>" in markdown
+
+
+@pytest.mark.parametrize("config,message", [
+    (
+        "extends: [{name: build-monitoring, params: {first-step: acme/start}}]",
+        "configuration: preset build-monitoring: parameter first-step cannot be overridden; "
+        "overridable parameters: last-step-any-of",
+    ),
+    (
+        "extends: [required-actions]",
+        "configuration: preset required-actions needs a value for parameter actions; "
+        "set it under params",
+    ),
+    (
+        "extends: [{name: required-actions, params: {actions: [checkout]}}]",
+        "configuration: preset required-actions: parameter actions must be a non-empty list "
+        "of unversioned action paths, such as actions/checkout",
+    ),
+    (
+        "required-actions: [actions/checkout]",
+        "configuration: required-actions is a preset; list it under extends with params.actions",
+    ),
+])
+def test_preset_params_explain_what_can_be_set(tmp_path, config, message):
+    result = run_check(
+        tmp_path,
+        {"ci.yml": "jobs: {build: {runs-on: ubuntu-latest, steps: []}}"},
+        config,
+    )
+
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert message in result.stderr
+
+
+def test_extends_mapping_without_params_keeps_the_defaults(tmp_path):
+    result = run_check(
+        tmp_path,
+        {"ci.yml": f"""
+            jobs:
+              build:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: {MONITOR}
+                  - uses: actions/checkout@v5
+                  - uses: {SUBMIT}
+                    if: always()
+                    continue-on-error: true
+        """},
+        """
+            extends:
+              - name: build-monitoring
+              - name: required-actions
+                params:
+                  actions: [actions/checkout]
+        """,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "Rules: build-monitoring, required-actions." in result.stdout
+    assert "Override: required-actions: actions = actions/checkout (policy.yml:6)" in result.stdout
+    assert "Override: build-monitoring" not in result.stdout
+
+
+def test_unknown_preset_param_lists_the_available_ones(tmp_path):
+    result = run_check(
+        tmp_path,
+        {"ci.yml": "jobs: {build: {runs-on: ubuntu-latest, steps: []}}"},
+        "extends: [{name: build-monitoring, params: {last-step: ./local}}]",
+    )
+
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert (
+        "preset build-monitoring has no parameter last-step; "
+        "available parameters: first-step, last-step-any-of"
+    ) in result.stderr
+
+
 def test_rule_scoped_exceptions_leave_other_rules_checked(tmp_path):
     reports = tmp_path / "reports"
     result = run_check(
@@ -804,8 +936,7 @@ def test_rule_scoped_exceptions_leave_other_rules_checked(tmp_path):
                   - uses: actions/checkout@v5
         """},
         """
-            required-actions: [actions/checkout]
-            extends: [build-monitoring]
+            extends: [{name: required-actions, params: {actions: [actions/checkout]}}, build-monitoring]
             exceptions:
               - workflow: "*"
                 jobs: [lint]
@@ -825,7 +956,7 @@ def test_rule_scoped_exceptions_leave_other_rules_checked(tmp_path):
     assert jobs["notify"]["status"] == "passed"
     assert jobs["notify"]["rules"] == ["required-actions"]
     markdown = (reports / "summary.md").read_text(encoding="utf-8")
-    assert "build-monitoring: Too short to monitor (config, policy.yml:5)" in markdown
+    assert "build-monitoring: Too short to monitor (config, policy.yml:4)" in markdown
     assert "build-monitoring: Notification-only jobs are not monitored (preset, " in markdown
 
 
@@ -842,8 +973,7 @@ def test_inline_directive_can_skip_a_single_rule(tmp_path, has_checkout):
                 steps: {steps}
         """},
         """
-            required-actions: [actions/checkout]
-            extends: [build-monitoring]
+            extends: [{name: required-actions, params: {actions: [actions/checkout]}}, build-monitoring]
         """,
         "--report-dir", str(reports),
     )
@@ -863,6 +993,18 @@ def test_inline_directive_can_skip_a_single_rule(tmp_path, has_checkout):
         "SKIP .github/workflows/ci.yml:lint: build-monitoring: too short to monitor "
         "(inline, .github/workflows/ci.yml:3)"
     ) in result.stderr
+
+
+def test_local_conftest_matches_the_version_the_action_installs():
+    action = YAML(typ="safe", pure=True).load(
+        CHECK.with_name("action.yml").read_text(encoding="utf-8"),
+    )
+    tooling = next(step for step in action["runs"]["steps"] if step.get("id") == "tooling")
+    version = subprocess.run(
+        ["conftest", "--version"], capture_output=True, text=True, check=True,
+    ).stdout
+    # glob.match semantics differ across the OPA versions Conftest bundles.
+    assert f"Conftest: {tooling['env']['CONFTEST_VERSION']}" in version, version
 
 
 @pytest.mark.parametrize("policy", sorted(
@@ -889,7 +1031,7 @@ def test_unused_exception_fails_instead_of_hiding_a_typo(tmp_path):
                   - uses: actions/checkout@v4
         """},
         """
-            required-actions: [actions/checkout]
+            extends: [{name: required-actions, params: {actions: [actions/checkout]}}]
             exceptions:
               - workflow: "*"
                 jobs: [notifiy]
@@ -903,20 +1045,20 @@ def test_unused_exception_fails_instead_of_hiding_a_typo(tmp_path):
 
 @pytest.mark.parametrize("config", [
     "{}",
-    "required-actions: []",
+    "extends: [{name: required-actions, params: {actions: []}}]",
     "required-actions: actions/checkout",
-    "required-actions: [actions/checkout@v4]",
-    "required-actions: [actions/checkout]\nexception: []",
+    "extends: [{name: required-actions, params: {actions: [actions/checkout@v4]}}]",
+    "extends: [{name: required-actions, params: {actions: [actions/checkout]}}]\nexception: []",
     """
-        required-actions: [actions/checkout]
+        extends: [{name: required-actions, params: {actions: [actions/checkout]}}]
         exceptions: [{workflow: "*", jobs: [notify], reason: ""}]
     """,
     """
-        required-actions: [actions/checkout]
+        extends: [{name: required-actions, params: {actions: [actions/checkout]}}]
         exceptions: [{workflow: "*", jobs: notify, reason: Notifications}]
     """,
     """
-        required-actions: [actions/checkout]
+        extends: [{name: required-actions, params: {actions: [actions/checkout]}}]
         exceptions: [{workflow: "*", jobs: ["notify-*"], reason: Notifications}]
     """,
     "extends: build-monitoring",
@@ -925,9 +1067,28 @@ def test_unused_exception_fails_instead_of_hiding_a_typo(tmp_path):
     "extends: [build-monitoring, build-monitoring]",
     "extends: [required-actions]",
     """
-        required-actions: [actions/checkout]
+        extends: [{name: required-actions, params: {actions: [actions/checkout]}}]
         exceptions: [{workflow: "*", jobs: [notify], rule: build-monitoring, reason: Notify}]
     """,
+    "extends: [{name: build-monitoring, params: {}}]",
+    "extends: [{name: build-monitoring, params: }]",
+    "extends: [{name: build-monitoring, params: [first-step]}]",
+    "extends: [{params: {first-step: acme/start}}]",
+    "extends: [{name: build-monitoring, params: {first-step: acme/start}, extra: 1}]",
+    "extends: [{name: required-actions, params: {first-step: acme/start}}]",
+    "extends: [{name: missing, params: {first-step: acme/start}}]",
+    "extends: [{name: build-monitoring, params: {unknown: acme/start}}]",
+    "extends: [build-monitoring, {name: build-monitoring, params: {first-step: acme/start}}]",
+    "extends: [{name: build-monitoring, params: {first-step: acme/start}}]",
+    "required-actions: [actions/checkout]",
+    "extends: [{name: required-actions, params: {actions: [checkout]}}]",
+    "extends: [{name: required-actions, params: {actions: ['acme/ tool']}}]",
+    "extends: [{name: required-actions, params: {actions: ['acme/{tool,cli}']}}]",
+    "extends: [{name: required-actions, params: {actions: ['acme/tool?']}}]",
+    "extends: [{name: build-monitoring, params: {last-step-any-of: acme/submit}}]",
+    "extends: [{name: build-monitoring, params: {last-step-any-of: []}}]",
+    "extends: [{name: build-monitoring, params: {last-step-any-of: [acme/submit@v1]}}]",
+    "extends: [{name: build-monitoring, params: {last-step-any-of: [acme/submit, '']}}]",
 ])
 def test_invalid_configuration_fails_before_policy_evaluation(tmp_path, config):
     result = run_check(
@@ -942,7 +1103,7 @@ def test_invalid_configuration_fails_before_policy_evaluation(tmp_path, config):
 
 
 def test_empty_workflow_discovery_is_not_a_successful_check(tmp_path):
-    result = run_check(tmp_path, {}, "required-actions: [actions/checkout]")
+    result = run_check(tmp_path, {}, "extends: [{name: required-actions, params: {actions: [actions/checkout]}}]")
 
     assert result.returncode == 2, result.stdout + result.stderr
     assert "no workflow files found" in result.stderr
@@ -961,7 +1122,7 @@ def test_malformed_workflows_fail_even_with_a_whole_file_exception(tmp_path, wor
         tmp_path,
         {"ci.yml": workflow},
         """
-            required-actions: [actions/checkout]
+            extends: [{name: required-actions, params: {actions: [actions/checkout]}}]
             exceptions:
               - workflow: "*"
                 jobs: ["*"]
@@ -996,7 +1157,7 @@ def test_reusable_workflow_calls_are_never_checked_and_called_workflows_are(tmp_
                       - run: make test
             """,
         },
-        "required-actions: [actions/checkout]",
+        "extends: [{name: required-actions, params: {actions: [actions/checkout]}}]",
         "--report-dir", str(reports),
     )
 
@@ -1030,7 +1191,7 @@ def test_exceptions_matching_only_reusable_workflow_calls_fail(tmp_path):
                 uses: acme/shared/.github/workflows/build.yml@main
         """},
         """
-            required-actions: [actions/checkout]
+            extends: [{name: required-actions, params: {actions: [actions/checkout]}}]
             exceptions:
               - workflow: "*"
                 jobs: [shared-build]
@@ -1052,7 +1213,7 @@ def test_callers_conftest_configuration_cannot_disable_the_bundled_policy(tmp_pa
     result = run_check(
         tmp_path,
         {"ci.yml": "jobs: {build: {runs-on: ubuntu-latest, steps: []}}"},
-        "required-actions: [actions/checkout]",
+        "extends: [{name: required-actions, params: {actions: [actions/checkout]}}]",
     )
 
     assert result.returncode == 1, result.stdout + result.stderr
@@ -1074,7 +1235,7 @@ def test_yaml_12_job_ids_are_not_lost_during_policy_evaluation(
                 runs-on: ubuntu-latest
                 steps: {steps}
         """},
-        "required-actions: [actions/checkout]",
+        "extends: [{name: required-actions, params: {actions: [actions/checkout]}}]",
     )
 
     assert result.returncode == (0 if has_checkout else 1), result.stdout + result.stderr
@@ -1103,7 +1264,7 @@ def test_composite_action_runs_bundled_checker_with_literal_caller_config(
     )
     config = "policy file $(touch injected).yml"
     (caller / config).write_text(
-        "required-actions: [actions/checkout]\n", encoding="utf-8",
+        "extends: [{name: required-actions, params: {actions: [actions/checkout]}}]\n", encoding="utf-8",
     )
     (caller / "workflow-policy").mkdir()
     (caller / "workflow-policy/check.py").write_text(

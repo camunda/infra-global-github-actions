@@ -1,6 +1,6 @@
 # 🔎 Workflow policy check
 
-Checks the calling repository's workflow jobs against rules: required actions and presets bundled with this action.
+Checks the calling repository's workflow jobs against presets bundled with this action.
 
 ## ⚙️ Configuration
 
@@ -9,9 +9,10 @@ Create `.github/workflow-policy.yml`:
 ```yaml
 extends:
   - build-monitoring
-
-required-actions:
-  - actions/checkout
+  - name: required-actions
+    params:
+      actions:
+        - actions/checkout
 
 exceptions:
   - workflow: .github/workflows/workflow-policy.yml
@@ -23,9 +24,7 @@ exceptions:
     reason: Too short to monitor
 ```
 
-Set `required-actions`, `extends`, or both. Each becomes a rule: `required-actions` checks that every job uses each listed action, and each [preset](#-presets) adds its own rule.
-
-Configure action paths without `@ref`. Remote composites and local paths such as `./.github/actions/observe-build-status` are supported.
+Each [preset](#-presets) listed in `extends` is a rule, written as its name or as a mapping with `name` and optional [`params`](#preset-parameters).
 
 The first exception excludes the checker job below from every rule; the second excludes `lint` from `build-monitoring` only. Use exact workflow paths and job IDs, or `"*"` for all workflows or jobs. Each exception needs a reason and must match at least one job; `rule` is optional and must name a configured rule. To exclude a job from several rules, add one exception per rule.
 
@@ -33,13 +32,37 @@ A job that calls a reusable workflow is never checked: a called workflow in `.gi
 
 ## 🧩 Presets
 
-A preset is a rule maintained in this action, enabled by name with `extends`. Pinning the action's commit SHA pins its presets too.
+A preset is a rule maintained in this action. Pinning the action's commit SHA pins its presets too.
 
 | Preset | Checks |
 | --- | --- |
-| `build-monitoring` | The first step uses `camunda/infra-global-github-actions/start-build-monitor`, and the last step uses `camunda/infra-global-github-actions/submit-build-status` or `./.github/actions/observe-build-status` with `if: always()` and `continue-on-error: true`. Jobs named `notify`, `notify-on-failure`, or `notify-on-success` are excluded. |
+| `build-monitoring` | The first step uses `camunda/infra-global-github-actions/start-build-monitor`, and the last step uses `camunda/infra-global-github-actions/submit-build-status` or the local `observe-build-status` wrapper at any checkout path with `if: always()` and `continue-on-error: true`. Jobs named `notify`, `notify-on-failure`, or `notify-on-success` are excluded. |
+| `required-actions` | Every job uses an action matching each entry of `actions`, at any ref. |
 
-A preset's own exceptions apply only to its rule and may match no job. Each preset lives in `presets/<name>/`: `preset.yml` holds its parameters and exceptions, and its Rego package `workflow_policy.<name>` returns findings with `rule`, `job`, and `msg`. The checker applies exceptions to those findings afterwards. Run its tests with `conftest verify --policy presets/<name>`.
+A preset's own exceptions apply only to its rule and may match no job. Each preset lives in `presets/<name>/`: `preset.yml` holds its parameters, the ones a repository may override, and its exceptions; its Rego package `workflow_policy.<name>` returns findings with `rule`, `job`, and `msg`. The checker applies exceptions to those findings afterwards. Run its tests with `conftest verify --policy presets/<name>`.
+
+### Preset parameters
+
+A repository sets the parameters a preset lists as `overridable` under `params`:
+
+```yaml
+extends:
+  - name: build-monitoring
+    params:
+      last-step-any-of:
+        - camunda/infra-global-github-actions/submit-build-status
+        - ./.github/actions/report-build
+```
+
+| Preset | Parameter | Default | Overridable |
+| --- | --- | --- | --- |
+| `build-monitoring` | `first-step` | `camunda/infra-global-github-actions/start-build-monitor` | No |
+| `build-monitoring` | `last-step-any-of` | `camunda/infra-global-github-actions/submit-build-status`, `./**/.github/actions/observe-build-status` | Yes |
+| `required-actions` | `actions` | None, must be set | Yes |
+
+A value replaces its default, so repeat the defaults you still want, as above: a string, or a non-empty list when the default is a list. Each value is an action path without `@ref`, such as `actions/checkout`, or a pattern: `*` matches one path segment and `**` any number of segments, including none, so `./**/.github/actions/observe-build-status` matches `./.github/actions/observe-build-status` and `./tool/.github/actions/observe-build-status`. An unknown or fixed parameter, a value of the wrong shape, a value with `?`, `[`, `{`, or `\`, an empty `params`, or a list parameter left empty fails the check. The `if: always()` and `continue-on-error: true` requirement on the last step of `build-monitoring` is fixed.
+
+The report and the job summary list every override with its value and configuration line, such as `build-monitoring: last-step-any-of = camunda/infra-global-github-actions/submit-build-status, ./.github/actions/report-build (.github/workflow-policy.yml:4)`, and the rule's findings name the effective values.
 
 ### Inline exceptions
 
@@ -89,7 +112,7 @@ jobs:
 
 A malformed directive, an unconfigured rule, a misplaced directive, two directives for the same rule, or a directive without `rule` next to another one on the same job or workflow fails the check. `#` inside `run:` scripts and quoted strings is ignored.
 
-Inline, configured, and preset exceptions combine. The report lists every exception that matches a job, inline first, each with its source and location, prefixed by its rule when it excludes only one: `Slack only (inline, .github/workflows/ci.yml:6)` or `build-monitoring: Too short to monitor (config, .github/workflow-policy.yml:11)`.
+Inline, configured, and preset exceptions combine. The report lists every exception that matches a job, inline first, each with its source and location, prefixed by its rule when it excludes only one: `Slack only (inline, .github/workflows/ci.yml:6)` or `build-monitoring: Too short to monitor (config, .github/workflow-policy.yml:12)`.
 
 ## 🔧 Caller workflow
 
@@ -130,10 +153,10 @@ The GitHub job summary lists each job's result, rule findings, and exclusion rea
 
 | Output | Contents |
 | --- | --- |
-| `report-path` | JSON with aggregate counts, per-job results, findings, exclusions, and errors |
+| `report-path` | JSON with aggregate counts, parameter overrides, per-job results, findings, exclusions, and errors |
 | `summary-path` | Markdown summary and job table |
 
-Each job has a `status`: `passed`, `failed`, `excluded`, `reusable`, or `error`; a `reusable` job names the workflow it calls in `calls`. Each job lists the `rules` it was checked against and its `findings` (`rule`, `message`, and `action` for `required-actions`). Its `exclusions` list holds `source` (`inline`, `config`, or `preset`), `file`, `line`, `reason`, and `rule` (`null` for every rule) for each matching exception, so excluded jobs can be traced to their declaration.
+Each job has a `status`: `passed`, `failed`, `excluded`, `reusable`, or `error`; a `reusable` job names the workflow it calls in `calls`. Each job lists the `rules` it was checked against and its `findings` (`rule`, `message`, and `action` for `required-actions`). Its `exclusions` list holds `source` (`inline`, `config`, or `preset`), `file`, `line`, `reason`, and `rule` (`null` for every rule) for each matching exception, so excluded jobs can be traced to their declaration. The top-level `overrides` list holds `rule`, `param`, `value`, `file`, and `line` for each parameter override.
 
 Outputs are runner-local file paths available after validation, including policy failures. Configuration and Conftest errors appear in the report and fail the check. Upload the JSON as an artifact to retain it after the job.
 

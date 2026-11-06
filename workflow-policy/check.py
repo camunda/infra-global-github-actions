@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Experimental workflow job policy check: required actions and presets, evaluated by Conftest."""
+"""Experimental workflow job policy check: presets evaluated by Conftest."""
 
 import argparse
 from datetime import date
@@ -66,33 +66,85 @@ def validate_exceptions(exceptions, rules, label):
             raise ValueError(f"{label}: exception rule must be one of: {', '.join(rules)}")
 
 
-def validate_config(config):
-    if not isinstance(config, dict) or set(config) - {"extends", REQUIRED_ACTIONS, "exceptions"}:
-        raise ValueError("configuration: expected extends, required-actions, and exceptions")
-    if "extends" not in config and REQUIRED_ACTIONS not in config:
-        raise ValueError("configuration: set required-actions, extends, or both")
-    rules = []
-    if REQUIRED_ACTIONS in config:
-        actions = config[REQUIRED_ACTIONS]
-        if not isinstance(actions, list) or not actions or any(
-            not isinstance(action, str) or "/" not in action or "@" in action
-            or any(character.isspace() for character in action)
-            for action in actions
-        ):
+def is_action_path(value):
+    """An action path or pattern without `@ref`, such as ./**/.github/actions/x.
+
+    `*` is the only wildcard accepted, so every pattern is valid for Rego's glob.match.
+    """
+    return (
+        isinstance(value, str) and "/" in value and "@" not in value
+        and not any(character.isspace() or character in "?[]{}\\" for character in value)
+    )
+
+
+def preset_entry(entry):
+    """Split an `extends` entry, a preset name or {name, params?}, into (name, overrides)."""
+    if isinstance(entry, dict):
+        if "name" not in entry or set(entry) - {"name", "params"}:
+            raise ValueError("configuration: an extends mapping needs name and accepts params")
+        name, overrides = entry["name"], entry.get("params", {})
+        if "params" in entry and (not isinstance(overrides, dict) or not overrides):
+            raise ValueError(f"configuration: params of preset {name} must be a non-empty mapping")
+    else:
+        name, overrides = entry, {}
+    if not isinstance(name, str) or not PRESET_NAME.fullmatch(name):
+        raise ValueError("configuration: extends must be a non-empty list of distinct preset names")
+    return name, overrides
+
+
+def override_params(name, defaults, overridable, overrides):
+    """Replace the overridable preset parameters named in `overrides`.
+
+    Parameters are action paths: a value keeps the shape of its default, a string or a list
+    of strings. A list parameter must end up non-empty, so an empty default must be set.
+    """
+    label = f"configuration: preset {name}"
+    unknown = sorted(str(key) for key in set(overrides) - set(defaults))
+    if unknown:
+        raise ValueError(
+            f"{label} has no parameter {', '.join(unknown)}; "
+            f"available parameters: {', '.join(defaults) or 'none'}"
+        )
+    fixed = [key for key in overrides if key not in overridable]
+    if fixed:
+        raise ValueError(
+            f"{label}: parameter {', '.join(fixed)} cannot be overridden; "
+            f"overridable parameters: {', '.join(overridable) or 'none'}"
+        )
+    params = dict(defaults)
+    for key, value in overrides.items():
+        is_list = isinstance(defaults[key], list)
+        values = value if is_list and isinstance(value, list) else [value]
+        if isinstance(value, list) != is_list or not values or not all(map(is_action_path, values)):
             raise ValueError(
-                "configuration: required-actions must be a non-empty list of "
-                "unversioned action paths, such as actions/checkout"
+                f"{label}: parameter {key} must be "
+                + ("a non-empty list of unversioned action paths" if is_list else
+                   "an unversioned action path")
+                + ", such as actions/checkout"
             )
-        rules.append(REQUIRED_ACTIONS)
-    if "extends" in config:
-        presets = config["extends"]
-        if not isinstance(presets, list) or not presets or any(
-            not isinstance(name, str) or not PRESET_NAME.fullmatch(name)
-            or name == REQUIRED_ACTIONS
-            for name in presets
-        ) or len(set(presets)) != len(presets):
-            raise ValueError("configuration: extends must be a non-empty list of distinct preset names")
-        rules.extend(presets)
+        params[key] = list(dict.fromkeys(values)) if is_list else value
+    for key, value in params.items():
+        if value == []:
+            raise ValueError(f"{label} needs a value for parameter {key}; set it under params")
+    return params
+
+
+def validate_config(config):
+    if isinstance(config, dict) and REQUIRED_ACTIONS in config:
+        raise ValueError(
+            "configuration: required-actions is a preset; list it under extends "
+            "with params.actions"
+        )
+    if not isinstance(config, dict) or set(config) - {"extends", "exceptions"} or (
+        "extends" not in config
+    ):
+        raise ValueError("configuration: expected extends and optional exceptions")
+    presets = config["extends"]
+    if not isinstance(presets, list) or not presets:
+        raise ValueError("configuration: extends must be a non-empty list of distinct preset names")
+    rules = [preset_entry(entry)[0] for entry in presets]
+    if len(set(rules)) != len(rules):
+        raise ValueError("configuration: extends must be a non-empty list of distinct preset names")
     validate_exceptions(config.get("exceptions", []), rules, "configuration")
 
 
@@ -115,8 +167,27 @@ def located_exceptions(entries, document, file, source, rule=None):
     ]
 
 
-def load_preset(name, yaml):
-    """Load a preset bundled with the action: its Rego policy, parameters, and exceptions."""
+def override_lines(document):
+    """Map each `extends` entry index to {param: line} for the params it overrides."""
+    extends = None
+    if isinstance(document, MappingNode):
+        extends = next((value for key, value in document.value if key.value == "extends"), None)
+    lines = {}
+    for index, entry in enumerate(extends.value if isinstance(extends, SequenceNode) else []):
+        params = None
+        if isinstance(entry, MappingNode):
+            params = next((value for key, value in entry.value if key.value == "params"), None)
+        if isinstance(params, MappingNode):
+            lines[index] = {key.value: key.start_mark.line + 1 for key, _ in params.value}
+    return lines
+
+
+def load_preset(name, yaml, overrides=None):
+    """Load a preset bundled with the action: its Rego policy, parameters, and exceptions.
+
+    `overrides` are the caller's replacements for the parameters the preset lists as
+    `overridable`.
+    """
     path = PRESETS / name / "preset.yml"
     if not path.is_file():
         available = ", ".join(sorted(preset.parent.name for preset in PRESETS.glob("*/preset.yml")))
@@ -125,11 +196,18 @@ def load_preset(name, yaml):
     preset = yaml.load(text)
     label = f"preset {name}"
     if (
-        not isinstance(preset, dict) or set(preset) - {"description", "params", "exceptions"}
+        not isinstance(preset, dict)
+        or set(preset) - {"description", "params", "overridable", "exceptions"}
         or not isinstance(preset.get("description"), str)
         or not isinstance(preset.get("params", {}), dict)
     ):
-        raise ValueError(f"{label}: expected description, params, and exceptions")
+        raise ValueError(f"{label}: expected description, params, overridable, and exceptions")
+    overridable = preset.get("overridable", [])
+    if (
+        not isinstance(overridable, list) or len(set(overridable)) != len(overridable)
+        or any(key not in preset.get("params", {}) for key in overridable)
+    ):
+        raise ValueError(f"{label}: overridable must list distinct parameters of the preset")
     validate_exceptions(preset.get("exceptions", []), None, label)
     exceptions = located_exceptions(
         preset.get("exceptions", []), yaml.compose(text),
@@ -138,24 +216,30 @@ def load_preset(name, yaml):
     return {
         "namespace": "workflow_policy." + name.replace("-", "_"),
         "policy": path.parent,
-        "params": preset.get("params", {}),
+        "params": override_params(name, preset.get("params", {}), overridable, overrides or {}),
         # A preset serves many repositories, so its exceptions may match no job in one of them.
         "exceptions": [{**entry, "optional": True} for entry in exceptions],
     }
 
 
-def load_rules(config, yaml):
-    """Return {rule: {namespace, policy, params, exceptions}} in evaluation order."""
+def load_rules(config, yaml, document, config_path):
+    """Return {rule: {namespace, policy, params, exceptions, overrides}} in `extends` order.
+
+    Each override records the effective value and where the configuration sets it.
+    """
     rules = {}
-    if REQUIRED_ACTIONS in config:
-        rules[REQUIRED_ACTIONS] = {
-            "namespace": "workflow_policy.required_actions",
-            "policy": ACTION_DIRECTORY / "policy",
-            "params": {"actions": list(dict.fromkeys(config[REQUIRED_ACTIONS]))},
-            "exceptions": [],
-        }
-    for name in config.get("extends", []):
-        rules[name] = load_preset(name, yaml)
+    lines = override_lines(document)
+    for index, entry in enumerate(config["extends"]):
+        name, overrides = preset_entry(entry)
+        rule = load_preset(name, yaml, overrides)
+        rule["overrides"] = [
+            {
+                "rule": name, "param": key, "value": rule["params"][key],
+                "file": config_path, "line": lines.get(index, {}).get(key),
+            }
+            for key in overrides
+        ]
+        rules[name] = rule
     return rules
 
 
@@ -260,6 +344,12 @@ def location(exclusion):
     if exclusion["line"] is None:
         return exclusion["file"]
     return f"{exclusion['file']}:{exclusion['line']}"
+
+
+def describe_override(override):
+    value = override["value"]
+    value = ", ".join(value) if isinstance(value, list) else value
+    return f"{override['rule']}: {override['param']} = {value} ({location(override)})"
 
 
 def describe_exclusions(exclusions):
@@ -500,6 +590,7 @@ def build_report(manifest, findings, error=None):
     return {
         "status": "error" if error else "failed" if failed_jobs else "passed",
         "rules": manifest["rules"],
+        "overrides": manifest["overrides"],
         "summary": {
             "workflows": len(manifest["workflows"]),
             "selected_jobs": sum(job["status"] not in {"excluded", "reusable"} for job in jobs),
@@ -534,6 +625,12 @@ def markdown_summary(report):
         f"({summary['passed_checks']} passed, {summary['failed_checks']} failed).",
         "",
     ]
+    if report["overrides"]:
+        lines.extend(["Parameter overrides:", ""])
+        lines.extend(
+            f"- {markdown_cell(describe_override(override))}" for override in report["overrides"]
+        )
+        lines.append("")
     for error in report["errors"]:
         lines.extend([markdown_cell(error), ""])
     lines.extend([
@@ -573,6 +670,8 @@ def print_report(report):
         return
     summary = report["summary"]
     print(f"Rules: {', '.join(report['rules'])}.")
+    for override in report["overrides"]:
+        print(f"Override: {describe_override(override)}")
     print(
         f"{summary['selected_jobs']} selected jobs across {summary['workflows']} workflows; "
         f"{summary['excluded_jobs']} excluded; {summary['reusable_jobs']} call reusable workflows."
@@ -608,7 +707,7 @@ def main():
         help="Write report.json and summary.md to this directory, including on failure.",
     )
     args = parser.parse_args()
-    manifest = {"rules": [], "workflows": [], "jobs": []}
+    manifest = {"rules": [], "overrides": [], "workflows": [], "jobs": []}
     findings = []
     error = None
     try:
@@ -622,13 +721,16 @@ def main():
         yaml = YAML(typ="safe", pure=True)
         config = yaml.load(text)
         validate_config(config)
-        rules = load_rules(config, yaml)
         document = yaml.compose(text)
+        rules = load_rules(config, yaml, document, config_path)
         exceptions = [
             *located_exceptions(config.get("exceptions", []), document, config_path, "config"),
             *(entry for rule in rules.values() for entry in rule["exceptions"]),
         ]
         manifest, workflows = select_jobs(root, rules, exceptions)
+        manifest["overrides"] = [
+            override for rule in rules.values() for override in rule["overrides"]
+        ]
         for job in manifest["jobs"]:
             if job["calls"] is not None:
                 print(

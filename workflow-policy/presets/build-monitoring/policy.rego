@@ -23,9 +23,12 @@ deny contains finding(job_id, "last step must set if: always() and continue-on-e
 
 # Negate a helper rule, never a comparison holding a call: `not f(x) == y` is skipped
 # silently when f(x) is undefined, such as for a `run:` step or a job without steps.
-starts_with_monitor(job_id) if action(input.jobs[job_id].steps[0]) == params["first-step"]
+starts_with_monitor(job_id) if uses(params["first-step"], input.jobs[job_id].steps[0])
 
-ends_with_observer(job_id) if action(last_step(job_id)) in params["last-step-any-of"]
+ends_with_observer(job_id) if {
+	some pattern in params["last-step-any-of"]
+	uses(pattern, last_step(job_id))
+}
 
 best_effort(step) if {
 	contains(step["if"], "always()")
@@ -35,6 +38,11 @@ best_effort(step) if {
 last_step(job_id) := input.jobs[job_id].steps[count(input.jobs[job_id].steps) - 1]
 
 action(step) := split(step.uses, "@")[0] if is_string(step.uses)
+
+# `*` matches one path segment, `**` any number including none (OPA 1.21+ needs `/**/` as `/`).
+uses(pattern, step) if glob.match(pattern, ["/"], action(step))
+
+uses(pattern, step) if glob.match(replace(pattern, "/**/", "/"), ["/"], action(step))
 
 # Not named `violation`: Conftest evaluates every deny*, warn*, and violation* rule.
 finding(job_id, msg) := {

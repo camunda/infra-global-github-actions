@@ -4,7 +4,7 @@ import data.workflow_policy.build_monitoring
 
 params := {"build-monitoring": {
 	"first-step": "acme/start",
-	"last-step-any-of": ["acme/submit", "./.github/actions/observe"],
+	"last-step-any-of": ["acme/submit", "./**/.github/actions/observe"],
 }}
 
 start := {"uses": "acme/start@0123456789012345678901234567890123456789"}
@@ -25,6 +25,18 @@ test_local_wrapper_with_expression_passes if {
 	count(messages([start, {"uses": "actions/checkout@v5"}, observer])) == 0
 }
 
+test_local_wrapper_under_a_checkout_path_passes if {
+	observer := {"uses": "./tool/.github/actions/observe", "if": "always()", "continue-on-error": true}
+	count(messages([start, {"uses": "actions/checkout@v5"}, observer])) == 0
+}
+
+test_wrapper_with_a_longer_name_fails if {
+	observer := {"uses": "./.github/actions/observe-extra", "if": "always()", "continue-on-error": true}
+	messages([start, observer]) == {
+		"job build: last step must use one of acme/submit, ./**/.github/actions/observe",
+	}
+}
+
 test_monitor_after_another_step_fails if {
 	messages([{"uses": "actions/checkout@v5"}, start, submit]) == {
 		"job build: first step must use acme/start",
@@ -37,7 +49,7 @@ test_run_step_first_fails if {
 
 test_missing_observer_fails if {
 	messages([start, {"run": "make"}]) == {
-		"job build: last step must use one of acme/submit, ./.github/actions/observe",
+		"job build: last step must use one of acme/submit, ./**/.github/actions/observe",
 	}
 }
 
@@ -56,6 +68,6 @@ test_submission_that_can_fail_the_job_fails if {
 test_job_without_steps_fails_both_checks if {
 	messages([]) == {
 		"job build: first step must use acme/start",
-		"job build: last step must use one of acme/submit, ./.github/actions/observe",
+		"job build: last step must use one of acme/submit, ./**/.github/actions/observe",
 	}
 }
