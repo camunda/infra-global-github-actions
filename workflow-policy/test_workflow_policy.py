@@ -269,19 +269,19 @@ def test_inline_directives_exclude_only_the_job_they_annotate(tmp_path):
                 runs-on: ubuntu-latest
                 steps:
                   - run: |
-                      # workflow-policy: skip script text is not a directive
-                      echo "# workflow-policy: skip"
+                      # workflow-policy: skip-job script text is not a directive
+                      echo "# workflow-policy: skip-job"
               # Sends Slack messages only.
-              # workflow-policy: skip notification-only job
+              # workflow-policy: skip-job notification-only job
               notify:
                 steps: []
-              cleanup: # workflow-policy: skip  housekeeping only
+              cleanup: # workflow-policy: skip-job  housekeeping only
                 steps: []
               deploy:
                 steps:
                   - run: "echo
-                      # workflow-policy: skip quoted text"
-              lint: {steps: []}  # workflow-policy: skip flow-style job
+                      # workflow-policy: skip-job quoted text"
+              lint: {steps: []}  # workflow-policy: skip-job flow-style job
         """},
         "required-actions: [actions/checkout]",
         "--select-only",
@@ -324,14 +324,14 @@ def test_inline_and_config_exceptions_combine(tmp_path):
                   build:
                     steps:
                       - uses: actions/checkout@v4
-                  notify: # workflow-policy: skip Slack only
+                  notify: # workflow-policy: skip-job Slack only
                     steps: []
                   docs:
                     steps: []
             """,
             "release.yml": """
                 jobs:
-                  # workflow-policy: skip steps live in the shared workflow
+                  # workflow-policy: skip-job steps live in the shared workflow
                   shared:
                     uses: acme/shared/.github/workflows/build.yml@main
                   docs:
@@ -377,64 +377,232 @@ def test_inline_and_config_exceptions_combine(tmp_path):
     ) in markdown
 
 
+def test_skip_workflow_directive_excludes_every_job_in_its_workflow(tmp_path):
+    reports = tmp_path / "reports"
+    result = run_check(
+        tmp_path,
+        {
+            "ci.yml": """
+                jobs:
+                  build:
+                    steps:
+                      - uses: actions/checkout@v5
+            """,
+            "maintenance.yml": """
+                # Manual cleanup tasks.
+
+                # workflow-policy: skip-workflow manual maintenance only
+                name: Maintenance
+                on: workflow_dispatch
+                jobs:
+                  reset:
+                    steps: []
+                  shared:
+                    uses: acme/shared/.github/workflows/cleanup.yml@main
+            """,
+        },
+        "required-actions: [actions/checkout]",
+        "--report-dir", str(reports),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
+    exclusion = {
+        "source": "inline", "file": ".github/workflows/maintenance.yml",
+        "line": 4, "reason": "manual maintenance only", "rule": None,
+    }
+    assert {(job["workflow"], job["job"]): job["exclusions"] for job in report["jobs"]} == {
+        (".github/workflows/ci.yml", "build"): [],
+        (".github/workflows/maintenance.yml", "reset"): [exclusion],
+        (".github/workflows/maintenance.yml", "shared"): [exclusion],
+    }
+    assert (
+        "SKIP .github/workflows/maintenance.yml:shared: manual maintenance only "
+        "(inline, .github/workflows/maintenance.yml:4)"
+    ) in result.stderr
+
+
+def test_skip_workflow_and_skip_job_directives_combine(tmp_path):
+    reports = tmp_path / "reports"
+    result = run_check(
+        tmp_path,
+        {"ci.yml": """
+            # workflow-policy: skip-workflow rule=build-monitoring jobs finish in seconds
+            on: push
+            jobs:
+              lint:
+                steps:
+                  - uses: actions/checkout@v5
+              cleanup: # workflow-policy: skip-job housekeeping only
+                steps: []
+        """},
+        """
+            required-actions: [actions/checkout]
+            extends: [build-monitoring]
+        """,
+        "--report-dir", str(reports),
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
+    jobs = {job["job"]: job for job in report["jobs"]}
+    workflow_exclusion = {
+        "source": "inline", "file": ".github/workflows/ci.yml", "line": 2,
+        "reason": "jobs finish in seconds", "rule": "build-monitoring",
+    }
+    assert jobs["lint"]["rules"] == ["required-actions"]
+    assert jobs["lint"]["exclusions"] == [workflow_exclusion]
+    assert jobs["cleanup"]["rules"] == []
+    assert jobs["cleanup"]["exclusions"] == [workflow_exclusion, {
+        "source": "inline", "file": ".github/workflows/ci.yml", "line": 8,
+        "reason": "housekeeping only", "rule": None,
+    }]
+
+
+def test_directives_for_different_rules_combine_on_the_same_job_or_workflow(tmp_path):
+    result = run_check(
+        tmp_path,
+        {
+            "ci.yml": """
+                # workflow-policy: skip-workflow rule=build-monitoring jobs finish in seconds
+                # workflow-policy: skip-workflow rule=required-actions no checkout needed
+                on: push
+                jobs:
+                  lint:
+                    steps: []
+            """,
+            "release.yml": """
+                jobs:
+                  # workflow-policy: skip-job rule=build-monitoring too short to monitor
+                  tag: # workflow-policy: skip-job rule=required-actions tags through the API
+                    steps: []
+                  publish:
+                    steps: []
+            """,
+        },
+        """
+            required-actions: [actions/checkout]
+            extends: [build-monitoring]
+        """,
+        "--select-only",
+    )
+
+    assert result.returncode == 0, result.stderr
+    jobs = {(job["workflow"], job["job"]): job for job in json.loads(result.stdout)["jobs"]}
+
+    def inline(workflow, line, reason, rule):
+        return {
+            "source": "inline", "file": f".github/workflows/{workflow}",
+            "line": line, "reason": reason, "rule": rule,
+        }
+
+    lint = jobs[(".github/workflows/ci.yml", "lint")]
+    assert lint["rules"] == []
+    assert lint["exclusions"] == [
+        inline("ci.yml", 2, "jobs finish in seconds", "build-monitoring"),
+        inline("ci.yml", 3, "no checkout needed", "required-actions"),
+    ]
+    tag = jobs[(".github/workflows/release.yml", "tag")]
+    assert tag["rules"] == []
+    assert tag["exclusions"] == [
+        inline("release.yml", 3, "too short to monitor", "build-monitoring"),
+        inline("release.yml", 4, "tags through the API", "required-actions"),
+    ]
+    publish = jobs[(".github/workflows/release.yml", "publish")]
+    assert publish["rules"] == ["required-actions", "build-monitoring"]
+    assert publish["exclusions"] == []
+
+
+SYNTAX = "expected '# workflow-policy: skip-job|skip-workflow [rule=<rule>] <reason>'"
+
+
 @pytest.mark.parametrize("workflow,message", [
+    ("jobs:\n  notify: # workflow-policy: skip-job\n    steps: []\n", f"ci.yml:2: {SYNTAX}"),
     (
-        "jobs:\n  notify: # workflow-policy: skip\n    steps: []\n",
-        "ci.yml:2: expected '# workflow-policy: skip [rule=<rule>] <reason>'",
+        "jobs:\n  notify: # workflow-policy: skip-job rule=required-actions\n    steps: []\n",
+        f"ci.yml:2: {SYNTAX}",
     ),
     (
-        "jobs:\n  notify: # workflow-policy: skip rule=required-actions\n    steps: []\n",
-        "ci.yml:2: expected '# workflow-policy: skip [rule=<rule>] <reason>'",
+        "jobs:\n  notify: # workflow-policy: skip-job rule= no rule name\n    steps: []\n",
+        f"ci.yml:2: {SYNTAX}",
     ),
     (
-        "jobs:\n  notify: # workflow-policy: skip rule= no rule name\n    steps: []\n",
-        "ci.yml:2: expected '# workflow-policy: skip [rule=<rule>] <reason>'",
-    ),
-    (
-        "jobs:\n  notify: # workflow-policy: skip rule=build-monitoring Slack only\n"
+        "jobs:\n  notify: # workflow-policy: skip-job rule=build-monitoring Slack only\n"
         "    steps: []\n",
         "ci.yml:2: rule build-monitoring is not configured; configured rules: required-actions",
     ),
     (
-        "jobs:\n  notify: # workflow-policy skip missing colon\n    steps: []\n",
-        "ci.yml:2: expected '# workflow-policy: skip [rule=<rule>] <reason>'",
+        "jobs:\n  notify: # workflow-policy skip-job missing colon\n    steps: []\n",
+        f"ci.yml:2: {SYNTAX}",
     ),
     (
-        "jobs:\n  notify: # Workflow-Policy: skip wrong case\n    steps: []\n",
-        "ci.yml:2: expected '# workflow-policy: skip [rule=<rule>] <reason>'",
+        "jobs:\n  notify: # Workflow-Policy: skip-job wrong case\n    steps: []\n",
+        f"ci.yml:2: {SYNTAX}",
+    ),
+    ("jobs:\n  notify: # workflow-policy: skip no scope\n    steps: []\n", f"ci.yml:2: {SYNTAX}"),
+    ("# workflow-policy: skip-file legacy\njobs:\n  notify:\n    steps: []\n", f"ci.yml:1: {SYNTAX}"),
+    ("# workflow-policy: skip-job whole file\njobs:\n  notify:\n    steps: []\n", "ci.yml:1: place skip-job"),
+    (
+        "jobs:\n  notify:\n    steps:\n      # workflow-policy: skip-job step\n      - run: echo\n",
+        "ci.yml:4: place skip-job",
     ),
     (
-        "# workflow-policy: skip-file legacy\njobs:\n  notify:\n    steps: []\n",
-        "ci.yml:1: expected '# workflow-policy: skip [rule=<rule>] <reason>'",
+        "jobs:\n  # workflow-policy: skip-job blank line\n\n  notify:\n    steps: []\n",
+        "ci.yml:2: place skip-job",
     ),
     (
-        "# workflow-policy: skip whole file\njobs:\n  notify:\n    steps: []\n",
-        "ci.yml:1: place the directive",
+        "jobs:\n    # workflow-policy: skip-job indentation\n  notify:\n    steps: []\n",
+        "ci.yml:2: place skip-job",
     ),
     (
-        "jobs:\n  notify:\n    steps:\n      # workflow-policy: skip step\n      - run: echo\n",
-        "ci.yml:4: place the directive",
+        "jobs: # workflow-policy: skip-job jobs key\n  notify:\n    steps: []\n",
+        "ci.yml:1: place skip-job",
     ),
     (
-        "jobs:\n  # workflow-policy: skip blank line\n\n  notify:\n    steps: []\n",
-        "ci.yml:2: place the directive",
+        "jobs: {build: {steps: []}, notify: {steps: []}} # workflow-policy: skip-job which\n",
+        "ci.yml:1: place skip-job",
     ),
     (
-        "jobs:\n    # workflow-policy: skip indentation\n  notify:\n    steps: []\n",
-        "ci.yml:2: place the directive",
-    ),
-    (
-        "jobs: # workflow-policy: skip jobs key\n  notify:\n    steps: []\n",
-        "ci.yml:1: place the directive",
-    ),
-    (
-        "jobs: {build: {steps: []}, notify: {steps: []}} # workflow-policy: skip which\n",
-        "ci.yml:1: place the directive",
-    ),
-    (
-        "jobs:\n  # workflow-policy: skip one\n  notify: # workflow-policy: skip two\n"
+        "jobs:\n  # workflow-policy: skip-job one\n  notify: # workflow-policy: skip-job two\n"
         "    steps: []\n",
-        "ci.yml:3: job notify has more than one workflow-policy directive",
+        "ci.yml:3: job notify has a skip-job directive without rule= and another skip-job directive",
+    ),
+    (
+        "jobs:\n  # workflow-policy: skip-job rule=required-actions one\n"
+        "  notify: # workflow-policy: skip-job two\n    steps: []\n",
+        "ci.yml:3: job notify has a skip-job directive without rule= and another skip-job directive",
+    ),
+    (
+        "jobs:\n  # workflow-policy: skip-job rule=required-actions one\n"
+        "  notify: # workflow-policy: skip-job rule=required-actions two\n    steps: []\n",
+        "ci.yml:3: job notify has more than one skip-job directive for rule required-actions",
+    ),
+    (
+        "jobs:\n  notify: # workflow-policy: skip-workflow on a job\n    steps: []\n",
+        "ci.yml:2: place skip-workflow",
+    ),
+    (
+        "on: push # workflow-policy: skip-workflow first key line\njobs:\n  notify:\n    steps: []\n",
+        "ci.yml:1: place skip-workflow",
+    ),
+    (
+        "on: push\n# workflow-policy: skip-workflow after the first key\njobs:\n  notify:\n    steps: []\n",
+        "ci.yml:2: place skip-workflow",
+    ),
+    (
+        "# workflow-policy: skip-workflow rule=build-monitoring legacy\njobs:\n  notify:\n    steps: []\n",
+        "ci.yml:1: rule build-monitoring is not configured; configured rules: required-actions",
+    ),
+    (
+        "# workflow-policy: skip-workflow one\n"
+        "# workflow-policy: skip-workflow rule=required-actions two\njobs:\n  notify:\n    steps: []\n",
+        "ci.yml:2: the workflow has a skip-workflow directive without rule= "
+        "and another skip-workflow directive",
+    ),
+    (
+        "# workflow-policy: skip-workflow rule=required-actions one\n"
+        "# workflow-policy: skip-workflow rule=required-actions two\njobs:\n  notify:\n    steps: []\n",
+        "ci.yml:2: the workflow has more than one skip-workflow directive for rule required-actions",
     ),
 ])
 def test_invalid_or_misplaced_inline_directives_fail(tmp_path, workflow, message):
@@ -647,7 +815,7 @@ def test_inline_directive_can_skip_a_single_rule(tmp_path, has_checkout):
         tmp_path,
         {"ci.yml": f"""
             jobs:
-              lint: # workflow-policy: skip rule=build-monitoring too short to monitor
+              lint: # workflow-policy: skip-job rule=build-monitoring too short to monitor
                 runs-on: ubuntu-latest
                 steps: {steps}
         """},
@@ -793,7 +961,7 @@ def test_reusable_workflow_jobs_require_an_explicit_exception(tmp_path, excluded
                 jobs: [shared-build]
                 reason: Required steps are managed in the shared workflow
         """)
-    directive = " # workflow-policy: skip shared workflow" if excluded == "inline" else ""
+    directive = " # workflow-policy: skip-job shared workflow" if excluded == "inline" else ""
     result = run_check(
         tmp_path,
         {"ci.yml": f"""
