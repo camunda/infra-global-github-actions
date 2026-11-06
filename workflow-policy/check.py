@@ -27,7 +27,7 @@ ACTION_DIRECTORY = Path(__file__).resolve().parent
 PRESETS = ACTION_DIRECTORY / "presets"
 REQUIRED_ACTIONS = "required-actions"
 EXCLUSION_FIELDS = ("source", "file", "line", "reason", "rule")
-UNINSPECTABLE = "Calls a reusable workflow; inspect it separately and add an exception"
+NEVER_CHECKED = "calls a reusable workflow, which is never checked"
 
 
 def validate_exceptions(exceptions, rules, label):
@@ -271,11 +271,16 @@ def describe_exclusions(exclusions):
 
 
 def select_jobs(root, rules, exceptions):
-    """Decide, for every job, which rules it is checked against and which exceptions apply."""
+    """Decide, for every job, which rules it is checked against and which exceptions apply.
+
+    A job that calls a reusable workflow is never checked: a called workflow in this repository
+    is checked as its own file, and one from another repository is outside this check.
+    """
     yaml = YAML(typ="safe", pure=True)
     workflows = {}
     jobs = []
     matched_exceptions = set()
+    caller_exceptions = set()
     directory = root / ".github" / "workflows"
     for path in sorted([*directory.glob("*.yml"), *directory.glob("*.yaml")]):
         # utf-8-sig drops a BOM so comment columns match the parser's.
@@ -294,38 +299,62 @@ def select_jobs(root, rules, exceptions):
         for job_id, job in workflow["jobs"].items():
             if not isinstance(job_id, str) or not isinstance(job, dict):
                 raise ValueError(f"{relative_path}: each job must be a named mapping")
+            if "uses" in job and not isinstance(job["uses"], str):
+                raise ValueError(f"{relative_path}:{job_id}: uses must be a reusable workflow path")
             if "uses" not in job and (
                 not isinstance(job.get("steps"), list)
                 or any(not isinstance(step, dict) for step in job["steps"])
             ):
                 raise ValueError(f"{relative_path}:{job_id}: expected a list of step mappings")
-            matches = [
-                (index, entry) for index, entry in enumerate(exceptions)
+            matches = {
+                index for index, entry in enumerate(exceptions)
                 if entry["workflow"] in ("*", relative_path)
                 and (job_id in entry["jobs"] or "*" in entry["jobs"])
-            ]
-            matched_exceptions.update(index for index, _ in matches)
+            }
+            if "uses" in job:
+                if job_id in job_exclusions:
+                    raise ValueError(
+                        f"{location(job_exclusions[job_id][0])}: job {job_id} {NEVER_CHECKED}; "
+                        "remove the directive"
+                    )
+                caller_exceptions.update(matches)
+                jobs.append({
+                    "workflow": relative_path, "job": job_id, "calls": job["uses"],
+                    "rules": [], "exclusions": [],
+                })
+                continue
+            matched_exceptions.update(matches)
             # Every exception covering the job is reported, so removing one shows what remains.
             exclusions = [*workflow_exclusions, *job_exclusions.get(job_id, [])]
             exclusions.extend(
-                {key: entry[key] for key in EXCLUSION_FIELDS} for _, entry in matches
+                {key: exceptions[index][key] for key in EXCLUSION_FIELDS}
+                for index in sorted(matches)
             )
             skipped = {exclusion["rule"] for exclusion in exclusions}
             jobs.append({
                 "workflow": relative_path,
                 "job": job_id,
-                "inspectable": "uses" not in job,
+                "calls": None,
                 "rules": [] if None in skipped else [rule for rule in rules if rule not in skipped],
                 "exclusions": exclusions,
             })
+        if workflow_exclusions and all("uses" in job for job in workflow["jobs"].values()):
+            raise ValueError(
+                f"{location(workflow_exclusions[0])}: every job in the workflow {NEVER_CHECKED}; "
+                "remove the directive"
+            )
         workflows[relative_path] = workflow
     if not workflows:
         raise ValueError(f"no workflow files found in {directory}")
     for index, entry in enumerate(exceptions):
-        if index not in matched_exceptions and not entry.get("optional"):
+        if index in matched_exceptions or entry.get("optional"):
+            continue
+        if index in caller_exceptions:
             raise ValueError(
-                f"{location(entry)}: exception #{index + 1} does not match any job"
+                f"{location(entry)}: exception #{index + 1} matches only jobs that call "
+                "reusable workflows, which are never checked"
             )
+        raise ValueError(f"{location(entry)}: exception #{index + 1} does not match any job")
     return {"rules": list(rules), "workflows": list(workflows), "jobs": jobs}, workflows
 
 
@@ -336,19 +365,22 @@ def json_value(value):
 
 
 def evaluate(root, manifest, workflows, rules):
-    """Run every rule on every inspectable job, then keep findings for checked rules only."""
+    """Run every rule on every job with steps, then keep findings for checked rules only."""
     checked = {
         (job["workflow"], job["job"]): set(job["rules"])
-        for job in manifest["jobs"] if job["inspectable"] and job["rules"]
+        for job in manifest["jobs"] if job["rules"]
     }
     targets = list(dict.fromkeys(workflow for workflow, _ in checked))
     if not targets:
         if not any(job["rules"] for job in manifest["jobs"]):
-            print("No jobs selected; all jobs are explicitly excluded.", file=sys.stderr)
+            print(
+                "No jobs selected; every job is excluded or calls a reusable workflow.",
+                file=sys.stderr,
+            )
         return []
     inspectable = {
         (job["workflow"], job["job"]) for job in manifest["jobs"]
-        if job["inspectable"] and job["workflow"] in targets
+        if job["calls"] is None and job["workflow"] in targets
     }
     namespaces = {rule["namespace"]: name for name, rule in rules.items()}
     with tempfile.TemporaryDirectory(prefix="workflow-policy-") as temporary:
@@ -448,29 +480,29 @@ def build_report(manifest, findings, error=None):
     for job in manifest["jobs"]:
         row = {
             "workflow": job["workflow"], "job": job["job"], "status": "passed",
-            "rules": job["rules"],
+            "calls": job["calls"], "rules": job["rules"],
             "findings": by_job.get((job["workflow"], job["job"]), []),
             "exclusions": job["exclusions"],
         }
-        if not job["rules"]:
+        if job["calls"] is not None:
+            row["status"] = "reusable"
+        elif not job["rules"]:
             row["status"] = "excluded"
         elif error:
             row["status"] = "error"
-        elif not job["inspectable"]:
-            row["status"] = "uninspectable"
         elif row["findings"]:
             row["status"] = "failed"
         jobs.append(row)
     checked = [job for job in jobs if job["status"] in {"passed", "failed"}]
     checks = sum(len(job["rules"]) for job in checked)
     failed_checks = sum(len({finding["rule"] for finding in job["findings"]}) for job in checked)
-    failed_jobs = sum(job["status"] in {"failed", "uninspectable"} for job in jobs)
+    failed_jobs = sum(job["status"] == "failed" for job in jobs)
     return {
         "status": "error" if error else "failed" if failed_jobs else "passed",
         "rules": manifest["rules"],
         "summary": {
             "workflows": len(manifest["workflows"]),
-            "selected_jobs": sum(job["status"] != "excluded" for job in jobs),
+            "selected_jobs": sum(job["status"] not in {"excluded", "reusable"} for job in jobs),
             "excluded_jobs": sum(job["status"] == "excluded" for job in jobs),
             "rules": len(manifest["rules"]),
             "checks": checks,
@@ -478,7 +510,7 @@ def build_report(manifest, findings, error=None):
             "failed_checks": failed_checks,
             "passed_jobs": sum(job["status"] == "passed" for job in jobs),
             "failed_jobs": failed_jobs,
-            "uninspectable_jobs": sum(job["status"] == "uninspectable" for job in jobs),
+            "reusable_jobs": sum(job["status"] == "reusable" for job in jobs),
         },
         "jobs": jobs,
         "findings": findings,
@@ -497,7 +529,7 @@ def markdown_summary(report):
         "## Workflow policy", "", f"**Status: {report['status'].upper()}**", "",
         f"Rules: {', '.join(report['rules']) or 'none'}.",
         f"{summary['selected_jobs']} selected jobs across {summary['workflows']} workflows; "
-        f"{summary['excluded_jobs']} excluded.",
+        f"{summary['excluded_jobs']} excluded; {summary['reusable_jobs']} call reusable workflows.",
         f"Rule checks: {summary['checks']} "
         f"({summary['passed_checks']} passed, {summary['failed_checks']} failed).",
         "",
@@ -515,8 +547,8 @@ def markdown_summary(report):
             failed = len({finding["rule"] for finding in job["findings"]})
             checks = f"{len(job['rules']) - failed}/{len(job['rules'])} passed"
             details = [finding["message"] for finding in job["findings"]] or ["All checked rules passed"]
-        elif job["status"] == "uninspectable":
-            details = [UNINSPECTABLE]
+        elif job["status"] == "reusable":
+            details = [f"Calls reusable workflow {job['calls']}"]
         elif job["status"] == "error":
             details = list(report["errors"])
         details.extend(describe_exclusions(job["exclusions"]))
@@ -543,35 +575,24 @@ def print_report(report):
     print(f"Rules: {', '.join(report['rules'])}.")
     print(
         f"{summary['selected_jobs']} selected jobs across {summary['workflows']} workflows; "
-        f"{summary['excluded_jobs']} excluded."
+        f"{summary['excluded_jobs']} excluded; {summary['reusable_jobs']} call reusable workflows."
     )
     print(
         f"Rule checks: {summary['checks']} "
         f"({summary['passed_checks']} passed, {summary['failed_checks']} failed)."
     )
-    print(
-        f"Jobs: {summary['passed_jobs']} passed, {summary['failed_jobs']} failed "
-        f"({summary['uninspectable_jobs']} uninspectable)."
-    )
+    print(f"Jobs: {summary['passed_jobs']} passed, {summary['failed_jobs']} failed.")
     for workflow in dict.fromkeys(job["workflow"] for job in report["jobs"]):
         jobs = [job for job in report["jobs"] if job["workflow"] == workflow]
         checked = [job for job in jobs if job["status"] in {"passed", "failed"}]
         checks = sum(len(job["rules"]) for job in checked)
         failures = sum(len({finding["rule"] for finding in job["findings"]}) for job in checked)
-        selected = sum(job["status"] != "excluded" for job in jobs)
+        selected = sum(job["status"] not in {"excluded", "reusable"} for job in jobs)
         display_path = workflow.replace("\r", "\\r").replace("\n", "\\n")
         print(f"{display_path}: {selected} selected jobs, {checks} rule checks, {failures} failed.")
     for finding in report["findings"]:
         path = annotation_value(finding["workflow"], property_value=True)
         print(f"::error file={path},line=1::{annotation_value(finding['message'])}")
-    for job in report["jobs"]:
-        if job["status"] == "uninspectable":
-            path = annotation_value(job["workflow"], property_value=True)
-            message = (
-                f"job {job['job']} calls a reusable workflow; "
-                "inspect it separately and add an explicit exception"
-            )
-            print(f"::error file={path},line=1::{annotation_value(message)}")
 
 
 def main():
@@ -602,15 +623,19 @@ def main():
         config = yaml.load(text)
         validate_config(config)
         rules = load_rules(config, yaml)
+        document = yaml.compose(text)
         exceptions = [
-            *located_exceptions(
-                config.get("exceptions", []), yaml.compose(text), config_path, "config",
-            ),
+            *located_exceptions(config.get("exceptions", []), document, config_path, "config"),
             *(entry for rule in rules.values() for entry in rule["exceptions"]),
         ]
         manifest, workflows = select_jobs(root, rules, exceptions)
         for job in manifest["jobs"]:
-            if job["exclusions"]:
+            if job["calls"] is not None:
+                print(
+                    f"SKIP {job['workflow']}:{job['job']}: calls reusable workflow {job['calls']}",
+                    file=sys.stderr,
+                )
+            elif job["exclusions"]:
                 reasons = "; ".join(describe_exclusions(job["exclusions"]))
                 print(f"SKIP {job['workflow']}:{job['job']}: {reasons}", file=sys.stderr)
         if args.select_only:

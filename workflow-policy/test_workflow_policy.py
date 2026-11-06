@@ -96,15 +96,15 @@ def test_reports_count_rule_checks_and_include_every_job(tmp_path):
     assert report["rules"] == ["required-actions"]
     assert report["summary"] == {
         "workflows": 2,
-        "selected_jobs": 3,
+        "selected_jobs": 2,
         "excluded_jobs": 1,
         "rules": 1,
         "checks": 2,
         "passed_checks": 1,
         "failed_checks": 1,
         "passed_jobs": 1,
-        "failed_jobs": 2,
-        "uninspectable_jobs": 1,
+        "failed_jobs": 1,
+        "reusable_jobs": 1,
     }
     jobs = {job["job"]: job for job in report["jobs"]}
     assert jobs["build"]["status"] == "passed"
@@ -113,15 +113,22 @@ def test_reports_count_rule_checks_and_include_every_job(tmp_path):
         "message": "job test is missing required action acme/tool", "action": "acme/tool",
     }]
     assert jobs["notify"]["status"] == "excluded"
-    assert jobs["shared"]["status"] == "uninspectable"
+    assert jobs["shared"]["status"] == "reusable"
+    assert jobs["shared"]["calls"] == "acme/shared/.github/workflows/build.yml@main"
     assert "Rule checks: 2 (1 passed, 1 failed)" in result.stdout
-    assert "3 selected jobs" in result.stdout
+    assert (
+        "2 selected jobs across 2 workflows; 1 excluded; 1 call reusable workflows."
+        in result.stdout
+    )
     assert "policies in namespace" not in result.stdout
     markdown = (reports / "summary.md").read_text(encoding="utf-8")
     assert "| Workflow | Job | Result | Rule checks | Details |" in markdown
     assert "Notifications &#124; &lt;only&gt;" in markdown
     assert "acme/tool" in markdown
-    assert "Uninspectable" in markdown
+    assert (
+        "| Reusable | - | <code>Calls reusable workflow acme/shared/.github/workflows/build.yml@main"
+        in markdown
+    )
 
 
 @pytest.mark.parametrize("error", [
@@ -250,7 +257,7 @@ def test_selection_manifest_matches_job_ids_not_display_names_or_prefixes(tmp_pa
     assert [job for job in manifest["jobs"] if not job["rules"]] == [{
         "workflow": ".github/workflows/ci.yml",
         "job": "notify",
-        "inspectable": True,
+        "calls": None,
         "rules": [],
         "exclusions": [{
             "source": "config", "file": "policy.yml", "line": 4,
@@ -331,7 +338,6 @@ def test_inline_and_config_exceptions_combine(tmp_path):
             """,
             "release.yml": """
                 jobs:
-                  # workflow-policy: skip-job steps live in the shared workflow
                   shared:
                     uses: acme/shared/.github/workflows/build.yml@main
                   docs:
@@ -350,8 +356,9 @@ def test_inline_and_config_exceptions_combine(tmp_path):
 
     assert result.returncode == 0, result.stdout + result.stderr
     report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
-    assert report["summary"]["excluded_jobs"] == 4
+    assert report["summary"]["excluded_jobs"] == 3
     assert report["summary"]["selected_jobs"] == 1
+    assert report["summary"]["reusable_jobs"] == 1
     exclusions = {(job["workflow"], job["job"]): job["exclusions"] for job in report["jobs"]}
     configured = {
         "source": "config", "file": "policy.yml", "line": 4,
@@ -365,10 +372,7 @@ def test_inline_and_config_exceptions_combine(tmp_path):
         configured,
     ]
     assert exclusions[(".github/workflows/ci.yml", "docs")] == [configured]
-    assert exclusions[(".github/workflows/release.yml", "shared")] == [{
-        "source": "inline", "file": ".github/workflows/release.yml",
-        "line": 3, "reason": "steps live in the shared workflow", "rule": None,
-    }]
+    assert exclusions[(".github/workflows/release.yml", "shared")] == []
     assert exclusions[(".github/workflows/ci.yml", "build")] == []
     markdown = (reports / "summary.md").read_text(encoding="utf-8")
     assert (
@@ -414,11 +418,15 @@ def test_skip_workflow_directive_excludes_every_job_in_its_workflow(tmp_path):
     assert {(job["workflow"], job["job"]): job["exclusions"] for job in report["jobs"]} == {
         (".github/workflows/ci.yml", "build"): [],
         (".github/workflows/maintenance.yml", "reset"): [exclusion],
-        (".github/workflows/maintenance.yml", "shared"): [exclusion],
+        (".github/workflows/maintenance.yml", "shared"): [],
     }
     assert (
-        "SKIP .github/workflows/maintenance.yml:shared: manual maintenance only "
+        "SKIP .github/workflows/maintenance.yml:reset: manual maintenance only "
         "(inline, .github/workflows/maintenance.yml:4)"
+    ) in result.stderr
+    assert (
+        "SKIP .github/workflows/maintenance.yml:shared: "
+        "calls reusable workflow acme/shared/.github/workflows/cleanup.yml@main"
     ) in result.stderr
 
 
@@ -604,6 +612,18 @@ SYNTAX = "expected '# workflow-policy: skip-job|skip-workflow [rule=<rule>] <rea
         "# workflow-policy: skip-workflow rule=required-actions two\njobs:\n  notify:\n    steps: []\n",
         "ci.yml:2: the workflow has more than one skip-workflow directive for rule required-actions",
     ),
+    (
+        "jobs:\n  shared: # workflow-policy: skip-job shared steps\n"
+        "    uses: acme/shared/.github/workflows/build.yml@main\n",
+        "ci.yml:2: job shared calls a reusable workflow, which is never checked; "
+        "remove the directive",
+    ),
+    (
+        "# workflow-policy: skip-workflow shared steps\njobs:\n  shared:\n"
+        "    uses: acme/shared/.github/workflows/build.yml@main\n",
+        "ci.yml:1: every job in the workflow calls a reusable workflow, which is never checked; "
+        "remove the directive",
+    ),
 ])
 def test_invalid_or_misplaced_inline_directives_fail(tmp_path, workflow, message):
     result = run_check(
@@ -682,7 +702,9 @@ def test_all_jobs_can_be_explicitly_excluded(tmp_path):
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    assert "all jobs are explicitly excluded" in result.stderr
+    assert (
+        "No jobs selected; every job is excluded or calls a reusable workflow." in result.stderr
+    )
     report = json.loads((tmp_path / "reports/report.json").read_text(encoding="utf-8"))
     assert report["status"] == "passed"
     assert report["summary"]["selected_jobs"] == 0
@@ -951,31 +973,76 @@ def test_malformed_workflows_fail_even_with_a_whole_file_exception(tmp_path, wor
     assert "Traceback" not in result.stderr
 
 
-@pytest.mark.parametrize("excluded", [False, "config", "inline"])
-def test_reusable_workflow_jobs_require_an_explicit_exception(tmp_path, excluded):
-    config = "required-actions: [actions/checkout]\n"
-    if excluded == "config":
-        config += textwrap.dedent("""
+def test_reusable_workflow_calls_are_never_checked_and_called_workflows_are(tmp_path):
+    reports = tmp_path / "reports"
+    result = run_check(
+        tmp_path,
+        {
+            "ci.yml": """
+                jobs:
+                  build:
+                    steps:
+                      - uses: actions/checkout@v5
+                  local:
+                    uses: ./.github/workflows/shared.yml
+                  remote:
+                    uses: acme/shared/.github/workflows/build.yml@main
+            """,
+            "shared.yml": """
+                on: workflow_call
+                jobs:
+                  test:
+                    steps:
+                      - run: make test
+            """,
+        },
+        "required-actions: [actions/checkout]",
+        "--report-dir", str(reports),
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    report = json.loads((reports / "report.json").read_text(encoding="utf-8"))
+    jobs = {job["job"]: job for job in report["jobs"]}
+    assert {job_id: (job["status"], job["calls"]) for job_id, job in jobs.items()} == {
+        "build": ("passed", None),
+        "local": ("reusable", "./.github/workflows/shared.yml"),
+        "remote": ("reusable", "acme/shared/.github/workflows/build.yml@main"),
+        "test": ("failed", None),
+    }
+    assert jobs["local"]["rules"] == jobs["local"]["exclusions"] == []
+    assert "job test is missing required action actions/checkout" in result.stdout
+    assert [line for line in result.stdout.splitlines() if line.startswith("::error")] == [
+        "::error file=.github/workflows/shared.yml,line=1::"
+        "job test is missing required action actions/checkout",
+    ]
+    assert (
+        "SKIP .github/workflows/ci.yml:local: calls reusable workflow ./.github/workflows/shared.yml"
+        in result.stderr
+    )
+
+
+def test_exceptions_matching_only_reusable_workflow_calls_fail(tmp_path):
+    result = run_check(
+        tmp_path,
+        {"ci.yml": """
+            jobs:
+              shared-build:
+                uses: acme/shared/.github/workflows/build.yml@main
+        """},
+        """
+            required-actions: [actions/checkout]
             exceptions:
               - workflow: "*"
                 jobs: [shared-build]
                 reason: Required steps are managed in the shared workflow
-        """)
-    directive = " # workflow-policy: skip-job shared workflow" if excluded == "inline" else ""
-    result = run_check(
-        tmp_path,
-        {"ci.yml": f"""
-            jobs:
-              shared-build:{directive}
-                uses: acme/shared/.github/workflows/build.yml@main
-        """},
-        config,
+        """,
     )
 
-    assert result.returncode == (0 if excluded else 1), result.stdout + result.stderr
-    if not excluded:
-        assert "job shared-build calls a reusable workflow" in result.stdout
-        assert "missing required action" not in result.stdout
+    assert result.returncode == 2, result.stdout + result.stderr
+    assert (
+        "policy.yml:4: exception #1 matches only jobs that call reusable workflows, "
+        "which are never checked"
+    ) in result.stderr
 
 
 def test_callers_conftest_configuration_cannot_disable_the_bundled_policy(tmp_path):
