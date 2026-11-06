@@ -29,7 +29,7 @@ Configure action paths without `@ref`. Remote composites and local paths such as
 
 The first exception excludes the checker job below from every rule; the second excludes `lint` from `build-monitoring` only. Use exact workflow paths and job IDs, or `"*"` for all workflows or jobs. Each exception needs a reason and must match at least one job; `rule` is optional and must name a configured rule. To exclude a job from several rules, add one exception per rule.
 
-Reusable-workflow call jobs require explicit exceptions, in the configuration or inline, because their steps are uninspectable.
+A job that calls a reusable workflow is never checked: a called workflow in `.github/workflows/` is checked as its own file, and one from another repository is outside this check. The report lists such jobs as `reusable`, with the workflow they call. An exception or directive that matches only such jobs fails the check.
 
 ## 🧩 Presets
 
@@ -133,7 +133,7 @@ The GitHub job summary lists each job's result, rule findings, and exclusion rea
 | `report-path` | JSON with aggregate counts, per-job results, findings, exclusions, and errors |
 | `summary-path` | Markdown summary and job table |
 
-Each job lists the `rules` it was checked against and its `findings` (`rule`, `message`, and `action` for `required-actions`). Its `exclusions` list holds `source` (`inline`, `config`, or `preset`), `file`, `line`, `reason`, and `rule` (`null` for every rule) for each matching exception, so excluded jobs can be traced to their declaration.
+Each job has a `status`: `passed`, `failed`, `excluded`, `reusable`, or `error`; a `reusable` job names the workflow it calls in `calls`. Each job lists the `rules` it was checked against and its `findings` (`rule`, `message`, and `action` for `required-actions`). Its `exclusions` list holds `source` (`inline`, `config`, or `preset`), `file`, `line`, `reason`, and `rule` (`null` for every rule) for each matching exception, so excluded jobs can be traced to their declaration.
 
 Outputs are runner-local file paths available after validation, including policy failures. Configuration and Conftest errors appear in the report and fail the check. Upload the JSON as an artifact to retain it after the job.
 
