@@ -17,8 +17,10 @@ from ruamel.yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
 
 DIRECTIVE = re.compile(r"#\s*workflow-policy\b", re.IGNORECASE)
-SKIP_DIRECTIVE = re.compile(r"#\s*workflow-policy:\s*skip(?:\s+rule=(\S+))?\s+(\S.*)")
-SKIP_SYNTAX = "expected '# workflow-policy: skip [rule=<rule>] <reason>'"
+SKIP_DIRECTIVE = re.compile(
+    r"#\s*workflow-policy:\s*skip-(job|workflow)(?:\s+rule=(\S+))?\s+(\S.*)"
+)
+SKIP_SYNTAX = "expected '# workflow-policy: skip-job|skip-workflow [rule=<rule>] <reason>'"
 COMMENT_START = re.compile(r"(?<!\S)#")
 PRESET_NAME = re.compile(r"[a-z][a-z0-9-]*")
 ACTION_DIRECTORY = Path(__file__).resolve().parent
@@ -189,14 +191,16 @@ def comment_columns(lines, document):
 
 
 def inline_exceptions(text, document, relative_path, rules):
-    """Return {job_id: exclusion} from `# workflow-policy: skip [rule=<rule>] <reason>` comments.
+    """Return the workflow's exclusions and {job_id: exclusions} from skip directives.
 
-    A directive belongs to the job whose ID shares its line, or to the job ID directly
+    `skip-workflow` belongs in the comment lines before the workflow's first key.
+    `skip-job` belongs to the job whose ID shares its line, or to the job ID directly
     below a block of full-line comments at that job ID's indentation. Without `rule=`,
-    it skips every rule.
+    a directive skips every rule; otherwise a job or workflow takes one directive per rule.
     """
     lines = text.splitlines()
     comments = comment_columns(lines, document)
+    first_key_line = document.value[0][0].start_mark.line
     jobs = next((value for key, value in document.value if key.value == "jobs"), None)
     owners = {}
     for key, _ in jobs.value if isinstance(jobs, MappingNode) else []:
@@ -206,34 +210,50 @@ def inline_exceptions(text, document, relative_path, rules):
         while comments.get(line) == column and not lines[line][:column].strip():
             owners.setdefault(line, []).append(key.value)
             line -= 1
-    exceptions = {}
+    workflow_exclusions, job_exclusions = [], {}
     for line, column in sorted(comments.items()):
         comment = lines[line][column:].rstrip()
         if not DIRECTIVE.match(comment):
             continue
         location = f"{relative_path}:{line + 1}"
         directive = SKIP_DIRECTIVE.fullmatch(comment)
-        # Without a reason, `skip rule=<rule>` would otherwise read as a reason for every rule.
-        if not directive or directive[2].startswith("rule="):
+        # Without a reason, `skip-job rule=<rule>` would otherwise read as a reason for every rule.
+        if not directive or directive[3].startswith("rule="):
             raise ValueError(f"{location}: {SKIP_SYNTAX}")
-        if len(owners.get(line, [])) != 1:
+        scope, rule, reason = directive.groups()
+        if scope == "workflow":
+            if line >= first_key_line:
+                raise ValueError(
+                    f"{location}: place skip-workflow in the comment lines before "
+                    "the workflow's first key"
+                )
+            target, existing = "the workflow", workflow_exclusions
+        else:
+            if len(owners.get(line, [])) != 1:
+                raise ValueError(
+                    f"{location}: place skip-job on a job ID line, or directly above "
+                    "the job ID at the same indentation"
+                )
+            job_id = owners[line][0]
+            target, existing = f"job {job_id}", job_exclusions.setdefault(job_id, [])
+        if rule is not None and rule not in rules:
             raise ValueError(
-                f"{location}: place the directive on a job ID line, or directly above "
-                "the job ID at the same indentation"
+                f"{location}: rule {rule} is not configured; configured rules: {', '.join(rules)}"
             )
-        job_id = owners[line][0]
-        if job_id in exceptions:
-            raise ValueError(f"{location}: job {job_id} has more than one workflow-policy directive")
-        if directive[1] is not None and directive[1] not in rules:
+        if existing and (rule is None or None in {exclusion["rule"] for exclusion in existing}):
             raise ValueError(
-                f"{location}: rule {directive[1]} is not configured; "
-                f"configured rules: {', '.join(rules)}"
+                f"{location}: {target} has a skip-{scope} directive without rule= "
+                f"and another skip-{scope} directive"
             )
-        exceptions[job_id] = {
+        if any(exclusion["rule"] == rule for exclusion in existing):
+            raise ValueError(
+                f"{location}: {target} has more than one skip-{scope} directive for rule {rule}"
+            )
+        existing.append({
             "source": "inline", "file": relative_path,
-            "line": line + 1, "reason": directive[2].strip(), "rule": directive[1],
-        }
-    return exceptions
+            "line": line + 1, "reason": reason.strip(), "rule": rule,
+        })
+    return workflow_exclusions, job_exclusions
 
 
 def location(exclusion):
@@ -268,7 +288,9 @@ def select_jobs(root, rules, exceptions):
             or not workflow["jobs"]
         ):
             raise ValueError(f"{relative_path}: expected a non-empty jobs mapping")
-        inline = inline_exceptions(text, yaml.compose(text), relative_path, list(rules))
+        workflow_exclusions, job_exclusions = inline_exceptions(
+            text, yaml.compose(text), relative_path, list(rules)
+        )
         for job_id, job in workflow["jobs"].items():
             if not isinstance(job_id, str) or not isinstance(job, dict):
                 raise ValueError(f"{relative_path}: each job must be a named mapping")
@@ -284,7 +306,7 @@ def select_jobs(root, rules, exceptions):
             ]
             matched_exceptions.update(index for index, _ in matches)
             # Every exception covering the job is reported, so removing one shows what remains.
-            exclusions = [inline[job_id]] if job_id in inline else []
+            exclusions = [*workflow_exclusions, *job_exclusions.get(job_id, [])]
             exclusions.extend(
                 {key: entry[key] for key in EXCLUSION_FIELDS} for _, entry in matches
             )

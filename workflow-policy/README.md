@@ -27,7 +27,7 @@ Set `required-actions`, `extends`, or both. Each becomes a rule: `required-actio
 
 Configure action paths without `@ref`. Remote composites and local paths such as `./.github/actions/observe-build-status` are supported.
 
-The first exception excludes the checker job below from every rule; the second excludes `lint` from `build-monitoring` only. Use exact workflow paths and job IDs, or `"*"` for all workflows or jobs. Each exception needs a reason and must match at least one job; `rule` is optional and must name a configured rule.
+The first exception excludes the checker job below from every rule; the second excludes `lint` from `build-monitoring` only. Use exact workflow paths and job IDs, or `"*"` for all workflows or jobs. Each exception needs a reason and must match at least one job; `rule` is optional and must name a configured rule. To exclude a job from several rules, add one exception per rule.
 
 Reusable-workflow call jobs require explicit exceptions, in the configuration or inline, because their steps are uninspectable.
 
@@ -43,28 +43,51 @@ A preset's own exceptions apply only to its rule and may match no job. Each pres
 
 ### Inline exceptions
 
-A workflow can also exclude a job with a comment next to that job:
+A workflow can also exclude a job with a `skip-job` comment next to that job:
 
 ```yaml
 jobs:
-  # workflow-policy: skip notification-only job
+  # workflow-policy: skip-job notification-only job
   notify:
     runs-on: ubuntu-latest
     steps:
       - run: echo "Notify"
 
-  cleanup: # workflow-policy: skip housekeeping only
+  cleanup: # workflow-policy: skip-job housekeeping only
     runs-on: ubuntu-latest
     steps:
       - run: echo "Clean up"
 
-  lint: # workflow-policy: skip rule=build-monitoring too short to monitor
+  lint: # workflow-policy: skip-job rule=build-monitoring too short to monitor
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 ```
 
-Write `# workflow-policy: skip [rule=<rule>] <reason>` on the job ID line, or in the comment lines directly above the job ID at the same indentation, with no blank line in between. Inline and configured exceptions share the same two fields: `reason` is required, and the optional `rule` names one configured rule; without it, the directive excludes the job from every rule. A malformed directive, an unconfigured rule, a directive not attached to exactly one job, or a second directive for the same job fails the check. `#` inside `run:` scripts and quoted strings is ignored.
+Write `# workflow-policy: skip-job [rule=<rule>] <reason>` on the job ID line, or in the comment lines directly above the job ID at the same indentation, with no blank line in between.
+
+To exclude every job of a workflow, write `# workflow-policy: skip-workflow [rule=<rule>] <reason>` in the comment lines before the workflow's first key:
+
+```yaml
+# Manual cluster maintenance.
+# workflow-policy: skip-workflow rule=build-monitoring manual maintenance only
+name: Maintenance
+on: workflow_dispatch
+```
+
+Both directives share the fields of configured exceptions: `reason` is required, and the optional `rule` names one configured rule; without it, the directive excludes from every rule. To exclude a job or workflow from several rules, write one directive per rule, each with its own reason:
+
+```yaml
+jobs:
+  # workflow-policy: skip-job rule=build-monitoring too short to monitor
+  # workflow-policy: skip-job rule=required-actions tags through the API
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./scripts/tag.sh
+```
+
+A malformed directive, an unconfigured rule, a misplaced directive, two directives for the same rule, or a directive without `rule` next to another one on the same job or workflow fails the check. `#` inside `run:` scripts and quoted strings is ignored.
 
 Inline, configured, and preset exceptions combine. The report lists every exception that matches a job, inline first, each with its source and location, prefixed by its rule when it excludes only one: `Slack only (inline, .github/workflows/ci.yml:6)` or `build-monitoring: Too short to monitor (config, .github/workflow-policy.yml:11)`.
 
