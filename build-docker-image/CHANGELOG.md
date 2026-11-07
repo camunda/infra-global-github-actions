@@ -1,5 +1,28 @@
 # Changelog
 
+## 1.0.8 (2026-11-07)
+
+## What's Changed
+* chore(deps): update s4u/setup-maven-action action to v1.22.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/878
+* chore(deps): update actions/setup-python action to v7.1.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/874
+* feat(fossa): add oidc-login action and end-to-end smoketest by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/880
+* chore(deps): update dependency fossas/fossa-cli to v3.20.8 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/838
+* chore(deps): update teleport-actions/setup action to v2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/861
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/879
+* chore(deps): update dependency fossas/fossa-cli to v3.20.10 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/882
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/883
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/884
+* fix(submit-build-status): keep monitor_fields JSON quotes intact by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/881
+* fix(submit-build-status): pass inputs through env and JSON-escape row values by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/887
+* chore(deps): update actions/add-to-project action to v2.0.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/888
+* chore(deps): update amannn/action-semantic-pull-request action to v6.1.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/889
+* chore(deps): update mikefarah/yq action to v4.54.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/890
+* chore(deps): update docker/login-action action to v4.8.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/891
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/892
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/build-docker-image-1.0.7...build-docker-image-1.0.8
+
 ## 1.0.7 (2026-10-24)
 
 ## What's Changed
