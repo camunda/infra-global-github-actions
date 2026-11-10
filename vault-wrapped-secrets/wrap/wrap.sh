@@ -6,8 +6,9 @@ if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]]; then
   exit 1
 fi
 
+audience=$(jq -rn --arg a "${JWT_AUDIENCE}" '$a | @uri')
 oidc=$(curl -sS --fail --max-time 10 -H "Authorization: Bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
-  "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${JWT_AUDIENCE}" | jq -r '.value')
+  "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=${audience}" | jq -r '.value')
 echo "::add-mask::${oidc}"
 
 token=$(jq -n --arg role "${JWT_ROLE}" --arg jwt "${oidc}" '{role: $role, jwt: $jwt}' \
@@ -26,7 +27,7 @@ while IFS= read -r line; do
   path="${BASH_REMATCH[1]}" key="${BASH_REMATCH[2]}" name="${BASH_REMATCH[3]}"
   # Keep the value JSON-encoded so trailing newlines survive.
   value_json=$(curl -sS --fail --max-time 10 -H "X-Vault-Token: ${token}" "${VAULT_ADDR}/v1/${path}" \
-    | jq -ec --arg k "${key}" '.data.data[$k] // empty') || {
+    | jq -ec --arg k "${key}" 'if (.data.data | has($k)) then .data.data[$k] else error("missing") end') || {
     echo "::error::Key '${key}' not found at '${path}'"
     exit 1
   }
