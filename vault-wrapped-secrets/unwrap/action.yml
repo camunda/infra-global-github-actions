@@ -1,0 +1,33 @@
+name: vault-wrapped-secrets unwrap
+
+description: |
+  Unwrap a single-use Vault response-wrapping token created by `vault-wrapped-secrets/wrap` and expose its secrets to this job, masked. Needs no Vault login and no `id-token: write`. Fails when the token was already unwrapped, has expired, or was not created by `sys/wrapping/wrap`.
+
+inputs:
+  vault-url:
+    description: Vault address (`secrets.VAULT_ADDR`)
+    required: true
+  wrap-token:
+    description: The `wrap-token` output of `vault-wrapped-secrets/wrap`
+    required: true
+  export-env:
+    description: Also export every secret as an environment variable for the following steps of this job
+    required: false
+    default: 'false'
+
+outputs:
+  secrets:
+    description: "JSON object `{NAME: value}` with the unwrapped secrets (values masked), read with `fromJSON(steps.<id>.outputs.secrets).NAME`"
+    value: ${{ steps.unwrap.outputs.secrets }}
+
+runs:
+  using: composite
+  steps:
+  - name: Unwrap Vault secrets
+    id: unwrap
+    shell: bash
+    env:
+      VAULT_ADDR: ${{ inputs.vault-url }}
+      WRAP_TOKEN: ${{ inputs.wrap-token }}
+      EXPORT_ENV: ${{ inputs.export-env }}
+    run: ${{ github.action_path }}/unwrap.sh

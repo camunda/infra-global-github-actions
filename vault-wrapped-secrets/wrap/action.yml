@@ -1,0 +1,53 @@
+name: vault-wrapped-secrets wrap
+
+description: |
+  Log in to Vault with the job's GitHub OIDC token, read the listed secrets and return them as a single-use Vault response-wrapping token. Pass the token to a job that runs untrusted code (an AI agent, PR code) and unwrap it there with `vault-wrapped-secrets/unwrap`; that job needs no `id-token: write` and no Vault credentials. Requires `id-token: write` on the calling job.
+
+inputs:
+  vault-url:
+    description: Vault address (`secrets.VAULT_ADDR`)
+    required: true
+  vault-auth-jwt-path:
+    description: Vault JWT auth mount (`secrets.VAULT_JWT_PATH`)
+    required: true
+  vault-auth-jwt-role:
+    description: Vault JWT role (`secrets.VAULT_JWT_ROLE`)
+    required: true
+  vault-auth-jwt-audience:
+    description: Audience of the GitHub OIDC token (`secrets.VAULT_JWT_AUDIENCE`)
+    required: true
+  secrets:
+    description: |
+      Secrets to wrap, one per line as `<kv-v2 path> <key> | <NAME>`, the format of `hashicorp/vault-action`, e.g. `secret/data/products/foo/ci/common ANTHROPIC_API_KEY | ANTHROPIC_API_KEY`. A trailing `;` is allowed.
+    required: false
+    default: ''
+  values:
+    description: |
+      Values produced in this job to wrap as well, as a JSON object of strings, e.g. `{"GH_TOKEN": "<the token step output>"}`. Use it for credentials minted here, such as a GitHub App token generated with `skip-token-revoke: true`. The values must already be masked in this job.
+    required: false
+    default: ''
+  wrap-ttl:
+    description: Lifetime of the wrapping token, e.g. `5m`. Keep it to the expected time until the consuming job starts and unwraps.
+    required: false
+    default: 5m
+
+outputs:
+  wrap-token:
+    description: Single-use wrapping token. Not masked, so it can cross a job boundary as a job output; it is not the secret and can be unwrapped once.
+    value: ${{ steps.wrap.outputs.wrap-token }}
+
+runs:
+  using: composite
+  steps:
+  - name: Wrap Vault secrets
+    id: wrap
+    shell: bash
+    env:
+      VAULT_ADDR: ${{ inputs.vault-url }}
+      JWT_PATH: ${{ inputs.vault-auth-jwt-path }}
+      JWT_ROLE: ${{ inputs.vault-auth-jwt-role }}
+      JWT_AUDIENCE: ${{ inputs.vault-auth-jwt-audience }}
+      SECRETS: ${{ inputs.secrets }}
+      VALUES: ${{ inputs.values }}
+      WRAP_TTL: ${{ inputs.wrap-ttl }}
+    run: ${{ github.action_path }}/wrap.sh

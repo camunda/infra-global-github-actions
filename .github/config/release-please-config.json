@@ -131,6 +131,9 @@
     "teams/infra/pull-request": {
       "package-name": "pull-request"
     },
+    "vault-wrapped-secrets": {
+      "package-name": "vault-wrapped-secrets"
+    },
     "wait-for-required-checks": {
       "package-name": "wait-for-required-checks"
     },

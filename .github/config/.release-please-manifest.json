@@ -30,6 +30,7 @@
   "submit-test-status": "1.0.6",
   "teams/infra/configure-maintenance-pull-request": "1.0.1",
   "teams/infra/pull-request": "1.1.2",
+  "vault-wrapped-secrets": "0.0.0",
   "wait-for-required-checks": "1.0.0",
   "workflow-run-stats": "1.0.0",
   "yq-yaml-processor": "1.0.7"
