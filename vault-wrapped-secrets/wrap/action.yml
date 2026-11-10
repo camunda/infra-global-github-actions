@@ -23,7 +23,7 @@ inputs:
     default: ''
   values:
     description: |
-      Values produced in this job to wrap as well, as a JSON object of strings, e.g. `{"GH_TOKEN": "${{ steps.app-token.outputs.token }}"}`. Use it for credentials minted here, such as a GitHub App token generated with `skip-token-revoke: true`. The values must already be masked in this job.
+      Values produced in this job to wrap as well, as a JSON object of strings, e.g. `{"GH_TOKEN": "<the token step output>"}`. Use it for credentials minted here, such as a GitHub App token generated with `skip-token-revoke: true`. The values must already be masked in this job.
     required: false
     default: ''
   wrap-ttl:
