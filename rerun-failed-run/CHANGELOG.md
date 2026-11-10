@@ -1,5 +1,42 @@
 # Changelog
 
+## 1.2.0 (2026-11-10)
+
+## What's Changed
+* fix(rerun-failed-run): retry the failed-logs download instead of swallowing it by @leiicamundi in https://github.com/camunda/infra-global-github-actions/pull/868
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/869
+* feat(preview-env): add troubleshooting_tips input and mention registry retention by @wollefitz in https://github.com/camunda/infra-global-github-actions/pull/871
+* chore: include new support for workload identity federation on submit-build-status by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/870
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/872
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.5.6 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/873
+* chore(deps): update docker/login-action action to v4.7.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/875
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.181.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/876
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/877
+* chore(deps): update s4u/setup-maven-action action to v1.22.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/878
+* chore(deps): update actions/setup-python action to v7.1.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/874
+* feat(fossa): add oidc-login action and end-to-end smoketest by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/880
+* chore(deps): update dependency fossas/fossa-cli to v3.20.8 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/838
+* chore(deps): update teleport-actions/setup action to v2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/861
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/879
+* chore(deps): update dependency fossas/fossa-cli to v3.20.10 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/882
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/883
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/884
+* fix(submit-build-status): keep monitor_fields JSON quotes intact by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/881
+* fix(submit-build-status): pass inputs through env and JSON-escape row values by @Kerruba in https://github.com/camunda/infra-global-github-actions/pull/887
+* chore(deps): update actions/add-to-project action to v2.0.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/888
+* chore(deps): update amannn/action-semantic-pull-request action to v6.1.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/889
+* chore(deps): update mikefarah/yq action to v4.54.2 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/890
+* chore(deps): update docker/login-action action to v4.8.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/891
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/892
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/885
+* feat(vault-wrapped-secrets)!: hand Vault secrets to a job without OIDC by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/895
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/896
+* feat: deprecate Vault AppRole in generate-github-app-token-from-vault-secrets and rerun-failed-run by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/894
+* fix(vault-wrapped-secrets): point to Re-run all jobs when a wrapping token is spent by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/897
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/rerun-failed-run-1.1.4...rerun-failed-run-1.2.0
+
 ## 1.1.4 (2026-10-17)
 
 ## What's Changed
