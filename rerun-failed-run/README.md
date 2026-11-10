@@ -17,8 +17,8 @@ Retriggers failed GitHub Actions workflows, with optional error message filterin
 | `repository` | Yes | - | Repository in `owner/repo` format |
 | `vault-addr` | Yes | - | Vault URL |
 | `vault-auth-method` | No | `approle` | Vault auth method: `approle` or `jwt` |
-| `vault-role-id` | No | `''` | Vault role ID (required when `vault-auth-method=approle`) |
-| `vault-secret-id` | No | `''` | Vault secret ID (required when `vault-auth-method=approle`) |
+| `vault-role-id` | No | `''` | Deprecated. Vault role ID (required when `vault-auth-method=approle`) |
+| `vault-secret-id` | No | `''` | Deprecated. Vault secret ID (required when `vault-auth-method=approle`) |
 | `vault-jwt-path` | No | `''` | Vault JWT auth backend path (required when `vault-auth-method=jwt`) |
 | `vault-jwt-role` | No | `''` | Vault JWT role (required when `vault-auth-method=jwt`) |
 | `vault-jwt-audience` | No | `''` | GitHub OIDC audience (required when `vault-auth-method=jwt`) |
@@ -63,7 +63,9 @@ The calling job must grant `id-token: write` so GitHub can mint the OIDC token.
     vault-jwt-audience: ${{ secrets.VAULT_JWT_AUDIENCE }}
 ```
 
-### 🚫 Legacy: AppRole authentication
+### 🚫 Deprecated: AppRole authentication
+
+AppRole emits a warning annotation and will be removed ([team-infrastructure#1076](https://github.com/camunda/team-infrastructure/issues/1076)).
 
 ```yaml
 - uses: camunda/infra-global-github-actions/rerun-failed-run@main

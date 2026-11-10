@@ -14,8 +14,8 @@ This composite GHA can be used in any repository.
 | github-app-private-key-vault-key    | The key of the Vault secret storing the private key of the GitHub App   |
 | github-app-private-key-vault-path   | The path of the Vault secret storing the private key of the GitHub App  |
 | vault-auth-method                   | The method to use to authenticate with Vault: `approle` or `jwt` (*)    |
-| vault-auth-role-id                  | The Role Id for (Vault) App Role authentication (required when `vault-auth-method=approle`) |
-| vault-auth-secret-id                | The Secret Id for (Vault) App Role authentication (required when `vault-auth-method=approle`) |
+| vault-auth-role-id                  | Deprecated. The Role Id for (Vault) App Role authentication (required when `vault-auth-method=approle`) |
+| vault-auth-secret-id                | Deprecated. The Secret Id for (Vault) App Role authentication (required when `vault-auth-method=approle`) |
 | vault-auth-jwt-path                 | The auth backend path for (Vault) JWT authentication (required when `vault-auth-method=jwt`) |
 | vault-auth-jwt-role                 | The role for (Vault) JWT authentication (required when `vault-auth-method=jwt`) |
 | vault-auth-jwt-audience             | The GitHub OIDC audience for (Vault) JWT authentication (required when `vault-auth-method=jwt`) |
@@ -25,9 +25,7 @@ This composite GHA can be used in any repository.
 | repositories                        | Comma or newline-separated list of repositories for which the GitHub app token will be valid for(defaults to current repository if owner is unset, optional). If you want to generate a token that has access to all repositories of the owner, set this to `!all` and explicitely set an `owner`. |
 | read-only                           | If `true`, the token can only read repository contents (`contents: read`), even when the GitHub App has more permissions. If `false` (default), the token has every permission granted to the GitHub App (optional). Set `true` when the job only checks out or reads repositories. |
 
-> (*) Supports both GitHub OIDC/JWT (`vault-auth-method=jwt`, recommended) and legacy
-> App Role (`vault-auth-method=approle`) authentication. When using `jwt`, the calling
-> job must grant `id-token: write` permission so GitHub can mint the OIDC token.
+> (*) Supports GitHub OIDC/JWT (`vault-auth-method=jwt`) and the deprecated App Role (`vault-auth-method=approle`) authentication, which emits a warning annotation and will be removed ([team-infrastructure#1076](https://github.com/camunda/team-infrastructure/issues/1076)). When using `jwt`, the calling job must grant `id-token: write` permission so GitHub can mint the OIDC token.
 
 ### Outputs
 | Output name      | Description                       |
@@ -66,7 +64,9 @@ jobs:
         repositories: ${{ github.repository }}  # Optional, defaults to current repository
 ```
 
-#### 🚫 Legacy: AppRole authentication
+#### 🚫 Deprecated: AppRole authentication
+
+AppRole emits a warning annotation and will be removed ([team-infrastructure#1076](https://github.com/camunda/team-infrastructure/issues/1076)).
 
 ```yaml
 ---
