@@ -21,9 +21,9 @@ inputs:
       Secrets to wrap, one per line as `<kv-v2 path> <key> | <NAME>`, the format of `hashicorp/vault-action`, e.g. `secret/data/products/foo/ci/common ANTHROPIC_API_KEY | ANTHROPIC_API_KEY`. A trailing `;` is allowed.
     required: true
   wrap-ttl:
-    description: Lifetime of the wrapping token, e.g. `30m`. Keep it close to the time until the consuming job unwraps.
+    description: Lifetime of the wrapping token, e.g. `5m`. Keep it to the expected time until the consuming job starts and unwraps.
     required: false
-    default: 30m
+    default: 5m
 
 outputs:
   wrap-token:

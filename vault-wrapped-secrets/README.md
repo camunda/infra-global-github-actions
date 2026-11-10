@@ -33,7 +33,7 @@ jobs:
         vault-auth-jwt-audience: ${{ secrets.VAULT_JWT_AUDIENCE }}
         secrets: |
           secret/data/products/<team>/ci/common ANTHROPIC_API_KEY | ANTHROPIC_API_KEY;
-        wrap-ttl: 30m
+        wrap-ttl: 5m
 
   agent:
     needs: secrets
@@ -60,7 +60,7 @@ jobs:
 | `vault-auth-jwt-role` | yes | | JWT role (`VAULT_JWT_ROLE`) |
 | `vault-auth-jwt-audience` | yes | | OIDC audience (`VAULT_JWT_AUDIENCE`) |
 | `secrets` | yes | | One `<kv-v2 path> <key> \| <NAME>` per line |
-| `wrap-ttl` | no | `30m` | Lifetime of the wrapping token |
+| `wrap-ttl` | no | `5m` | Lifetime of the wrapping token |
 
 Output: `wrap-token`.
 
