@@ -75,7 +75,7 @@ Output: `wrap-token`.
 
 Output: `secrets`, a JSON object `{NAME: value}`.
 
-Wrap only what the consuming job needs, and unwrap before any untrusted code runs. To hand over a GitHub App token, generate it in the broker job with `generate-github-app-token-from-vault-secrets` and `skip-token-revoke: true` (the job would otherwise revoke it on exit) and pass it in `values`. The unwrapped values are in the job's memory and environment afterwards, so an agent can still read the secrets it was given, just nothing else.
+Wrap only what the consuming job needs, and unwrap before any untrusted code runs. A wrapping token can be redeemed once, so a failed consumer job is retried with **Re-run all jobs**; **Re-run failed jobs** reuses the spent token and fails at `unwrap`. To hand over a GitHub App token, generate it in the broker job with `generate-github-app-token-from-vault-secrets` and `skip-token-revoke: true` (the job would otherwise revoke it on exit) and pass it in `values`. The unwrapped values are in the job's memory and environment afterwards, so an agent can still read the secrets it was given, just nothing else.
 
 ## 📚 References
 
