@@ -24,13 +24,22 @@ while IFS= read -r line; do
     exit 1
   fi
   path="${BASH_REMATCH[1]}" key="${BASH_REMATCH[2]}" name="${BASH_REMATCH[3]}"
-  value=$(curl -sS --fail --max-time 10 -H "X-Vault-Token: ${token}" "${VAULT_ADDR}/v1/${path}" \
-    | jq -er --arg k "${key}" '.data.data[$k] // empty') || {
+  # Keep the value JSON-encoded so trailing newlines survive.
+  value_json=$(curl -sS --fail --max-time 10 -H "X-Vault-Token: ${token}" "${VAULT_ADDR}/v1/${path}" \
+    | jq -ec --arg k "${key}" '.data.data[$k] // empty') || {
     echo "::error::Key '${key}' not found at '${path}'"
     exit 1
   }
-  payload=$(jq -c --arg n "${name}" --arg v "${value}" '. + {($n): $v}' <<< "${payload}")
+  payload=$(jq -c --arg n "${name}" --argjson v "${value_json}" '. + {($n): $v}' <<< "${payload}")
 done <<< "${SECRETS}"
+
+if [[ -n "${VALUES:-}" ]]; then
+  if ! jq -e 'type == "object" and all(.[]; type == "string")' <<< "${VALUES}" > /dev/null; then
+    echo "::error::'values' must be a JSON object of strings"
+    exit 1
+  fi
+  payload=$(jq -c --argjson extra "${VALUES}" '. + $extra' <<< "${payload}")
+fi
 
 if [[ "${payload}" == '{}' ]]; then
   echo "::error::No secrets to wrap"

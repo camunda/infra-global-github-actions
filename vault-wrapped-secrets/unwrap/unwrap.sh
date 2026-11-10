@@ -24,10 +24,19 @@ data=$(curl -sS --fail --max-time 10 -X POST -H "X-Vault-Token: ${WRAP_TOKEN}" \
   exit 1
 }
 
+mask() {
+  local part="$1"
+  part="${part//'%'/'%25'}"
+  part="${part//$'\r'/'%0D'}"
+  echo "::add-mask::${part}"
+}
+
 while IFS= read -r name; do
-  value=$(jq -r --arg n "${name}" '.[$n]' <<< "${data}")
-  while IFS= read -r part; do
-    [[ -n "${part}" ]] && echo "::add-mask::${part}"
+  # The sentinel keeps trailing newlines that command substitution would strip.
+  value=$(jq -j --arg n "${name}" '.[$n]' <<< "${data}"; printf x)
+  value="${value%x}"
+  while IFS= read -r part || [[ -n "${part}" ]]; do
+    [[ -n "${part//$'\r'/}" ]] && mask "${part}"
   done <<< "${value}"
   if [[ "${EXPORT_ENV}" == "true" ]]; then
     delim="EOF_$(openssl rand -hex 16)"

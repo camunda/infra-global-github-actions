@@ -19,7 +19,13 @@ inputs:
   secrets:
     description: |
       Secrets to wrap, one per line as `<kv-v2 path> <key> | <NAME>`, the format of `hashicorp/vault-action`, e.g. `secret/data/products/foo/ci/common ANTHROPIC_API_KEY | ANTHROPIC_API_KEY`. A trailing `;` is allowed.
-    required: true
+    required: false
+    default: ''
+  values:
+    description: |
+      Values produced in this job to wrap as well, as a JSON object of strings, e.g. `{"GH_TOKEN": "${{ steps.app-token.outputs.token }}"}`. Use it for credentials minted here, such as a GitHub App token generated with `skip-token-revoke: true`. The values must already be masked in this job.
+    required: false
+    default: ''
   wrap-ttl:
     description: Lifetime of the wrapping token, e.g. `5m`. Keep it to the expected time until the consuming job starts and unwraps.
     required: false
@@ -42,5 +48,6 @@ runs:
       JWT_ROLE: ${{ inputs.vault-auth-jwt-role }}
       JWT_AUDIENCE: ${{ inputs.vault-auth-jwt-audience }}
       SECRETS: ${{ inputs.secrets }}
+      VALUES: ${{ inputs.values }}
       WRAP_TTL: ${{ inputs.wrap-ttl }}
     run: ${{ github.action_path }}/wrap.sh

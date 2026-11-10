@@ -11,7 +11,7 @@ Two composite actions that hand Vault secrets to a job without giving that job a
 
 `id-token: write` applies to a whole job. Any process in a job with it can request an OIDC token and log in with the repository's Vault role, which can read far more than one secret. A job that runs an AI agent or other untrusted code therefore gets its secrets through `unwrap` and never holds `id-token: write`. See [Vault secrets in agentic workflows](https://github.com/camunda/infra-core/blob/stage/docs/vault/vault-secrets-in-agentic-workflows.md).
 
-The wrapping token is not masked: masked values are dropped when they cross a job boundary. It is single-use, short-lived, and `unwrap` fails loudly if someone redeemed it first or substituted a token from another source.
+The wrapping token is not masked: masked values are dropped when they cross a job boundary, so it appears in the logs of both jobs. It is single-use and short-lived. `unwrap` fails when the token expired, was already redeemed, or was not created by `sys/wrapping/wrap`; it cannot tell apart two tokens that were both created there.
 
 ## 🔧 How
 
@@ -59,7 +59,8 @@ jobs:
 | `vault-auth-jwt-path` | yes | | JWT auth mount (`VAULT_JWT_PATH`) |
 | `vault-auth-jwt-role` | yes | | JWT role (`VAULT_JWT_ROLE`) |
 | `vault-auth-jwt-audience` | yes | | OIDC audience (`VAULT_JWT_AUDIENCE`) |
-| `secrets` | yes | | One `<kv-v2 path> <key> \| <NAME>` per line |
+| `secrets` | no | | One `<kv-v2 path> <key> \| <NAME>` per line |
+| `values` | no | | JSON object of strings produced in this job, e.g. a GitHub App token minted with `skip-token-revoke: true` |
 | `wrap-ttl` | no | `5m` | Lifetime of the wrapping token |
 
 Output: `wrap-token`.
@@ -74,7 +75,7 @@ Output: `wrap-token`.
 
 Output: `secrets`, a JSON object `{NAME: value}`.
 
-Wrap only what the consuming job needs, and unwrap before any untrusted code runs. The unwrapped values are in the job's memory and environment afterwards, so an agent can still read the secrets it was given, just nothing else.
+Wrap only what the consuming job needs, and unwrap before any untrusted code runs. To hand over a GitHub App token, generate it in the broker job with `generate-github-app-token-from-vault-secrets` and `skip-token-revoke: true` (the job would otherwise revoke it on exit) and pass it in `values`. The unwrapped values are in the job's memory and environment afterwards, so an agent can still read the secrets it was given, just nothing else.
 
 ## 📚 References
 
