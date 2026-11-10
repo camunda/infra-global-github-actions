@@ -1,0 +1,32 @@
+name: "TEMP: AppRole deprecation test (revert before merge)"
+on:
+  push:
+    branches: [feat/deprecate-vault-approle]
+permissions:
+  contents: read
+jobs:
+  token:
+    strategy:
+      matrix:
+        method: [jwt, approle]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Check out the branch
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4.3.0
+      - name: Generate a GitHub token
+        uses: ./generate-github-app-token-from-vault-secrets
+        with:
+          github-app-id-vault-key: GITHUB_APP_ID
+          github-app-id-vault-path: secret/data/products/infra/ci/team-infrastructure
+          github-app-private-key-vault-key: GITHUB_APP_PRIVATE_KEY
+          github-app-private-key-vault-path: secret/data/products/infra/ci/team-infrastructure
+          vault-auth-method: ${{ matrix.method }}
+          vault-auth-jwt-path: ${{ matrix.method == 'jwt' && secrets.VAULT_JWT_PATH || '' }}
+          vault-auth-jwt-role: ${{ matrix.method == 'jwt' && secrets.VAULT_JWT_ROLE || '' }}
+          vault-auth-jwt-audience: ${{ matrix.method == 'jwt' && secrets.VAULT_JWT_AUDIENCE || '' }}
+          vault-auth-role-id: ${{ matrix.method == 'approle' && secrets.VAULT_ROLE_ID || '' }}
+          vault-auth-secret-id: ${{ matrix.method == 'approle' && secrets.VAULT_SECRET_ID || '' }}
+          vault-url: ${{ secrets.VAULT_ADDR }}
