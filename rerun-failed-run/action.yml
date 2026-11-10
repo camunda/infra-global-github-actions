@@ -28,11 +28,11 @@ inputs:
     required: false
     default: approle
   vault-role-id:
-    description: The Vault role ID for fetching secrets (required when `vault-auth-method` is `approle`)
+    description: Deprecated, use JWT. The Vault role ID for fetching secrets (required when `vault-auth-method` is `approle`)
     required: false
     default: ""
   vault-secret-id:
-    description: The Vault secret ID for fetching secrets (required when `vault-auth-method` is `approle`)
+    description: Deprecated, use JWT. The Vault secret ID for fetching secrets (required when `vault-auth-method` is `approle`)
     required: false
     default: ""
   vault-jwt-path:
@@ -79,6 +79,7 @@ runs:
         conflicting=()
         case "${VAULT_AUTH_METHOD}" in
           approle)
+            echo "::warning title=Vault AppRole is deprecated::Use vault-auth-method: jwt with vault-jwt-path, vault-jwt-role and vault-jwt-audience, and grant 'id-token: write' to the job. AppRole support will be removed, see https://github.com/camunda/team-infrastructure/issues/1076"
             [[ -z "${VAULT_ROLE_ID}" ]] && missing+=("vault-role-id")
             [[ -z "${VAULT_SECRET_ID}" ]] && missing+=("vault-secret-id")
             [[ -n "${VAULT_JWT_PATH}" ]] && conflicting+=("vault-jwt-path")
