@@ -1,0 +1,24 @@
+---
+name: Test add-to-monorepo-os
+
+on:
+  pull_request:
+    paths:
+    - 'add-to-monorepo-os/**'
+    - '.github/workflows/test-add-to-monorepo-os.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test-add-to-monorepo-os:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Run unit tests
+      working-directory: add-to-monorepo-os
+      run: node --test
+      shell: bash

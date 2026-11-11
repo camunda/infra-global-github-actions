@@ -44,6 +44,9 @@
     "add-bug-to-quality-board": {
       "package-name": "add-bug-to-quality-board"
     },
+    "add-to-monorepo-os": {
+      "package-name": "add-to-monorepo-os"
+    },
     "argocd-delete-applications": {
       "package-name": "argocd-delete-applications"
     },

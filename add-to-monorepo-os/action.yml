@@ -1,0 +1,37 @@
+name: "Add to Monorepo OS"
+description: "Adds issues and pull requests of Monorepo OS pilot users to the Monorepo OS board and sets their Due Date."
+author: "Camunda Engineering Operations"
+
+inputs:
+  github-token:
+    description: "Token of the Monorepo OS GitHub App: assigns pull request authors and writes the board."
+    required: true
+  project-url:
+    description: "The Monorepo OS board. Override it to test against a copy of the board."
+    required: false
+    default: "https://github.com/orgs/camunda/projects/267"
+  dry-run:
+    description: "If `true`, logs what would be added and dated without writing to the board."
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Add to Monorepo OS board
+      uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        PROJECT_URL: ${{ inputs.project-url }}
+        DRY_RUN: ${{ inputs.dry-run }}
+      with:
+        github-token: ${{ inputs.github-token }}
+        script: |
+          const { run } = require(`${process.env.ACTION_PATH}/index.js`);
+          await run({
+            github,
+            context,
+            core,
+            projectUrl: process.env.PROJECT_URL,
+            dryRun: process.env.DRY_RUN === "true",
+          });
