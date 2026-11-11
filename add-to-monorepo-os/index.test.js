@@ -115,7 +115,11 @@ test("parseProjectUrl accepts org project URLs only", () => {
 function fakeGitHub(items = {}) {
   const calls = [];
   const graphql = async (query, vars) => {
-    calls.push(query.match(/(organization|addProjectV2ItemById|updateProjectV2ItemFieldValue)/)[1]);
+    calls.push(query.match(/(organization|addProjectV2ItemById|updateProjectV2ItemFieldValue|items)\(/)[1]);
+    if (query.includes("items(")) {
+      const nodes = Object.keys(items).map((id) => ({ content: { id } }));
+      return { node: { items: { nodes, pageInfo: { hasNextPage: false, endCursor: null } } } };
+    }
     if (query.includes("organization(")) {
       return { organization: { projectV2: { id: "P", field: { id: "F", dataType: "DATE" } } } };
     }
@@ -171,8 +175,9 @@ test("run touches nothing for a skipped event, and writes nothing in a dry run",
   assert.deepEqual(dry.calls, ["organization"]);
 });
 
-test("backfill adds each search result once, keeping existing dates", async () => {
-  const github = fakeGitHub({ I_9: { id: "item-I_9", date: "2026-12-24" } });
+test("backfill adds each missing search result once and leaves items already on the board alone", async () => {
+  // I_9 is on the board with its Due Date cleared by a human.
+  const github = fakeGitHub({ I_9: { id: "item-I_9", date: null } });
   const queries = [];
   github.rest = { search: { issuesAndPullRequests: "search" } };
   github.paginate = async (_endpoint, { q }) => {
@@ -187,9 +192,9 @@ test("backfill adds each search result once, keeping existing dates", async () =
   github.rest.issues = { addAssignees: async (args) => assigned.push(args) };
   const context = { eventName: "workflow_dispatch", repo: { owner: "camunda", repo: "monorepo-os" }, payload: {} };
   await run({ github, context, core, projectUrl, dryRun: false, now: wednesday, sleep: async () => {} });
-  assert.equal(github.items.I_9.date, "2026-12-24");
+  assert.equal(github.items.I_9.date, null);
   assert.equal(github.items.PR_7.date, "2026-11-13");
-  assert.equal(github.calls.filter((c) => c === "addProjectV2ItemById").length, 2);
+  assert.equal(github.calls.filter((c) => c === "addProjectV2ItemById").length, 1);
   assert.ok(queries.every((q) => q.startsWith("repo:camunda/monorepo-os ")));
   assert.deepEqual(assigned, [{ owner: "camunda", repo: "monorepo-os", issue_number: 7, assignees: ["cmur2"] }]);
 });

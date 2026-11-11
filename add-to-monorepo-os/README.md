@@ -4,7 +4,7 @@ Adds the issues and pull requests of [Monorepo OS](https://github.com/camunda/mo
 
 ## Rules
 
-Due Dates count business days (Monday to Friday) from today. "If empty" leaves a date that humans set or removed alone; "reset" replaces it.
+Due Dates count business days (Monday to Friday) from today. "If empty" keeps a date humans set; "reset" replaces it. A date humans cleared comes back on the next event that sets one, such as a reassignment, but not from a backfill.
 
 | Event | Added when | Due Date |
 | --- | --- | --- |
@@ -12,11 +12,11 @@ Due Dates count business days (Monday to Friday) from today. "If empty" leaves a
 | `pull_request: review_requested` | a pilot user is requested to review, re-requests included; team requests are skipped | +2, reset |
 | `pull_request: opened`, `reopened`, `ready_for_review` | a pilot user authored it or is already requested to review; a pilot author is assigned if it has no assignee yet | +2, if empty |
 | `pull_request_review: submitted` | an approval of a pull request a pilot user authored or is assigned to | +2, reset |
-| `workflow_dispatch` | backfill: every open issue assigned to a pilot user, and every open pull request a pilot user authored or is requested to review, in the calling repository; pilot authors are assigned as above | +10 for issues, +2 for pull requests, if empty |
+| `workflow_dispatch` | backfill: every open issue assigned to a pilot user, and every open pull request a pilot user authored or is requested to review, in the calling repository that is not on the board yet; pilot authors are assigned as above | +10 for issues, +2 for pull requests |
 
 Assigning the author makes them the owner of the merge, as an assignee owns an issue, both for the webapp and for anything else that reads assignees. Draft and closed pull requests are skipped. The action never removes items from the board: an issue whose assignee drops it keeps its date, and the webapp lists it under Needs attention.
 
-The backfill fills the board for a repository that starts calling the action, and rebuilds a wiped board.
+The backfill fills the board for a repository that starts calling the action, and rebuilds a wiped board. It leaves items already on the board alone, so it never brings back a Due Date someone cleared.
 
 ## Inputs
 
