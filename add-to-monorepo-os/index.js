@@ -161,8 +161,39 @@ async function apply(github, core, board, { contentId, days, reset, assign }, to
   core.info(`${contentId} is on the board, Due Date ${current ?? "empty"} → ${due}`);
 }
 
+/** The IDs of the issues and pull requests already on the board. */
+async function boardContentIds(github, board) {
+  const ids = new Set();
+  let after = null;
+  do {
+    const res = await github.graphql(
+      `query($project: ID!, $after: String) {
+        node(id: $project) {
+          ... on ProjectV2 {
+            items(first: 100, after: $after) {
+              nodes { content { ... on Issue { id } ... on PullRequest { id } } }
+              pageInfo { hasNextPage endCursor }
+            }
+          }
+        }
+      }`,
+      { project: board.projectId, after },
+    );
+    const items = res.node.items;
+    for (const node of items.nodes) if (node.content?.id) ids.add(node.content.id);
+    after = items.pageInfo.hasNextPage ? items.pageInfo.endCursor : null;
+  } while (after);
+  return ids;
+}
+
+/**
+ * Adds what is missing from the board. Items already on it are left alone, so a Due Date someone cleared stays
+ * cleared; only a wiped or new board gets dates again.
+ */
 async function backfill(github, core, board, repository, today, dryRun, sleep) {
+  const onBoard = await boardContentIds(github, board);
   const seen = new Set();
+  let added = 0;
   for (const login of ROSTER) {
     for (const { q, days } of backfillSearches(repository, login)) {
       const results = await github.paginate(github.rest.search.issuesAndPullRequests, { q, per_page: 100 });
@@ -170,13 +201,18 @@ async function backfill(github, core, board, repository, today, dryRun, sleep) {
       for (const result of results) {
         if (seen.has(result.node_id)) continue;
         seen.add(result.node_id);
+        if (onBoard.has(result.node_id)) {
+          core.info(`${result.html_url} is already on the board, leaving it alone`);
+          continue;
+        }
         core.info(`${result.html_url}`);
         const assign = result.pull_request ? authorToAssign(result, repository, (l) => inRoster(l)) : undefined;
         await apply(github, core, board, { contentId: result.node_id, days, reset: false, assign }, today, dryRun);
+        added++;
       }
     }
   }
-  core.info(`Backfill of ${repository}: ${seen.size} issues and pull requests`);
+  core.info(`Backfill of ${repository}: ${seen.size} issues and pull requests found, ${added} added`);
 }
 
 async function run({ github, context, core, projectUrl, dryRun, now = new Date(), sleep }) {
