@@ -95,7 +95,7 @@ function backfillSearches(repository, login) {
   return [
     { q: `repo:${repository} is:issue is:open assignee:${login}`, days: ISSUE_DAYS },
     { q: `repo:${repository} is:pr is:open draft:false author:${login}`, days: PR_DAYS },
-    { q: `repo:${repository} is:pr is:open draft:false review-requested:${login}`, days: PR_DAYS },
+    { q: `repo:${repository} is:pr is:open draft:false user-review-requested:${login}`, days: PR_DAYS },
   ];
 }
 

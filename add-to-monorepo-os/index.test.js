@@ -95,13 +95,13 @@ test("a non-approving review, or an approval of an outsider's pull request, is s
   assert.ok(decide("pull_request_review", outsider, ROSTER).skip);
 });
 
-test("backfill searches open assigned issues, and authored and review-requested non-draft pull requests", () => {
+test("backfill searches open assigned issues, and authored and directly review-requested non-draft pull requests", () => {
   assert.deepEqual(
     backfillSearches("camunda/x", "pilot").map((s) => [s.q, s.days]),
     [
       ["repo:camunda/x is:issue is:open assignee:pilot", 10],
       ["repo:camunda/x is:pr is:open draft:false author:pilot", 2],
-      ["repo:camunda/x is:pr is:open draft:false review-requested:pilot", 2],
+      ["repo:camunda/x is:pr is:open draft:false user-review-requested:pilot", 2],
     ],
   );
 });

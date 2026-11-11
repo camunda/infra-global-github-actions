@@ -12,7 +12,7 @@ Due Dates count business days (Monday to Friday) from today. "If empty" keeps a 
 | `pull_request: review_requested` | a pilot user is requested to review, re-requests included; team requests are skipped | +2, reset |
 | `pull_request: opened`, `reopened`, `ready_for_review` | a pilot user authored it or is already requested to review; a pilot author is assigned if it has no assignee yet | +2, if empty |
 | `pull_request_review: submitted` | an approval of a pull request a pilot user authored or is assigned to | +2, reset |
-| `workflow_dispatch` | backfill: every open issue assigned to a pilot user, and every open pull request a pilot user authored or is requested to review, in the calling repository that is not on the board yet; pilot authors are assigned as above | +10 for issues, +2 for pull requests |
+| `workflow_dispatch` | backfill: every open issue assigned to a pilot user, and every open pull request a pilot user authored or is requested to review directly (team requests are skipped, as for events), in the calling repository that is not on the board yet; pilot authors are assigned as above | +10 for issues, +2 for pull requests |
 
 Assigning the author makes them the owner of the merge, as an assignee owns an issue, both for the webapp and for anything else that reads assignees. Draft and closed pull requests are skipped. The action never removes items from the board: an issue whose assignee drops it keeps its date, and the webapp lists it under Needs attention.
 
