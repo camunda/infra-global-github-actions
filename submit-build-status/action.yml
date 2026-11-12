@@ -180,6 +180,7 @@ runs:
       # Resource and network metrics as a JSON fragment ', "key": number, ...' (might be empty).
       MONITOR_FIELDS: "${{ steps.monitor.outputs.monitor_fields }}"
       ACCESS_TOKEN: "${{ steps.auth.outputs.access_token }}"
+      JOB_ID: "${{ job.check_run_id }}"
       RUNNER_INFO_RUNS_ON_FILE: "/home/runner/.camunda-arc-runner-info/runs-on"
     run: |
       WORKFLOW_REF_PATH="${GITHUB_WORKFLOW_REF%@*}"
@@ -220,6 +221,7 @@ runs:
       add_field runner_arch "$(lower "$RUNNER_ARCH")"
       add_field runner_os "$(lower "$RUNNER_OS")"
       # Optional fields are sent only when set.
+      [ -z "$JOB_ID" ] || add_field job_id "$JOB_ID"
       [ -z "$BUILD_BASE_REF" ] || add_field build_base_ref "$BUILD_BASE_REF"
       [ -z "$BUILD_HEAD_REF" ] || add_field build_head_ref "$BUILD_HEAD_REF"
       [ -z "$BUILD_DURATION_MILLIS" ] || add_field build_duration_milliseconds "$BUILD_DURATION_MILLIS"

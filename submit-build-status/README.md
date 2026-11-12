@@ -43,6 +43,7 @@ All data submitted by this action is stored as one record in the Big Query table
 | workflow_ref     | STRING     | NULLABLE   | GHA workflow file path extracted from `"$GITHUB_WORKFLOW_REF"`, e.g. `.github/workflows/ci.yml` |
 | job_name         | STRING     | REQUIRED   | GHA workflow job ID from `"$GITHUB_JOB"` |
 | build_id         | STRING     | REQUIRED   | GHA workflow run ID from `"$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT"` |
+| job_id           | STRING     | NULLABLE   | GHA workflow job ID from `${{ job.check_run_id }}`, equals the job `id` of the GitHub REST API |
 | build_trigger    | STRING     | NULLABLE   | Github event name from `"$GITHUB_EVENT_NAME"` |
 | build_status     | STRING     | REQUIRED   | Based on user input |
 | build_ref        | STRING     | NULLABLE   | Git object reference from `"$GITHUB_REF"` |

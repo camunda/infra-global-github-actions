@@ -62,6 +62,7 @@ All data submitted by this action is stored as one record per JSONL input line i
 | ci_url                           | STRING     | REQUIRED   | Github repository URL from `"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"` |
 | build_id                         | STRING     | REQUIRED   | GHA workflow run ID from `"$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT"` |
 | job_name                         | STRING     | REQUIRED   | GHA workflow job ID from `"$GITHUB_JOB"` |
+| job_id                           | STRING     | NULLABLE   | GHA workflow job ID from `${{ job.check_run_id }}`, equals the job `id` of the GitHub REST API |
 | test_class_name                  | STRING     | NULLABLE   | Individual (unit) test cases are usually grouped together in a container/class. This field holds the name of the container. |
 | test_class_duration_milliseconds | INTEGER    | NULLABLE   | Based on user input (time a test class needed from start to finish) |
 | test_name                        | STRING     | REQUIRED   | Name of the individual test case, can include parameters for uniqueness |

@@ -38,6 +38,7 @@ All data submitted by this action is stored as one record in the Big Query table
 | workflow_name    | STRING     | NULLABLE   | GHA workflow name from `"$GITHUB_WORKFLOW"` |
 | workflow_ref     | STRING     | NULLABLE   | GHA workflow file path extracted from `"$GITHUB_WORKFLOW_REF"`, e.g. `.github/workflows/ci.yml` |
 | job_name         | STRING     | REQUIRED   | GHA workflow job ID of the aborted job |
+| job_id           | STRING     | NULLABLE   | GHA workflow job ID of the aborted job from the GitHub REST API (jobs `id`) |
 | build_id         | STRING     | REQUIRED   | GHA workflow run ID from `"$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT"` |
 | build_trigger    | STRING     | NULLABLE   | Github event name from `"$GITHUB_EVENT_NAME"` |
 | build_status     | STRING     | REQUIRED   | `"aborted"` |
