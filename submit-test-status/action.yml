@@ -147,15 +147,17 @@ runs:
     shell: bash
     env:
       BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
+      JOB_ID: "${{ job.check_run_id }}"
     run: |
-      # add mandatory report_time, ci_url and build_id to the test records
+      # add mandatory report_time, ci_url, build_id and job_name (plus job_id when set) to the test records
       REPORT_TIME=$(date -u '+%Y-%m-%d %H:%M:%S')
       jq -c \
         --arg REPORT_TIME "$REPORT_TIME" \
         --arg CI_URL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY" \
         --arg BUILD_ID "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT" \
         --arg JOB_NAME "${{ (inputs.job_name_override == '') && '$GITHUB_JOB' || inputs.job_name_override }}" \
-        '. + {"report_time": $REPORT_TIME} + {"ci_url": $CI_URL} + {"build_id": $BUILD_ID} + {"job_name": $JOB_NAME}' \
+        --arg JOB_ID "$JOB_ID" \
+        '. + {"report_time": $REPORT_TIME} + {"ci_url": $CI_URL} + {"build_id": $BUILD_ID} + {"job_name": $JOB_NAME} + (if $JOB_ID == "" then {} else {"job_id": $JOB_ID} end)' \
          "$INPUT_FILE" > "$SUBMIT_TEST_STATUS_TEMP_DIR/enriched_test_event_records.jsonl"
 
       # upload data to CI Analytics
