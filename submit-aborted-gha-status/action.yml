@@ -82,6 +82,7 @@ runs:
         "workflow_name": "$GITHUB_WORKFLOW",
         "workflow_ref": "$WORKFLOW_REF_PATH",
         "job_name": "$job_name",
+        "job_id": "$job_id",
         "build_id": "$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT",
         "build_trigger": "$GITHUB_EVENT_NAME",
         "build_status": "aborted",
