@@ -183,7 +183,7 @@ Use a dedicated checker job on Linux or macOS (x86-64 or ARM64) to isolate the a
 
 ## 📊 Results
 
-The GitHub job summary lists each job's result, rule findings, and exclusion reasons, including on policy failure. A rule check is one rule evaluated on one job.
+The GitHub job summary lists each job's result, rule findings, and exclusion reasons, including on policy failure. The result column marks passed jobs 🟢, failed jobs and errors 🔴, and excluded or reusable jobs ⚪. A rule check is one rule evaluated on one job.
 
 | Output | Contents |
 | --- | --- |

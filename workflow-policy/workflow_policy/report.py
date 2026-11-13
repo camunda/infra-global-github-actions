@@ -7,6 +7,12 @@ import sys
 from .model import location
 
 
+# Shown only in the Markdown summary; an error means the check could not finish.
+STATUS_EMOJI = {
+    "passed": "🟢", "failed": "🔴", "error": "🔴", "excluded": "⚪", "reusable": "⚪",
+}
+
+
 def job_status(job, findings, error):
     if job["calls"] is not None:
         return "reusable"
@@ -105,7 +111,8 @@ def markdown_cell(value):
 
 def markdown_summary(report):
     lines = [
-        "## Workflow policy", "", f"**Status: {report['status'].upper()}**", "",
+        "## Workflow policy", "",
+        f"**Status: {STATUS_EMOJI[report['status']]} {report['status'].upper()}**", "",
         f"Rules: {', '.join(report['rules']) or 'none'}.",
         *summary_sentences(report["summary"]),
         "",
@@ -138,7 +145,7 @@ def markdown_summary(report):
         cell = markdown_cell("\n".join(details))
         lines.append(
             f"| {markdown_cell(job['workflow'])} | {markdown_cell(job['job'])} "
-            f"| {job['status'].capitalize()} | {checks} | {cell} |"
+            f"| {STATUS_EMOJI[job['status']]} {job['status'].capitalize()} | {checks} | {cell} |"
         )
     return "\n".join(lines) + "\n"
 
