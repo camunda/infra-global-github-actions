@@ -35,6 +35,11 @@ runs:
         python -m pip install --disable-pip-version-check \
           --requirement "${ACTION_DIRECTORY}/requirements.txt"
 
+    # Conftest comes from its pinned release asset, verified against the release's checksums.txt, and is on PATH for the check step only.
+    # asdf is not used for it:
+    # - its conftest plugin (looztra/asdf-conftest) is a personal repository cloned at its default branch on every install, and it downloads the archive without verifying a checksum;
+    # - asdf-vm/actions/setup adds asdf to PATH and sets ASDF_DIR and ASDF_DATA_DIR for every later step of the caller's job, and writes into any asdf installation the caller already sets up and caches;
+    # - asdf resolves versions from the caller's .tool-versions, while the presets depend on the OPA version bundled with Conftest (whether `**` matches zero path segments differs between 0.66.0 and 0.71.1), so the action pins CONFTEST_VERSION and Renovate updates it.
     - name: Install Conftest
       id: tooling
       env:

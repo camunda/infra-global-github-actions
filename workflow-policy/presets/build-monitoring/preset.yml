@@ -9,8 +9,3 @@ params:
     - ./**/.github/actions/observe-build-status
 
 overridable: [last-step-any-of]
-
-exceptions:
-  - workflow: "*"
-    jobs: [notify, notify-on-failure, notify-on-success]
-    reason: Notification-only jobs are not monitored
