@@ -1,0 +1,11 @@
+description: >-
+  Jobs report their status to build_status_v2: start-build-monitor runs first, and
+  submit-build-status or the observe-build-status wrapper, at any path, runs last, best-effort.
+
+params:
+  first-step: camunda/infra-global-github-actions/start-build-monitor
+  last-step-any-of:
+    - camunda/infra-global-github-actions/submit-build-status
+    - ./**/.github/actions/observe-build-status
+
+overridable: [last-step-any-of]

@@ -1,0 +1,60 @@
+---
+name: Workflow policy check (Python rules)
+description: Check the caller repository's workflow jobs against configured presets written as Python rules
+
+inputs:
+  config-path:
+    description: Policy configuration path relative to the caller checkout
+    required: true
+  write-summary:
+    description: Append the job table to the GitHub job summary, including on failure
+    default: 'true'
+    required: false
+
+outputs:
+  report-path:
+    description: Path to the JSON report on the current runner
+    value: ${{ steps.check.outputs.report-path }}
+  summary-path:
+    description: Path to the Markdown table on the current runner
+    value: ${{ steps.check.outputs.summary-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: '3.13'
+
+    - name: Install Python dependency
+      env:
+        ACTION_DIRECTORY: ${{ github.action_path }}
+      shell: bash
+      run: |
+        python -m pip install --disable-pip-version-check \
+          --requirement "${ACTION_DIRECTORY}/requirements.txt"
+
+    - name: Validate caller workflows
+      id: check
+      env:
+        ACTION_DIRECTORY: ${{ github.action_path }}
+        CONFIG_PATH: ${{ inputs.config-path }}
+      shell: bash
+      run: |
+        report_directory="$(mktemp -d "${RUNNER_TEMP}/workflow-policy.XXXXXX")/report"
+        printf 'report-path=%s/report.json\n' "${report_directory}" >> "${GITHUB_OUTPUT}"
+        printf 'summary-path=%s/summary.md\n' "${report_directory}" >> "${GITHUB_OUTPUT}"
+        python "${ACTION_DIRECTORY}/check.py" \
+          --root "${GITHUB_WORKSPACE}" --config "${CONFIG_PATH}" \
+          --report-dir "${report_directory}"
+
+    - name: Write job summary
+      if: ${{ always() && inputs.write-summary == 'true' && steps.check.outputs.summary-path != '' }}
+      env:
+        SUMMARY_PATH: ${{ steps.check.outputs.summary-path }}
+      shell: bash
+      run: |
+        if [[ -f "${SUMMARY_PATH}" ]]; then
+          cat "${SUMMARY_PATH}" >> "${GITHUB_STEP_SUMMARY}"
+        fi
