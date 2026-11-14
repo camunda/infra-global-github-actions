@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.2.1 (2026-11-14)
+
+## What's Changed
+* feat(add-to-monorepo-os): add pilot users' issues and PRs to the Monorepo OS board by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/899
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/900
+* fix(add-to-monorepo-os): skip team review requests when backfilling by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/901
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/902
+* chore(deps): update mikefarah/yq action to v4.54.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/904
+* chore(deps): update codex-/return-dispatch action to v4.1.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/905
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.239.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/906
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/rerun-failed-run-1.2.0...rerun-failed-run-1.2.1
+
 ## 1.2.0 (2026-11-10)
 
 ## What's Changed

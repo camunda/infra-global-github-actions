@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.0.8 (2026-11-14)
+
+## What's Changed
+* feat(vault-wrapped-secrets)!: hand Vault secrets to a job without OIDC by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/895
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/896
+* feat: deprecate Vault AppRole in generate-github-app-token-from-vault-secrets and rerun-failed-run by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/894
+* fix(vault-wrapped-secrets): point to Re-run all jobs when a wrapping token is spent by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/897
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/898
+* feat(add-to-monorepo-os): add pilot users' issues and PRs to the Monorepo OS board by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/899
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/900
+* fix(add-to-monorepo-os): skip team review requests when backfilling by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/901
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/902
+* chore(deps): update mikefarah/yq action to v4.54.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/904
+* chore(deps): update codex-/return-dispatch action to v4.1.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/905
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.239.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/906
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/yq-yaml-processor-1.0.7...yq-yaml-processor-1.0.8
+
 ## 1.0.7 (2026-11-07)
 
 ## What's Changed
