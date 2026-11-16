@@ -35,6 +35,10 @@ inputs:
     description: Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB` useful e.g. for matrix builds
     required: false
     default: ''
+  job_id_override:
+    description: Optional numeric GHA job ID being used for the `job_id` field instead of the default `job.check_run_id`, for observer jobs reporting another job's status (pass that job's `job.check_run_id` via its job outputs)
+    required: false
+    default: ''
 
   big_query_table_name:
     description: Use only for infrastructure testing purposes to target e.g. dev environment.
@@ -53,6 +57,7 @@ runs:
       USER_REASON: "${{ inputs.user_reason }}"
       USER_DESCRIPTION: "${{ inputs.user_description }}"
       JOB_NAME_OVERRIDE: "${{ inputs.job_name_override }}"
+      JOB_ID_OVERRIDE: "${{ inputs.job_id_override }}"
       BIG_QUERY_TABLE_NAME: "${{ inputs.big_query_table_name }}"
     run: |
       echo "Inputs"
@@ -63,6 +68,7 @@ runs:
       echo "User reason: $USER_REASON"
       echo "User description: $USER_DESCRIPTION"
       echo "Job name override: $JOB_NAME_OVERRIDE (default job name: $GITHUB_JOB)"
+      echo "Job ID override: $JOB_ID_OVERRIDE"
       echo "BQ table name (for testing): $BIG_QUERY_TABLE_NAME"
 
   - name: Validate inputs
@@ -180,7 +186,7 @@ runs:
       # Resource and network metrics as a JSON fragment ', "key": number, ...' (might be empty).
       MONITOR_FIELDS: "${{ steps.monitor.outputs.monitor_fields }}"
       ACCESS_TOKEN: "${{ steps.auth.outputs.access_token }}"
-      JOB_ID: "${{ job.check_run_id }}"
+      JOB_ID: "${{ inputs.job_id_override || job.check_run_id }}"
       RUNNER_INFO_RUNS_ON_FILE: "/home/runner/.camunda-arc-runner-info/runs-on"
     run: |
       WORKFLOW_REF_PATH="${GITHUB_WORKFLOW_REF%@*}"

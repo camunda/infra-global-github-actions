@@ -18,6 +18,7 @@ This composite GHA can be used in any repository set up to access the central Go
 | gcp_workload_identity_provider | Optional full Workload Identity Provider resource name. Defaults to the shared Camunda CI provider; ignored when JSON credentials are supplied. |
 | gcp_service_account | Optional service account email to impersonate for WIF. Defaults to the production CI Analytics writer; ignored when JSON credentials are supplied. |
 | job_name_override    | Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB`, useful e.g. for matrix builds |
+| job_id_override      | Optional numeric GHA job ID being used for the `job_id` field instead of the default `${{ job.check_run_id }}`, for observer jobs reporting another job's status (pass that job's `${{ job.check_run_id }}` via its job outputs) |
 | big_query_table_name | Optional destination in `project:dataset.table` format for infrastructure testing. Defaults to `ci-30-162810:prod_ci_analytics.build_status_v2`. |
 
 ### Authentication
@@ -41,9 +42,9 @@ All data submitted by this action is stored as one record in the Big Query table
 | ci_url           | STRING     | REQUIRED   | Github repository URL from `"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"` |
 | workflow_name    | STRING     | NULLABLE   | GHA workflow name from `"$GITHUB_WORKFLOW"` |
 | workflow_ref     | STRING     | NULLABLE   | GHA workflow file path extracted from `"$GITHUB_WORKFLOW_REF"`, e.g. `.github/workflows/ci.yml` |
-| job_name         | STRING     | REQUIRED   | GHA workflow job ID from `"$GITHUB_JOB"` |
+| job_name         | STRING     | REQUIRED   | GHA job key from the workflow YAML (`"$GITHUB_JOB"`), or `job_name_override` |
 | build_id         | STRING     | REQUIRED   | GHA workflow run ID from `"$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT"` |
-| job_id           | STRING     | NULLABLE   | GHA workflow job ID from `${{ job.check_run_id }}`, equals the job `id` of the GitHub REST API |
+| job_id           | STRING     | NULLABLE   | Numeric GHA job ID from `${{ job.check_run_id }}` (the job `id` of the GitHub REST API), or `job_id_override` |
 | build_trigger    | STRING     | NULLABLE   | Github event name from `"$GITHUB_EVENT_NAME"` |
 | build_status     | STRING     | REQUIRED   | Based on user input |
 | build_ref        | STRING     | NULLABLE   | Git object reference from `"$GITHUB_REF"` |

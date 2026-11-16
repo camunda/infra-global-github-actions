@@ -19,6 +19,7 @@ This composite GHA can be used in any repository that was set up to provide cred
 | test_results_file_path   | Path to a file containing test event(s) in JSONL format. Required keys are test_name and test_status. | No* |
 | test_event_record        | Test event(s) in JSONL format. Required keys are test_name and test_status. | No* |
 | job_name_override        | Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB`, useful e.g. for matrix builds | No |
+| job_id_override          | Optional numeric GHA job ID being used for the `job_id` field instead of the default `${{ job.check_run_id }}`, for observer jobs reporting another job's status (pass that job's `${{ job.check_run_id }}` via its job outputs) | No |
 | gcp_credentials_json     | Credentials for a Google Cloud ServiceAccount allowed to publish to Big Query formatted as contents of credentials.json file | Yes |
 
 *Note: Either `test_results_file_path` OR `test_event_record` must be provided (not both). If neither is provided, the action will skip submission gracefully.
@@ -61,8 +62,8 @@ All data submitted by this action is stored as one record per JSONL input line i
 | report_time                      | TIMESTAMP  | REQUIRED   | Time of record submission, in UTC |
 | ci_url                           | STRING     | REQUIRED   | Github repository URL from `"$GITHUB_SERVER_URL/$GITHUB_REPOSITORY"` |
 | build_id                         | STRING     | REQUIRED   | GHA workflow run ID from `"$GITHUB_RUN_ID/$GITHUB_RUN_ATTEMPT"` |
-| job_name                         | STRING     | REQUIRED   | GHA workflow job ID from `"$GITHUB_JOB"` |
-| job_id                           | STRING     | NULLABLE   | GHA workflow job ID from `${{ job.check_run_id }}`, equals the job `id` of the GitHub REST API |
+| job_name                         | STRING     | REQUIRED   | GHA job key from the workflow YAML (`"$GITHUB_JOB"`), or `job_name_override` |
+| job_id                           | STRING     | NULLABLE   | Numeric GHA job ID from `${{ job.check_run_id }}` (the job `id` of the GitHub REST API), or `job_id_override` |
 | test_class_name                  | STRING     | NULLABLE   | Individual (unit) test cases are usually grouped together in a container/class. This field holds the name of the container. |
 | test_class_duration_milliseconds | INTEGER    | NULLABLE   | Based on user input (time a test class needed from start to finish) |
 | test_name                        | STRING     | REQUIRED   | Name of the individual test case, can include parameters for uniqueness |
