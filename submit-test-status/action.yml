@@ -20,6 +20,10 @@ inputs:
     description: Optional string being used for the `job_name` field instead of the default `$GITHUB_JOB` useful e.g. for matrix builds
     required: false
     default: ''
+  job_id_override:
+    description: Optional numeric GHA job ID being used for the `job_id` field instead of the default `job.check_run_id`, for observer jobs reporting another job's status (pass that job's `job.check_run_id` via its job outputs)
+    required: false
+    default: ''
 
   big_query_table_name:
     description: Use only for infrastructure testing purposes to target e.g. dev environment.
@@ -32,10 +36,13 @@ runs:
   steps:
   - name: Echo inputs
     shell: bash
+    env:
+      JOB_ID_OVERRIDE: "${{ inputs.job_id_override }}"
     run: |
       echo "Inputs"
       echo "-----"
       echo "Job name override: ${{ inputs.job_name_override }} (default job name: $GITHUB_JOB)"
+      echo "Job ID override: $JOB_ID_OVERRIDE"
       echo "BQ table name (for testing): ${{ inputs.big_query_table_name }}"
       echo "Test results file path: '${{ inputs.test_results_file_path }}'"
       echo "Test event record provided: ${{ inputs.test_event_record != '' }}"
@@ -147,7 +154,7 @@ runs:
     shell: bash
     env:
       BQ_COMMAND: "${{ (runner.os == 'Windows') && 'bq.cmd' || 'bq' }}"
-      JOB_ID: "${{ job.check_run_id }}"
+      JOB_ID: "${{ inputs.job_id_override || job.check_run_id }}"
     run: |
       # add mandatory report_time, ci_url, build_id and job_name (plus job_id when set) to the test records
       REPORT_TIME=$(date -u '+%Y-%m-%d %H:%M:%S')
