@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.2 (2026-11-16)
+
+## What's Changed
+* chore(deps): update mikefarah/yq action to v4.54.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/904
+* chore(deps): update codex-/return-dispatch action to v4.1.0 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/905
+* chore(deps): update pre-commit hook renovatebot/pre-commit-hooks to v44.239.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/906
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/907
+* feat: submit the GHA job ID to CI Analytics by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/903
+* fix(add-to-monorepo-os): survive two runs adding the same pull request at once by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/909
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/add-to-monorepo-os-1.0.1...add-to-monorepo-os-1.0.2
+
 ## 1.0.1 (2026-11-11)
 
 ## What's Changed
