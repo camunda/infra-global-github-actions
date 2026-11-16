@@ -9,6 +9,7 @@ const PR_DAYS = 2;
 const DUE_DATE_FIELD = "Due Date";
 // The search API allows 30 requests per minute.
 const SEARCH_PAUSE_MS = 2100;
+const ADD_RETRY_PAUSE_MS = 2000;
 
 function inRoster(login, roster = ROSTER) {
   return !!login && roster.some((r) => r.toLowerCase() === login.toLowerCase());
@@ -123,8 +124,33 @@ async function loadBoard(github, projectUrl) {
   return { projectId: project.id, dueFieldId: project.field.id };
 }
 
+/**
+ * Adds the content to the board and returns its item, also when it is already there. When two runs add the same content
+ * at once, GitHub rejects one with "Content already exists"; adding again then returns the other run's item.
+ */
+async function addItem(github, board, contentId, sleep) {
+  const add = () =>
+    github.graphql(
+      `mutation($project: ID!, $content: ID!, $field: String!) {
+        addProjectV2ItemById(input: { projectId: $project, contentId: $content }) {
+          item { id fieldValueByName(name: $field) { ... on ProjectV2ItemFieldDateValue { date } } }
+        }
+      }`,
+      { project: board.projectId, content: contentId, field: DUE_DATE_FIELD },
+    );
+  let added;
+  try {
+    added = await add();
+  } catch (error) {
+    if (!/Content already exists/.test(error.message)) throw error;
+    await sleep(ADD_RETRY_PAUSE_MS);
+    added = await add();
+  }
+  return added.addProjectV2ItemById.item;
+}
+
 /** Adds the content to the board (a no-op when it is already there) and sets its Due Date per the rule. */
-async function apply(github, core, board, { contentId, days, reset, assign }, today, dryRun) {
+async function apply(github, core, board, { contentId, days, reset, assign }, today, dryRun, sleep) {
   const due = addBusinessDays(today, days);
   if (dryRun) {
     const assigning = assign ? `, assign @${assign.login} to ${assign.repository}#${assign.number}` : "";
@@ -136,15 +162,7 @@ async function apply(github, core, board, { contentId, days, reset, assign }, to
     await github.rest.issues.addAssignees({ owner, repo, issue_number: assign.number, assignees: [assign.login] });
     core.info(`Assigned @${assign.login} to ${assign.repository}#${assign.number}`);
   }
-  const added = await github.graphql(
-    `mutation($project: ID!, $content: ID!, $field: String!) {
-      addProjectV2ItemById(input: { projectId: $project, contentId: $content }) {
-        item { id fieldValueByName(name: $field) { ... on ProjectV2ItemFieldDateValue { date } } }
-      }
-    }`,
-    { project: board.projectId, content: contentId, field: DUE_DATE_FIELD },
-  );
-  const item = added.addProjectV2ItemById.item;
+  const item = await addItem(github, board, contentId, sleep);
   const current = item.fieldValueByName?.date;
   if (current && !reset) {
     core.info(`${contentId} is on the board, keeping its Due Date ${current}`);
@@ -207,7 +225,7 @@ async function backfill(github, core, board, repository, today, dryRun, sleep) {
         }
         core.info(`${result.html_url}`);
         const assign = result.pull_request ? authorToAssign(result, repository, (l) => inRoster(l)) : undefined;
-        await apply(github, core, board, { contentId: result.node_id, days, reset: false, assign }, today, dryRun);
+        await apply(github, core, board, { contentId: result.node_id, days, reset: false, assign }, today, dryRun, sleep);
         added++;
       }
     }
@@ -227,7 +245,7 @@ async function run({ github, context, core, projectUrl, dryRun, now = new Date()
     core.info(`Skipped: ${decision.skip}`);
     return;
   }
-  await apply(github, core, await loadBoard(github, projectUrl), decision, now, dryRun);
+  await apply(github, core, await loadBoard(github, projectUrl), decision, now, dryRun, sleep);
 }
 
 module.exports = { addBusinessDays, decide, backfillSearches, parseProjectUrl, run };

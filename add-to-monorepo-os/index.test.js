@@ -211,3 +211,39 @@ test("run assigns the author before adding the pull request", async () => {
   assert.deepEqual(assigned, [{ owner: "camunda", repo: "x", issue_number: 3, assignees: ["szpraat"] }]);
   assert.equal(github.items.PR_1.date, "2026-11-13");
 });
+
+test("run adds again when a concurrent run added the same pull request first", async () => {
+  // The other run (opened, fired together with review_requested) commits the item and its date while this add is rejected.
+  const github = fakeGitHub();
+  const graphql = github.graphql;
+  let raced = false;
+  github.graphql = async (query, vars) => {
+    if (!raced && query.includes("addProjectV2ItemById")) {
+      raced = true;
+      github.items[vars.content] = { id: `item-${vars.content}`, date: "2026-11-13" };
+      throw new Error("Request failed due to following response errors:\n - Content already exists in this project");
+    }
+    return graphql(query, vars);
+  };
+  const pauses = [];
+  const context = {
+    eventName: "pull_request",
+    payload: { action: "review_requested", pull_request: pr(), requested_reviewer: user("cmur2") },
+  };
+  const thursday = new Date("2026-11-12T08:00:00Z");
+  await run({ github, context, core, projectUrl, dryRun: false, now: thursday, sleep: async (ms) => pauses.push(ms) });
+  assert.equal(github.items.PR_1.date, "2026-11-16");
+  assert.equal(pauses.length, 1);
+});
+
+test("run fails on other errors when adding", async () => {
+  const github = fakeGitHub();
+  const graphql = github.graphql;
+  github.graphql = async (query, vars) => {
+    if (query.includes("addProjectV2ItemById")) throw new Error("Resource not accessible by integration");
+    return graphql(query, vars);
+  };
+  const context = { eventName: "issues", payload: { action: "assigned", issue: issue(), assignee: user("cmur2") } };
+  const running = run({ github, context, core, projectUrl, dryRun: false, now: wednesday, sleep: async () => {} });
+  await assert.rejects(running, /not accessible/);
+});
