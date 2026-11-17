@@ -1,8 +1,18 @@
 // Adds issues and pull requests of Monorepo OS pilot users to the Monorepo OS board and sets their Due Date.
 // The rules are in README.md; decide() holds them, run() applies them to the board.
 
-// Pilot users by GitHub login: Engineering Operations for now.
-const ROSTER = ["cmur2", "liliancavalet", "maxdanilov", "szpraat", "yanavasileva"];
+// Pilot users by GitHub login: Engineering Operations and Infrastructure.
+const ROSTER = [
+  "cmur2",
+  "liliancavalet",
+  "maxdanilov",
+  "szpraat",
+  "yanavasileva",
+  "clementnero",
+  "Kerruba",
+  "kellervater",
+  "archiebw",
+];
 
 const ISSUE_DAYS = 10;
 const PR_DAYS = 2;
