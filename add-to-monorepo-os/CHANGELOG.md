@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.0 (2026-11-17)
+
+## What's Changed
+* ci: add pilot users' issues and PRs in this repo to the Monorepo OS board by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/910
+* feat(add-to-monorepo-os): add the Infrastructure team to the pilot by @cmur2 in https://github.com/camunda/infra-global-github-actions/pull/911
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/add-to-monorepo-os-1.0.2...add-to-monorepo-os-1.1.0
+
 ## 1.0.2 (2026-11-16)
 
 ## What's Changed
