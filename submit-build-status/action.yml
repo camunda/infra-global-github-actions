@@ -140,6 +140,34 @@ runs:
         printf 'service_account=%s\n' "$GCP_SERVICE_ACCOUNT"
       } >> "$GITHUB_OUTPUT"
 
+  - name: Annotate first failing step
+    if: inputs.build_status != 'success'
+    shell: bash
+    env:
+      GH_TOKEN: "${{ github.token }}"
+      JOB_ID: "${{ inputs.job_id_override || job.check_run_id }}"
+    run: |
+      # Best-effort: missing gh, missing job ID or a token without
+      # actions: read must never fail the submission.
+      if ! command -v gh >/dev/null || ! [[ "$JOB_ID" =~ ^[0-9]+$ ]]; then
+        echo "Skipping first failing step lookup (gh CLI or job ID unavailable)"
+        exit 0
+      fi
+      if ! STEP=$(gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$JOB_ID" \
+          --jq '[.steps[] | select(.conclusion == "failure")][0] // empty | "#\(.number) \(.name)"' 2>&1); then
+        echo "Skipping first failing step lookup (jobs API failed, needs actions: read): $STEP"
+        exit 0
+      fi
+      if [ -z "$STEP" ]; then
+        echo "No failed step found in job $JOB_ID"
+        exit 0
+      fi
+      # Escape workflow command data so step names cannot break the annotation.
+      STEP="${STEP//'%'/'%25'}"
+      STEP="${STEP//$'\r'/'%0D'}"
+      STEP="${STEP//$'\n'/'%0A'}"
+      echo "::notice title=First failing step::$STEP"
+
   - name: Login to Google Cloud
     id: auth
     uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
