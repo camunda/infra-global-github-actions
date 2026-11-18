@@ -250,7 +250,7 @@ runs:
         -d "$PAYLOAD"
 
   - name: Annotate first unsuccessful step
-    if: always() && inputs.build_status != 'success'
+    if: inputs.build_status != 'success'
     shell: bash
     env:
       GH_TOKEN: "${{ github.token }}"
