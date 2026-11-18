@@ -265,7 +265,7 @@ runs:
       QUERY='[.steps[] | select(.conclusion != null and .conclusion != "success" and .conclusion != "skipped")][0] // empty
         | "#\(.number) \(.name) (\(.conclusion))"'
       for ATTEMPT in 1 2 3; do
-        STEP=$(timeout 20 gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$JOB_ID" --jq "$QUERY" 2>&1) && break
+        STEP=$(timeout 10 gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$JOB_ID" --jq "$QUERY" 2>&1) && break
         echo "Jobs API lookup attempt $ATTEMPT failed (exit code $?, 124 = timeout): $STEP"
         # Client errors (e.g. 403 without actions: read) won't heal on retry.
         if [[ "$STEP" == *"(HTTP 4"* || "$ATTEMPT" == 3 ]]; then
