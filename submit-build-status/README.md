@@ -65,9 +65,16 @@ When [`start-build-monitor`](../start-build-monitor/) is the first step in a job
 
 An explicit `build_duration_millis` input takes precedence over the automatic duration. Explicit values must be non-negative integers no greater than 72 hours (`259200000` milliseconds); invalid values emit a warning and omit the duration field without failing submission or falling back to the monitor-derived duration. Automatic duration is used only when no explicit value is supplied. If the monitor did not run, its timestamp is invalid, or the calculated duration is outside that range, the duration field is omitted without failing submission.
 
-#### First failing step
+#### First unsuccessful step
 
-When `build_status` is not `success`, this action looks up the job's steps via the GitHub REST API (using `job_id_override` or `${{ job.check_run_id }}`) and emits a notice annotation naming the first step that failed, e.g. `#3 test`. This is not submitted to CI Analytics yet. The lookup needs `actions: read` for the calling job's `GITHUB_TOKEN` and the `gh` CLI on the runner; without either, it is skipped without failing the submission. Steps inside composite actions are reported as their top-level step.
+When `build_status` is not `success`, this action looks up the job's steps via the GitHub REST API (using `job_id_override` or `${{ job.check_run_id }}`) after submitting the record, and emits a notice annotation naming the first step that did not succeed or get skipped, with its conclusion, e.g. `#3 test (failure)` or `#5 integration-tests (cancelled)`. This is not submitted to CI Analytics yet. Steps inside composite actions are reported as their top-level step.
+
+The lookup needs:
+
+- `actions: read` permission for the calling job's `GITHUB_TOKEN` (recommended, see the examples below)
+- the `gh` CLI on the runner (preinstalled on GitHub-hosted and Camunda self-hosted runners, usually missing in `container:` jobs)
+
+Without either, the annotation is skipped. The lookup never fails the job: each API call has a 20s timeout and is retried up to 3 times on server or network errors.
 
 ### Integration
 
@@ -92,6 +99,9 @@ on: [pull_request]
 jobs:
   successful-job:
     runs-on: ubuntu-22.04
+    permissions:
+      actions: read # annotate the first unsuccessful step
+      contents: read
     steps:
     # Must remain first to collect the automatic duration and resource metrics.
     - uses: camunda/infra-global-github-actions/start-build-monitor@main
@@ -130,6 +140,7 @@ jobs:
   successful-job:
     runs-on: ubuntu-22.04
     permissions:
+      actions: read # annotate the first unsuccessful step
       contents: read
       id-token: write
     steps:
