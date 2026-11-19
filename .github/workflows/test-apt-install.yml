@@ -1,0 +1,48 @@
+---
+name: Test apt-install
+
+on:
+  pull_request:
+    paths:
+    - 'apt-install/action.yml'
+    - '.github/workflows/test-apt-install.yml'
+
+permissions: {}
+
+jobs:
+  test-apt-install:
+    strategy:
+      fail-fast: false
+      matrix:
+        label: ["ubuntu-latest", "gcp-core-2-default", "aws-arm-core-2-default"]
+    runs-on: ${{ matrix.label }}
+    timeout-minutes: 10
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Install packages
+      uses: ./apt-install
+      with:
+        packages: jq tree
+    - name: Check that the packages are available
+      run: |
+        jq --version
+        tree --version
+    - name: Skip the install when the marker path exists
+      uses: ./apt-install
+      with:
+        packages: package-that-does-not-exist
+        skip-if-exists: /usr/bin/jq
+    - name: Reject an empty package list
+      id: empty
+      continue-on-error: true
+      uses: ./apt-install
+      with:
+        packages: " "
+    - name: Check that the empty package list failed
+      if: steps.empty.outcome != 'failure'
+      run: |
+        echo "::error::an empty package list must fail"
+        exit 1

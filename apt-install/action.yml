@@ -1,0 +1,78 @@
+---
+name: Install apt packages
+description: |
+  Installs apt packages on a runner whose Ubuntu mirror may be slow or unreachable.
+  Shortens per-mirror timeouts, retries the install, and does not gate it on
+  `apt-get update`, which exits 100 when any single configured repository fails.
+
+inputs:
+  packages:
+    description: Space-separated list of apt packages to install.
+    required: true
+  timeout:
+    description: Per-attempt timeout in seconds for the combined update and install.
+    default: "115"
+  max-attempts:
+    description: Number of attempts before the step fails.
+    default: "3"
+  no-install-recommends:
+    description: Whether to pass --no-install-recommends to apt-get install.
+    default: "true"
+  skip-if-exists:
+    description: >-
+      Absolute path that, when it exists, skips the install entirely.
+      Empty disables the check.
+    default: ""
+
+runs:
+  using: composite
+  steps:
+  - name: Validate inputs and check whether the install can be skipped
+    id: check
+    shell: bash
+    env:
+      APT_PACKAGES: ${{ inputs.packages }}
+      SKIP_IF_EXISTS: ${{ inputs.skip-if-exists }}
+      APT_TIMEOUT: ${{ inputs.timeout }}
+    run: |
+      # `required: true` is not enforced for composite actions.
+      if [ -z "${APT_PACKAGES// /}" ]; then
+        echo "::error::apt-install: the 'packages' input is required but was empty"
+        exit 1
+      fi
+      if [ -n "$SKIP_IF_EXISTS" ] && [ -e "$SKIP_IF_EXISTS" ]; then
+        echo "skip=true" >> "$GITHUB_OUTPUT"
+      else
+        echo "skip=false" >> "$GITHUB_OUTPUT"
+      fi
+      echo "retry_timeout=$((APT_TIMEOUT + 5))" >> "$GITHUB_OUTPUT"
+
+  - name: Configure apt fast mirror failover
+    if: steps.check.outputs.skip == 'false'
+    shell: bash
+    run: |
+      sudo tee /etc/apt/apt.conf.d/99-fast-mirror-failover.conf > /dev/null <<'EOF'
+      Acquire::http::Timeout "10";
+      Acquire::https::Timeout "10";
+      Acquire::Retries "2";
+      EOF
+
+  # `timeout` runs inside the sudo'd process tree so a hung apt-get ends itself and gets retried.
+  # The inner script is single-quoted so package tokens reach it as positional arguments.
+  - name: Install packages
+    if: steps.check.outputs.skip == 'false'
+    uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
+    env:
+      APT_PACKAGES: ${{ inputs.packages }}
+      APT_TIMEOUT: ${{ inputs.timeout }}
+      APT_RECOMMENDS: ${{ inputs.no-install-recommends == 'true' && '--no-install-recommends' || '' }}
+    with:
+      max_attempts: ${{ inputs.max-attempts }}
+      retry_wait_seconds: 10
+      timeout_seconds: ${{ steps.check.outputs.retry_timeout }}
+      shell: bash
+      command: |
+        sudo timeout "$APT_TIMEOUT" bash -c '
+          apt-get update || echo "::warning::apt-get update could not refresh every repository, continuing with the index as-is"
+          apt-get install -y "$@"
+        ' bash $APT_RECOMMENDS $APT_PACKAGES
