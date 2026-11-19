@@ -36,7 +36,7 @@ runs:
       APT_TIMEOUT: ${{ inputs.timeout }}
     run: |
       # `required: true` is not enforced for composite actions.
-      if [ -z "${APT_PACKAGES// /}" ]; then
+      if [ -z "${APT_PACKAGES//[[:space:]]/}" ]; then
         echo "::error::apt-install: the 'packages' input is required but was empty"
         exit 1
       fi
@@ -46,6 +46,7 @@ runs:
         echo "skip=false" >> "$GITHUB_OUTPUT"
       fi
       echo "retry_timeout=$((APT_TIMEOUT + 5))" >> "$GITHUB_OUTPUT"
+      echo "update_timeout=$((APT_TIMEOUT / 2))" >> "$GITHUB_OUTPUT"
 
   - name: Configure apt fast mirror failover
     if: steps.check.outputs.skip == 'false'
@@ -58,13 +59,14 @@ runs:
       EOF
 
   # `timeout` runs inside the sudo'd process tree so a hung apt-get ends itself and gets retried.
-  # The inner script is single-quoted so package tokens reach it as positional arguments.
+  # The update gets half of the timeout, so the install always has time left. The inner script is single-quoted so package tokens reach it as positional arguments.
   - name: Install packages
     if: steps.check.outputs.skip == 'false'
     uses: nick-fields/retry@ad984534de44a9489a53aefd81eb77f87c70dc60 # v4.0.0
     env:
       APT_PACKAGES: ${{ inputs.packages }}
       APT_TIMEOUT: ${{ inputs.timeout }}
+      APT_UPDATE_TIMEOUT: ${{ steps.check.outputs.update_timeout }}
       APT_RECOMMENDS: ${{ inputs.no-install-recommends == 'true' && '--no-install-recommends' || '' }}
     with:
       max_attempts: ${{ inputs.max-attempts }}
@@ -73,6 +75,8 @@ runs:
       shell: bash
       command: |
         sudo timeout "$APT_TIMEOUT" bash -c '
-          apt-get update || echo "::warning::apt-get update could not refresh every repository, continuing with the index as-is"
+          update_timeout=$1
+          shift
+          timeout "$update_timeout" apt-get update || echo "::warning::apt-get update could not refresh every repository, continuing with the index as-is"
           apt-get install -y "$@"
-        ' bash $APT_RECOMMENDS $APT_PACKAGES
+        ' bash "$APT_UPDATE_TIMEOUT" $APT_RECOMMENDS $APT_PACKAGES
