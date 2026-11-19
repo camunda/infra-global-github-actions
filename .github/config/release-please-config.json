@@ -47,6 +47,9 @@
     "add-to-monorepo-os": {
       "package-name": "add-to-monorepo-os"
     },
+    "apt-install": {
+      "package-name": "apt-install"
+    },
     "argocd-delete-applications": {
       "package-name": "argocd-delete-applications"
     },
