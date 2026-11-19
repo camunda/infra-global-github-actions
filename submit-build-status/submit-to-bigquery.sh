@@ -54,13 +54,45 @@ if [ -f "$RUNNER_INFO_RUNS_ON_FILE" ]; then
   add_field runner_type "$(tr -cd '[:alnum:]_. -' < "$RUNNER_INFO_RUNS_ON_FILE")"
 fi
 
-# Create insertAll request payload; MONITOR_FIELDS is already ', "key": number, ...'.
-PAYLOAD=$(printf '{"rows": [{"json": {%s%s}}]}' "$ROW" "$MONITOR_FIELDS")
+# ── Tool install figures: camunda/infra-tools appends one JSON object per line to this file. ──
+# The lines are opaque here: their fields belong to infra-tools. Blank lines are skipped.
+TOOL_INSTALLS_FILE="$RUNNER_TEMP/ci-analytics/tool-installs.jsonl"
+TOOL_INSTALLS_ITEMS=""
+# Set TOOL_INSTALLS_ITEMS to the file's lines joined with commas; returns non-zero when the file can't be read.
+read_tool_installs() {
+  local line
+  while IFS= read -r line || [ -n "$line" ]; do
+    [ -z "${line//[[:space:]]/}" ] || TOOL_INSTALLS_ITEMS="${TOOL_INSTALLS_ITEMS:+$TOOL_INSTALLS_ITEMS,}$line"
+  done < "$TOOL_INSTALLS_FILE"
+}
+# `if !`: set -e would otherwise end the step on an unreadable file.
+if [ -f "$TOOL_INSTALLS_FILE" ] && ! read_tool_installs; then
+  TOOL_INSTALLS_ITEMS=""
+  echo "::warning::Cannot read $TOOL_INSTALLS_FILE; sending the build status without tool_installs."
+fi
 
-# Submit to BigQuery REST API
+# Insert the row fields $1 plus MONITOR_FIELDS (already ', "key": number, ...') with the BigQuery REST API.
+# The payload goes on stdin: Linux caps one argument at 128 KiB, and tool_installs can be larger.
+# Prints the response and sets RESPONSE; returns curl's exit status, which -f makes non-zero on an HTTP error.
+insert_row() {
+  RESPONSE=$(printf '{"rows": [{"json": {%s%s}}]}' "$1" "$MONITOR_FIELDS" | curl -fsS -X POST \
+    "https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT_ID}/datasets/${DATASET}/tables/${TABLE}/insertAll" \
+    -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data-binary @-) || return
+  printf '%s\n' "$RESPONSE"
+}
+
 echo "Submitting build status to BigQuery..."
-curl -fsS -X POST \
-  "https://bigquery.googleapis.com/bigquery/v2/projects/${PROJECT_ID}/datasets/${DATASET}/tables/${TABLE}/insertAll" \
-  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "$PAYLOAD"
+if [ -n "$TOOL_INSTALLS_ITEMS" ]; then
+  # insertAll takes a JSON column's value as a JSON-encoded string. It answers HTTP 200 with
+  # insertErrors for a rejected row, which curl -f does not catch.
+  if insert_row "$ROW, $(json_string tool_installs): $(json_string "[$TOOL_INSTALLS_ITEMS]")" \
+    && [[ "$RESPONSE" != *'"insertErrors"'* ]]; then
+    exit 0
+  fi
+  # A bad file must never lose the build status row.
+  echo "::warning::BigQuery did not insert the row with tool_installs from $TOOL_INSTALLS_FILE; sending it again without them."
+fi
+# Without tool_installs, as before: a curl or HTTP error fails the step, and insertErrors are not checked.
+insert_row "$ROW"

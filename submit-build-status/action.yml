@@ -188,5 +188,6 @@ runs:
       ACCESS_TOKEN: "${{ steps.auth.outputs.access_token }}"
       JOB_ID: "${{ inputs.job_id_override || job.check_run_id }}"
       RUNNER_INFO_RUNS_ON_FILE: "/home/runner/.camunda-arc-runner-info/runs-on"
+    # Also adds the tool install figures from $RUNNER_TEMP/ci-analytics/tool-installs.jsonl when that file exists.
     run: |
       bash "$GITHUB_ACTION_PATH/submit-to-bigquery.sh"
