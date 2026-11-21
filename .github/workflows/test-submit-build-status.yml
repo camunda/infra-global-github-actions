@@ -1,0 +1,35 @@
+---
+name: Test submit-build-status
+
+on:
+  pull_request:
+    paths:
+    - 'submit-build-status/**'
+    - '.github/workflows/test-submit-build-status.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test-submit-build-status:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Run unit tests
+      run: bash submit-build-status/submit-to-bigquery-test.sh
+
+  # Consumers run the action in container jobs too, where jq may be missing: the image has none.
+  test-submit-build-status-in-container:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    container: ubuntu:26.04
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Run unit tests
+      shell: bash
+      run: bash submit-build-status/submit-to-bigquery-test.sh
