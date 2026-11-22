@@ -28,7 +28,7 @@ repos:
 # --offline keeps the hook deterministic and token-free; the pinning audit needs
 # no network, and zizmor's online audits are not adopted here.
 - repo: https://github.com/zizmorcore/zizmor-pre-commit
-  rev: v1.32.0
+  rev: v1.33.0
   hooks:
     - id: zizmor
       args: ["--no-progress", "--offline", "--config=.github/zizmor.yml"]
