@@ -18,6 +18,8 @@ Assigning the author makes them the owner of the merge, as an assignee owns an i
 
 The backfill fills the board for a repository that starts calling the action, and rebuilds a wiped board. It leaves items already on the board alone, so it never brings back a Due Date someone cleared.
 
+With `issue-number` set, the action handles only that issue of the calling repository, under the `issues: assigned` rule: it is added if it is open and a pilot user is assigned. This covers assignments that trigger no workflow, such as those another workflow makes with `GITHUB_TOKEN`: that workflow then dispatches the calling workflow with the issue number (see [Usage](#usage)).
+
 ## Inputs
 
 | Input | Description |
@@ -25,6 +27,7 @@ The backfill fills the board for a repository that starts calling the action, an
 | `github-token` | Token of the Monorepo OS GitHub App, which assigns pull request authors and writes the board (required) |
 | `project-url` | The board, `https://github.com/orgs/camunda/projects/267` by default; point it at a copy of the board to test |
 | `dry-run` | If `true`, logs what would be added and dated without writing to the board (default `false`) |
+| `issue-number` | If set, adds only this issue of the calling repository, as if it had just been assigned, instead of handling the event or backfilling (default empty) |
 
 ## Usage
 
@@ -40,6 +43,11 @@ on:
   pull_request_review:
     types: [submitted]
   workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Add only this issue instead of backfilling the repository
+        type: string
+        default: ""
 
 permissions: {}
 
@@ -68,9 +76,20 @@ jobs:
     - uses: camunda/infra-global-github-actions/add-to-monorepo-os@<sha>  # add-to-monorepo-os-X.Y.Z
       with:
         github-token: ${{ steps.github-token.outputs.token }}
+        issue-number: ${{ inputs.issue_number }}
 ```
 
 The Monorepo OS App must be installed on the calling repository.
+
+A workflow that assigns issues with `GITHUB_TOKEN` (which triggers no `issues: assigned` event) dispatches the workflow above with the issue, which `GITHUB_TOKEN` may do given `actions: write`:
+
+```yaml
+    - name: Add to Monorepo OS board
+      env:
+        GH_TOKEN: ${{ github.token }}
+        ISSUE_NUMBER: <number of the issue just assigned>
+      run: gh workflow run add-to-monorepo-os.yml -R "$GITHUB_REPOSITORY" -f issue_number="$ISSUE_NUMBER"
+```
 
 ## Development
 

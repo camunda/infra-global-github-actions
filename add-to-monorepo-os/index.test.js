@@ -247,3 +247,51 @@ test("run fails on other errors when adding", async () => {
   const running = run({ github, context, core, projectUrl, dryRun: false, now: wednesday, sleep: async () => {} });
   await assert.rejects(running, /not accessible/);
 });
+
+// A fake GitHub client that also serves one issue by number, as GET /repos/{owner}/{repo}/issues/{number} does.
+function fakeGitHubWithIssue(served, items) {
+  const github = fakeGitHub(items);
+  const fetched = [];
+  github.rest = { issues: { get: async (args) => (fetched.push(args), { data: served }) } };
+  return { github, fetched };
+}
+const dispatch = { eventName: "workflow_dispatch", repo: { owner: "camunda", repo: "team-infrastructure" }, payload: {} };
+
+test("run with an issue number adds that issue with 10 days if a pilot user is assigned", async () => {
+  const served = issue({ number: 1199, assignees: [user("outsider"), user("kerruba")] });
+  const { github, fetched } = fakeGitHubWithIssue(served);
+  await run({ github, context: dispatch, core, projectUrl, dryRun: false, issueNumber: "1199", now: wednesday });
+  assert.deepEqual(fetched, [{ owner: "camunda", repo: "team-infrastructure", issue_number: 1199 }]);
+  assert.equal(github.items.I_1.date, "2026-11-25");
+});
+
+test("run with an issue number keeps an existing Due Date", async () => {
+  const served = issue({ assignees: [user("cmur2")] });
+  const { github } = fakeGitHubWithIssue(served, { I_1: { id: "item-I_1", date: "2026-12-24" } });
+  await run({ github, context: dispatch, core, projectUrl, dryRun: false, issueNumber: "1", now: wednesday });
+  assert.equal(github.items.I_1.date, "2026-12-24");
+});
+
+test("run with an issue number skips outsiders' issues, closed issues and pull requests, and never backfills", async () => {
+  for (const served of [
+    issue({ assignees: [user("outsider")] }),
+    issue({ assignees: [] }),
+    issue({ state: "closed", assignees: [user("cmur2")] }),
+    issue({ assignees: [user("cmur2")], pull_request: {} }),
+  ]) {
+    const { github } = fakeGitHubWithIssue(served);
+    await run({ github, context: dispatch, core, projectUrl, dryRun: false, issueNumber: "5", now: wednesday });
+    assert.deepEqual(github.calls, []);
+  }
+});
+
+test("run rejects an issue number that is not a positive integer, and ignores an empty one", async () => {
+  for (const issueNumber of ["abc", "0", "-3", "1.5"]) {
+    const { github } = fakeGitHubWithIssue(issue());
+    await assert.rejects(run({ github, context: dispatch, core, projectUrl, dryRun: false, issueNumber }), /positive integer/);
+  }
+  const github = fakeGitHub();
+  const context = { eventName: "issues", payload: { action: "assigned", issue: issue(), assignee: user("cmur2") } };
+  await run({ github, context, core, projectUrl, dryRun: false, issueNumber: "", now: wednesday });
+  assert.equal(github.items.I_1.date, "2026-11-25");
+});

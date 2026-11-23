@@ -243,8 +243,37 @@ async function backfill(github, core, board, repository, today, dryRun, sleep) {
   core.info(`Backfill of ${repository}: ${seen.size} issues and pull requests found, ${added} added`);
 }
 
-async function run({ github, context, core, projectUrl, dryRun, now = new Date(), sleep }) {
+/** The issue-number input as a number, or undefined when it is empty. */
+function parseIssueNumber(value) {
+  if (value === undefined || value === null || String(value).trim() === "") return undefined;
+  const number = Number(value);
+  if (!Number.isInteger(number) || number <= 0) throw new Error(`issue-number must be a positive integer, got ${value}`);
+  return number;
+}
+
+/**
+ * Applies the `issues: assigned` rule to one issue of the calling repository. This is for assignments that trigger no
+ * workflow, such as those made with GITHUB_TOKEN: the workflow that made one dispatches the calling workflow instead.
+ */
+async function decideIssue(github, context, number) {
+  const { data: issue } = await github.rest.issues.get({ ...context.repo, issue_number: number });
+  if (issue.pull_request) return { skip: `#${number} is a pull request` };
+  const assignee = (issue.assignees ?? []).find((a) => inRoster(a.login)) ?? issue.assignees?.[0];
+  return decide("issues", { action: "assigned", issue, assignee });
+}
+
+async function run({ github, context, core, projectUrl, dryRun, issueNumber, now = new Date(), sleep }) {
   sleep ??= (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const number = parseIssueNumber(issueNumber);
+  if (number !== undefined) {
+    const decision = await decideIssue(github, context, number);
+    if (decision.skip) {
+      core.info(`Skipped: ${decision.skip}`);
+      return;
+    }
+    await apply(github, core, await loadBoard(github, projectUrl), decision, now, dryRun, sleep);
+    return;
+  }
   if (context.eventName === "workflow_dispatch") {
     const board = await loadBoard(github, projectUrl);
     await backfill(github, core, board, `${context.repo.owner}/${context.repo.repo}`, now, dryRun, sleep);

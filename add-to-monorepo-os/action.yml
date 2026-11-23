@@ -14,6 +14,10 @@ inputs:
     description: "If `true`, logs what would be added and dated without writing to the board."
     required: false
     default: "false"
+  issue-number:
+    description: "If set, adds only this issue of the calling repository, as if it had just been assigned, instead of handling the event or backfilling. For assignments that trigger no workflow, such as those made with GITHUB_TOKEN."
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -24,6 +28,7 @@ runs:
         ACTION_PATH: ${{ github.action_path }}
         PROJECT_URL: ${{ inputs.project-url }}
         DRY_RUN: ${{ inputs.dry-run }}
+        ISSUE_NUMBER: ${{ inputs.issue-number }}
       with:
         github-token: ${{ inputs.github-token }}
         script: |
@@ -34,4 +39,5 @@ runs:
             core,
             projectUrl: process.env.PROJECT_URL,
             dryRun: process.env.DRY_RUN === "true",
+            issueNumber: process.env.ISSUE_NUMBER,
           });
