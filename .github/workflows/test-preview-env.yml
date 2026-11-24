@@ -54,7 +54,7 @@ jobs:
     - name: Deploy the test app
       uses: ./preview-env/create
       with:
-        revision: ${{ github.head_ref }}
+        revision: ${{ github.event.pull_request.head.sha }}
         app_name: ${{ env.APP_NAME }}
         app_url: https://argocd.int.camunda.com/applications/argocd/${{ env.APP_NAME }}
         argocd_server: ${{ env.ARGOCD_SERVER }}
@@ -64,7 +64,7 @@ jobs:
           --dest-namespace ${{ env.APP_NAME }}
           --file preview-env/test/application.yml
           --name ${{ env.APP_NAME }}
-          --revision ${{ github.head_ref }}
+          --revision ${{ github.event.pull_request.head.sha }}
           --upsert
     - name: Assert the app is Synced and Healthy and report the Argo CD versions
       shell: bash
@@ -73,6 +73,7 @@ jobs:
         ARGOCD_OPTS: "--grpc-web"
       run: |
         argocd version
+        argocd app wait "$APP_NAME" --sync --health --timeout 120
         status=$(argocd app get "$APP_NAME" --output json | jq -r '"\(.status.sync.status)/\(.status.health.status)"')
         if [[ "$status" != "Synced/Healthy" ]]; then
           echo "::error::Expected $APP_NAME to be Synced/Healthy, got $status"
@@ -87,11 +88,15 @@ jobs:
         server: ${{ env.ARGOCD_SERVER }}
         max-waiting-time-sync: "120"
         max-waiting-time-health: "120"
+    - name: Put the CLI of preview-env on the PATH again
+      if: always()
+      shell: bash
+      run: echo /usr/local/bin >> "$GITHUB_PATH"
     - name: Destroy the test app
       if: always()
       uses: ./preview-env/destroy
       with:
-        revision: ${{ github.head_ref }}
+        revision: ${{ github.event.pull_request.head.sha }}
         app_name: ${{ env.APP_NAME }}
         argocd_server: ${{ env.ARGOCD_SERVER }}
         argocd_token: ${{ steps.secrets.outputs.ARGOCD_TOKEN }}
@@ -102,7 +107,8 @@ jobs:
         ARGOCD_OPTS: "--grpc-web"
       run: |
         for _ in $(seq 12); do
-          if ! argocd app get "$APP_NAME" > /dev/null 2>&1; then
+          apps=$(argocd app list --project infra-actions-previews --output name)
+          if ! grep -qx "$APP_NAME" <<< "$apps"; then
             echo "$APP_NAME is gone"
             exit 0
           fi

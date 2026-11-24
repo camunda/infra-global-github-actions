@@ -17,5 +17,8 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    managedNamespaceMetadata:
+      labels:
+        purpose: infra-global-github-actions-test
     syncOptions:
     - CreateNamespace=true
