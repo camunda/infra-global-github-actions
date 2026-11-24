@@ -12,7 +12,7 @@ Other repositories consume these actions directly from `main`. A broken action b
 
 ### Argo CD CLI (`quay.io/argoproj/argocd`)
 
-Test: [`.github/workflows/test-preview-env.yml`](.github/workflows/test-preview-env.yml), against the real Argo CD at `argocd.int.camunda.com`. It deploys a ConfigMap-only app (`preview-env/test/`) into the `infra-actions-previews` project, asserts `Synced/Healthy`, syncs it, destroys it and asserts it is gone. It prints `argocd version` (client and server), so a client/server skew shows up in the run.
+Test: [`.github/workflows/test-preview-env.yml`](.github/workflows/test-preview-env.yml), against the real Argo CD at `argocd.int.camunda.com`. It deploys a small chart (`preview-env/test/chart`: a Namespace and a ConfigMap, so destroying the app removes its namespace) into the `infra-actions-previews` project, asserts `Synced/Healthy`, syncs it, destroys it and asserts it is gone. It prints `argocd version` (client and server), so a client/server skew shows up in the run.
 
 | Usage path | Consumers | Covered by |
 |---|---|---|

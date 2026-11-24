@@ -1,6 +1,7 @@
 ---
 # Application template of the preview-env test harness (.github/workflows/test-preview-env.yml).
-# Same shape as the consumers' templates: project, camunda-ci destination, CreateNamespace.
+# Same shape as the consumers' templates: project, camunda-ci destination, Helm source.
+# The chart renders the Namespace, so deleting the application deletes the namespace.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -12,13 +13,8 @@ spec:
     name: camunda-ci
   source:
     repoURL: https://github.com/camunda/infra-global-github-actions.git
-    path: preview-env/test/manifests
+    path: preview-env/test/chart
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-    managedNamespaceMetadata:
-      labels:
-        purpose: infra-global-github-actions-test
-    syncOptions:
-    - CreateNamespace=true

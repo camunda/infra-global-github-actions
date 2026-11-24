@@ -1,6 +1,6 @@
 ---
 # End-to-end test of preview-env/create, preview-env/destroy and argocd-sync-applications against the real
-# Argo CD (argocd.int.camunda.com): deploy a ConfigMap-only app, assert Synced and Healthy, sync it through
+# Argo CD (argocd.int.camunda.com): deploy a Namespace-and-ConfigMap app, assert Synced and Healthy, sync it through
 # argocd-sync-applications, destroy it, assert it is gone. It runs on every Renovate bump of the Argo CD CLI.
 name: Test preview-env
 
@@ -63,6 +63,7 @@ jobs:
         argocd_arguments: >-
           --dest-namespace ${{ env.APP_NAME }}
           --file preview-env/test/application.yml
+          --helm-set namespaceName=${{ env.APP_NAME }}
           --name ${{ env.APP_NAME }}
           --revision ${{ github.event.pull_request.head.sha }}
           --upsert

@@ -1,8 +1,8 @@
 ---
-# The only resource of the preview-env test harness: it is Healthy as soon as it is applied.
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: preview-env-test
+  namespace: {{ .Values.namespaceName }}
 data:
   purpose: infra-global-github-actions preview-env test harness
