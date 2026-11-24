@@ -108,7 +108,7 @@ jobs:
         ARGOCD_OPTS: "--grpc-web"
       run: |
         for _ in $(seq 12); do
-          apps=$(argocd app list --project infra-actions-previews --output name)
+          apps=$(argocd app list --project infra-actions-previews --output json | jq -r '.[]?.metadata.name')
           if ! grep -qx "$APP_NAME" <<< "$apps"; then
             echo "$APP_NAME is gone"
             exit 0
