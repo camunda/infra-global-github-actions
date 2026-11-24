@@ -79,7 +79,7 @@
       matchUpdateTypes: ["patch"],
       matchPackageNames: [
         "/actionlint/",
-        "/argocd/",
+        "/argocd/", // quay.io/argoproj/argocd: .github/workflows/test-preview-env.yml
         "argoproj/argo-cd",
         "kubernetes-sigs/gateway-api",
         "public.ecr.aws/gravitational/teleport-ent-distroless",
@@ -103,6 +103,15 @@
       matchUpdateTypes: ["major"],
       matchPackageNames: [
         "actions/setup-python",
+      ],
+      addLabels: ["automerge"],
+      automerge: true,
+    },
+    // Gated by .github/workflows/test-preview-env.yml, see TESTING.md#argo-cd-cli-quayioargoprojargocd
+    {
+      matchUpdateTypes: ["minor"],
+      matchPackageNames: [
+        "quay.io/argoproj/argocd",
       ],
       addLabels: ["automerge"],
       automerge: true,
