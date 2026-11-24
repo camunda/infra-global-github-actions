@@ -1,0 +1,112 @@
+---
+# End-to-end test of preview-env/create, preview-env/destroy and argocd-sync-applications against the real
+# Argo CD (argocd.int.camunda.com): deploy a ConfigMap-only app, assert Synced and Healthy, sync it through
+# argocd-sync-applications, destroy it, assert it is gone. It runs on every Renovate bump of the Argo CD CLI.
+name: Test preview-env
+
+on:
+  pull_request:
+    paths:
+    - 'preview-env/create/**'
+    - 'preview-env/destroy/**'
+    - 'preview-env/test/**'
+    - 'argocd-sync-applications/**'
+    - '.github/workflows/test-preview-env.yml'
+
+permissions: {}
+
+concurrency:
+  group: test-preview-env-${{ github.head_ref }}
+  cancel-in-progress: true
+
+env:
+  ARGOCD_SERVER: argocd.int.camunda.com
+
+jobs:
+  test-preview-env:
+    # Forked pull requests get no OIDC token and no Vault secrets
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-26.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      deployments: write  # GitHub deployment of preview-env/create and /destroy
+      id-token: write     # GitHub OIDC token for the Vault JWT login
+    env:
+      # the Argo CD project only allows namespaces matching infra-actions-*
+      APP_NAME: infra-actions-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Import secrets
+      id: secrets
+      uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc # v4.0.0
+      with:
+        url: ${{ secrets.VAULT_ADDR }}
+        method: jwt
+        role: ${{ secrets.VAULT_JWT_ROLE }}
+        path: ${{ secrets.VAULT_JWT_PATH }}
+        jwtGithubAudience: ${{ secrets.VAULT_JWT_AUDIENCE }}
+        secrets: |
+          secret/data/products/infra/ci/infra-actions-previews ARGOCD_TOKEN;
+    - name: Deploy the test app
+      uses: ./preview-env/create
+      with:
+        revision: ${{ github.head_ref }}
+        app_name: ${{ env.APP_NAME }}
+        app_url: https://argocd.int.camunda.com/applications/argocd/${{ env.APP_NAME }}
+        argocd_server: ${{ env.ARGOCD_SERVER }}
+        argocd_token: ${{ steps.secrets.outputs.ARGOCD_TOKEN }}
+        argocd_wait_for_sync_timeout: "300"
+        argocd_arguments: >-
+          --dest-namespace ${{ env.APP_NAME }}
+          --file preview-env/test/application.yml
+          --name ${{ env.APP_NAME }}
+          --revision ${{ github.head_ref }}
+          --upsert
+    - name: Assert the app is Synced and Healthy and report the Argo CD versions
+      shell: bash
+      env:
+        ARGOCD_AUTH_TOKEN: ${{ steps.secrets.outputs.ARGOCD_TOKEN }}
+        ARGOCD_OPTS: "--grpc-web"
+      run: |
+        argocd version
+        status=$(argocd app get "$APP_NAME" --output json | jq -r '"\(.status.sync.status)/\(.status.health.status)"')
+        if [[ "$status" != "Synced/Healthy" ]]; then
+          echo "::error::Expected $APP_NAME to be Synced/Healthy, got $status"
+          exit 1
+        fi
+    - name: Sync the app through argocd-sync-applications
+      uses: ./argocd-sync-applications
+      with:
+        app-name: ${{ env.APP_NAME }}
+        argocd-token: ${{ steps.secrets.outputs.ARGOCD_TOKEN }}
+        github-token: ${{ github.token }}
+        server: ${{ env.ARGOCD_SERVER }}
+        max-waiting-time-sync: "120"
+        max-waiting-time-health: "120"
+    - name: Destroy the test app
+      if: always()
+      uses: ./preview-env/destroy
+      with:
+        revision: ${{ github.head_ref }}
+        app_name: ${{ env.APP_NAME }}
+        argocd_server: ${{ env.ARGOCD_SERVER }}
+        argocd_token: ${{ steps.secrets.outputs.ARGOCD_TOKEN }}
+    - name: Assert the app is gone
+      shell: bash
+      env:
+        ARGOCD_AUTH_TOKEN: ${{ steps.secrets.outputs.ARGOCD_TOKEN }}
+        ARGOCD_OPTS: "--grpc-web"
+      run: |
+        for _ in $(seq 12); do
+          if ! argocd app get "$APP_NAME" > /dev/null 2>&1; then
+            echo "$APP_NAME is gone"
+            exit 0
+          fi
+          sleep 5
+        done
+        echo "::error::$APP_NAME still exists after preview-env/destroy"
+        exit 1

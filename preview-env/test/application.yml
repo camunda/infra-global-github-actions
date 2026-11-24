@@ -1,0 +1,21 @@
+---
+# Application template of the preview-env test harness (.github/workflows/test-preview-env.yml).
+# Same shape as the consumers' templates: project, camunda-ci destination, CreateNamespace.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  labels:
+    purpose: infra-global-github-actions-test
+spec:
+  project: infra-actions-previews
+  destination:
+    name: camunda-ci
+  source:
+    repoURL: https://github.com/camunda/infra-global-github-actions.git
+    path: preview-env/test/manifests
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
