@@ -1,0 +1,5 @@
+---
+apiVersion: v2
+name: preview-env-test
+description: Namespace and ConfigMap of the preview-env test harness (.github/workflows/test-preview-env.yml).
+version: 0.1.0

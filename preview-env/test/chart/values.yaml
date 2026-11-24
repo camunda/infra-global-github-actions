@@ -1,0 +1,3 @@
+---
+# Name of the namespace the application owns; the workflow sets it to the application name.
+namespaceName: infra-actions-local

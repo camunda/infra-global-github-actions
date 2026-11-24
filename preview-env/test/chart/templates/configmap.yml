@@ -1,0 +1,8 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: preview-env-test
+  namespace: {{ .Values.namespaceName }}
+data:
+  purpose: infra-global-github-actions preview-env test harness
