@@ -119,6 +119,9 @@
     "setup-yarn-cache": {
       "package-name": "setup-yarn-cache"
     },
+    "stale-backport-tracker": {
+      "package-name": "stale-backport-tracker"
+    },
     "start-build-monitor": {
       "package-name": "start-build-monitor"
     },

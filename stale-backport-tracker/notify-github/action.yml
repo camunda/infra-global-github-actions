@@ -1,0 +1,48 @@
+name: Notify stale backport PRs on GitHub
+
+description: >-
+  Comments on each stale backport PR (mentioning its assignee, or the original PR's author),
+  adds the `stale-backport` label and, for bot-authored originals, requests the approvers as reviewers.
+
+inputs:
+  github-token:
+    description: GitHub token with pull request write access to every repository in the stale data
+    required: true
+  stale-data:
+    description: JSON output of the `collect` action
+    required: true
+  dry-run:
+    description: When `true`, only log what would be commented or labelled
+    required: false
+    default: "false"
+  workflow-run-url:
+    description: URL of the workflow run, linked from the comments
+    required: false
+    default: ""
+  target-backport-pr:
+    description: "TEST ONLY: restrict notifications to a single backport PR number"
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+  - name: Notify stale backport PRs
+    shell: bash
+    env:
+      GH_TOKEN: ${{ inputs.github-token }}
+      DRY_RUN: ${{ inputs.dry-run }}
+      NOTIFY_ORIGINAL: "false"
+      TARGET_BACKPORT_PR: ${{ inputs.target-backport-pr }}
+      WORKFLOW_RUN_URL: ${{ inputs.workflow-run-url }}
+      STALE_DATA: ${{ inputs.stale-data }}
+      ACTION_PATH: ${{ github.action_path }}
+    run: |
+      stale_data="$STALE_DATA"
+      if [[ -n "$TARGET_BACKPORT_PR" ]]; then
+        echo "🎯 Filtering to backport PR #${TARGET_BACKPORT_PR} only"
+        stale_data=$(printf '%s' "$stale_data" | jq --arg pr "$TARGET_BACKPORT_PR" '
+          [ .[] | .backport_prs = (.backport_prs | map(select((.backport_pr_number|tostring) == $pr)))
+            | select((.backport_prs | length) > 0) ]')
+      fi
+      printf '%s' "$stale_data" | bash "${ACTION_PATH}/../scripts/notify-stale-backports.sh"

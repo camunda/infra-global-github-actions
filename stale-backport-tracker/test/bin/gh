@@ -1,0 +1,45 @@
+#!/bin/bash
+# Stand-in for the GitHub CLI in the stale-backport-tracker tests. Serves the fixtures in $FIXTURE_DIR.
+#   gh pr list --author <login> ...   -> $FIXTURE_DIR/prs-<login>.json (or [])
+#   gh pr view <n> --json commits ... -> no commits
+#   gh pr view <n> --json title,...   -> $FIXTURE_DIR/original-pr.json
+#   gh api users/<login>              -> {"name": "<login> Name"}
+#   anything else                     -> no output
+set -euo pipefail
+
+args=("$@")
+
+jq_expr=""
+author=""
+for ((i = 0; i < ${#args[@]}; i++)); do
+  case "${args[$i]}" in
+    --jq | -q) jq_expr="${args[$((i + 1))]}" ;;
+    --author) author="${args[$((i + 1))]}" ;;
+  esac
+done
+
+apply() {
+  if [[ -n "$jq_expr" ]]; then jq -r "$jq_expr"; else cat; fi
+}
+
+case "${args[0]:-} ${args[1]:-}" in
+  "pr list")
+    file="$FIXTURE_DIR/prs-${author}.json"
+    if [[ -f "$file" ]]; then cat "$file"; else echo '[]'; fi
+    ;;
+  "pr view")
+    if printf '%s ' "${args[@]}" | grep -q -- '--json commits'; then
+      echo '{"commits": []}' | apply
+    else
+      apply < "$FIXTURE_DIR/original-pr.json"
+    fi
+    ;;
+  "api users/"*)
+    jq -n --arg n "${args[1]#users/} Name" '{name: $n}' | apply
+    ;;
+  api*)
+    case "${args[1]}" in
+      users/*) jq -n --arg n "${args[1]#users/} Name" '{name: $n}' | apply ;;
+    esac
+    ;;
+esac
