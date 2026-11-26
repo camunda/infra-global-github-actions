@@ -11,11 +11,14 @@ Two composite actions that hand Vault secrets to a job without giving that job a
 
 `id-token: write` applies to a whole job. Any process in a job with it can request an OIDC token and log in with the repository's Vault role, which can read far more than one secret. A job that runs an AI agent or other untrusted code therefore gets its secrets through `unwrap` and never holds `id-token: write`. See [Vault secrets in agentic workflows](https://github.com/camunda/infra-core/blob/stage/docs/vault/vault-secrets-in-agentic-workflows.md).
 
-The wrapping token is not masked: masked values are dropped when they cross a job boundary, so it appears in the logs of both jobs. It is single-use and short-lived. `unwrap` fails when the token expired, was already redeemed, or was not created by `sys/wrapping/wrap`; it cannot tell apart two tokens that were both created there.
+The wrapping token crosses the job boundary as a job output, which GitHub does not mask. Pass it into the consuming job as a reusable-workflow secret (below): GitHub then masks it everywhere in that job, including the inputs of `unwrap`. A token handed over as a plain job output is printed in clear text in the consuming job's log. The token is single-use and short-lived. `unwrap` fails when the token expired, was already redeemed, or was not created by `sys/wrapping/wrap`; it cannot tell apart two tokens that were both created there.
 
 ## 🔧 How
 
+The job that runs the agent lives in its own workflow and receives the wrapping token as a secret:
+
 ```yaml
+# .github/workflows/agent-caller.yml
 jobs:
   secrets:
     runs-on: ubuntu-latest
@@ -37,19 +40,41 @@ jobs:
 
   agent:
     needs: secrets
-    runs-on: ubuntu-latest
     permissions:
       contents: read  # no id-token
+    uses: ./.github/workflows/agent.yml
+    secrets:
+      VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+      WRAP_TOKEN: ${{ needs.secrets.outputs.wrap-token }}
+```
+
+```yaml
+# .github/workflows/agent.yml
+on:
+  workflow_call:
+    secrets:
+      VAULT_ADDR:
+        required: true
+      WRAP_TOKEN:
+        required: true
+
+jobs:
+  agent:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
     - id: unwrap
       uses: camunda/infra-global-github-actions/vault-wrapped-secrets/unwrap@<sha> # vault-wrapped-secrets-<version>
       with:
         vault-url: ${{ secrets.VAULT_ADDR }}
-        wrap-token: ${{ needs.secrets.outputs.wrap-token }}
+        wrap-token: ${{ secrets.WRAP_TOKEN }}
     - run: ./run-agent.sh
       env:
         ANTHROPIC_API_KEY: ${{ fromJSON(steps.unwrap.outputs.secrets).ANTHROPIC_API_KEY }}
 ```
+
+With a matrix, wrap one token per shard and select it in the caller: `WRAP_TOKEN: ${{ needs.secrets.outputs[format('wrap-token-{0}', matrix.shard)] }}`.
 
 ### `wrap` inputs
 
@@ -75,7 +100,7 @@ Output: `wrap-token`.
 
 Output: `secrets`, a JSON object `{NAME: value}`.
 
-Wrap only what the consuming job needs, and unwrap before any untrusted code runs. A wrapping token can be redeemed once, so a failed consumer job is retried with **Re-run all jobs**; **Re-run failed jobs** reuses the spent token and fails at `unwrap`. To hand over a GitHub App token, generate it in the broker job with `generate-github-app-token-from-vault-secrets` and `skip-token-revoke: true` (the job would otherwise revoke it on exit) and pass it in `values`. The unwrapped values are in the job's memory and environment afterwards, so an agent can still read the secrets it was given, just nothing else.
+Wrap only what the consuming job needs, make `unwrap` the first step of the consuming job, and keep `wrap-ttl` to a few minutes. Do not enable step debug logging on a run that wraps: the runner then prints the job output, and with it the unused wrapping token, in the wrap job's log. A wrapping token can be redeemed once, so a failed consumer job is retried with **Re-run all jobs**; **Re-run failed jobs** reuses the spent token and fails at `unwrap`. When `unwrap` reports a rejected token on the first run attempt, someone else may have redeemed it. To hand over a GitHub App token, generate it in the broker job with `generate-github-app-token-from-vault-secrets` and `skip-token-revoke: true` (the job would otherwise revoke it on exit) and pass it in `values`. The unwrapped values are in the job's memory and environment afterwards, so an agent can still read the secrets it was given, just nothing else.
 
 ## 📚 References
 
