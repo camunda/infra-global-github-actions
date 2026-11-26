@@ -15,7 +15,11 @@ vault_post() {
   local args=(-sS --max-time 10 -o "${body}" -w '%{http_code}' -X POST --data-binary @-)
   [[ -n "${3:-}" ]] && args+=(-H "X-Vault-Token: ${3}")
   status=$(curl "${args[@]}" "${VAULT_ADDR}/v1/${1}" <<< "${2}") || {
-    echo "::error::Could not reach Vault at ${1}. The wrapping token was not redeemed and stays valid until it expires; retry with 'Re-run all jobs'."
+    if [[ "${1}" == sys/wrapping/lookup ]]; then
+      echo "::error::Could not reach Vault for the token lookup. The wrapping token was not redeemed; retry with 'Re-run all jobs'."
+    else
+      echo "::error::Could not reach Vault for the unwrap, so it is unknown whether the wrapping token was redeemed. Retry with 'Re-run all jobs'."
+    fi
     exit 1
   }
 }
@@ -23,7 +27,7 @@ vault_post() {
 # Vault answers 400 for a token that is unknown, expired or already redeemed.
 rejected() {
   if [[ "${GITHUB_RUN_ATTEMPT:-1}" == "1" ]]; then
-    echo "::error::Vault rejected the wrapping token on the first run attempt. Unless the wrap job finished longer ago than its wrap-ttl, someone else redeemed it: treat this as a possible interception and report the run to InfoSec."
+    echo "::error::Vault rejected the wrapping token on the first run attempt. The token expires its wrap-ttl after the wrap step created it; if less time than that has passed, someone else redeemed it: treat this as a possible interception and report the run to InfoSec."
   else
     echo "::error::Vault rejected the wrapping token. Wrapping tokens are single-use: retry with 'Re-run all jobs' so the job that wraps runs again."
   fi
@@ -32,7 +36,7 @@ rejected() {
 
 # A substituted token that wraps some other response has a different creation path.
 vault_post sys/wrapping/lookup "$(jq -n --arg t "${WRAP_TOKEN}" '{token: $t}')"
-[[ "${status}" == 4* ]] && rejected
+[[ "${status}" == 400 ]] && rejected
 [[ "${status}" == 200 ]] || { echo "::error::Wrapping token lookup returned HTTP ${status}"; exit 1; }
 creation_path=$(jq -r '.data.creation_path' "${body}")
 if [[ "${creation_path}" != "sys/wrapping/wrap" ]]; then
@@ -41,7 +45,7 @@ if [[ "${creation_path}" != "sys/wrapping/wrap" ]]; then
 fi
 
 vault_post sys/wrapping/unwrap '{}' "${WRAP_TOKEN}"
-[[ "${status}" == 4* ]] && rejected
+[[ "${status}" == 400 ]] && rejected
 [[ "${status}" == 200 ]] || { echo "::error::Unwrapping returned HTTP ${status}"; exit 1; }
 data=$(jq -c '.data' "${body}")
 
