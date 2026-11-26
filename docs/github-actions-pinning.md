@@ -14,8 +14,7 @@ Pinning levels per owner:
 
 | Owner pattern | Level | Accepted refs |
 |:--------------|:------|:--------------|
-| `camunda/*` | `ref-pin` | tag, branch, or SHA (`@main` is the contract this repo offers its consumers) |
-| everything else, **including `actions/*` and `github/*`** | `hash-pin` | 40-character commit SHA only |
+| everything, **including `actions/*`, `github/*` and `camunda/*`** | `hash-pin` | 40-character commit SHA only |
 
 Local references (`uses: ./common-tooling`) are same-repo and out of scope.
 
@@ -44,11 +43,9 @@ It is evaluated over the **whole dependency tree**, and refusal happens at `Set 
 
 Note the carve-out is for **reusable workflows**, not for organization ownership — which is why `camunda/*` cannot be exempted on "it's ours" grounds either. See below.
 
-### The `camunda/*` exemption, and its known gap
+### References to this repository
 
-`camunda/*` stays at `ref-pin`, and this is a deliberate trade-off rather than a trust judgement. This repository references itself at `@main` in three composite actions — [`setup-yarn-cache`](../setup-yarn-cache/action.yml) → `is-cache-enabled`, [`fossa/info`](../fossa/info/action.yml) → `setup-gh-cli`, and [`teams/infra/configure-maintenance-pull-request`](../teams/infra/configure-maintenance-pull-request/action.yml) → `configure-pull-request`. That `@main` reference is the contract consumers rely on: they get current `main` without a bump PR. Hash-pinning it would turn every internal change into a two-step merge-then-bump.
-
-> ⚠️ **Known gap.** Because the GitHub setting walks the whole dependency tree, those three `@main` self-references are still refused for a consumer that enforces it, even with everything else pinned. Closing that gap means giving up the `@main` contract, which is a repository-design decision tracked separately rather than settled by this policy.
+This repository's references to itself are pinned like any other action, as `@<sha> # <family>-X.Y.Z`, and kept current by the [`renovate-action-versions.json5`](../renovate-action-versions.json5) preset that [`.github/renovate.json5`](../.github/renovate.json5) extends. A change to a self-referenced action therefore reaches the actions that use it through a Renovate bump, not on its own.
 
 ### Alternatives considered
 
