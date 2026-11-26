@@ -6,6 +6,8 @@
     ":semanticCommits",
     ":dependencyDashboard",
     ":enablePreCommit",
+    // Version-tracks this repository's own sub-action pins (`# <family>-X.Y.Z`).
+    "local>camunda/infra-global-github-actions:renovate-action-versions.json5",
     // cannot use shared config, it's in a private repo (https://github.com/renovatebot/renovate/discussions/26300):
     // "github>camunda/infra-renovate-config:default.json5"
   ],

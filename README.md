@@ -82,9 +82,9 @@ Every action used here, in a workflow or in a composite `action.yml`, **includin
 
 A tag is a mutable pointer that a compromised upstream can force-push; a SHA cannot be moved. Several consuming repositories also enforce GitHub's **Require actions to be pinned to a full-length commit SHA** setting, which exempts no namespace and is evaluated over the whole dependency tree, so an action left on a tag here refuses the consumer's job at `Set up job`, before any step runs.
 
-The one exemption is `camunda/*`, because this repository references itself at `@main` by contract. The rule is enforced by the `zizmor` hook and configured in [`.github/zizmor.yml`](.github/zizmor.yml).
+This includes this repository's references to itself. The rule is enforced by the `zizmor` hook and configured in [`.github/zizmor.yml`](.github/zizmor.yml).
 
 ## 📚 References
 
-- [GitHub Actions pinning policy](docs/github-actions-pinning.md) for the full rationale, the known gap around `@main` self-references, and how to resolve a tag to a SHA
+- [GitHub Actions pinning policy](docs/github-actions-pinning.md) for the full rationale and how to resolve a tag to a SHA
 - [zizmor `unpinned-uses` audit](https://docs.zizmor.sh/audits/#unpinned-uses)

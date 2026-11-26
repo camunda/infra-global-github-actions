@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.1.3 (2026-11-26)
+
+## What's Changed
+* test(preview-env): add an end-to-end test of the Argo CD CLI usage by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/927
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.6.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/893
+* fix: pin self-referenced actions to release SHAs by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/929
+* fix(vault-wrapped-secrets): keep the wrapping token out of the consuming job's log by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/931
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.1.2...fossa-1.1.3
+
 ## 1.1.2 (2026-11-22)
 
 ## What's Changed

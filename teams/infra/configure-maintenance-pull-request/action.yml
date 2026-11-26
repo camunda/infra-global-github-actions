@@ -94,7 +94,7 @@ runs:
       } >> $GITHUB_OUTPUT
 
   - name: Apply Pull Request configuration
-    uses: camunda/infra-global-github-actions/configure-pull-request@main
+    uses: camunda/infra-global-github-actions/configure-pull-request@e6af3c4650d44677f5eb0210d9e7c128200741cd # configure-pull-request-1.0.3
     with:
       github-token: ${{ inputs.github-token }}
       labels: ${{ steps.pr-configuration.outputs.labels }}

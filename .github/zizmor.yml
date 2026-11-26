@@ -54,22 +54,11 @@ rules:
         # A `ref-pin` policy for `actions/*` would therefore be weaker than the
         # policy already binding on the repositories this gate exists to
         # protect -- green here, broken downstream.
-        "*": hash-pin
-
-        # The one exemption, and it is a deliberate trade-off rather than a
-        # trust judgement. This repository references itself at `@main`
-        # (setup-yarn-cache -> is-cache-enabled, fossa/info -> setup-gh-cli,
-        # configure-maintenance-pull-request -> configure-pull-request), which
-        # is the contract its consumers rely on: they get the current `main`
-        # without a bump PR. Hash-pinning those would make every internal
-        # change a two-step merge-then-bump.
         #
-        # KNOWN GAP: because the GitHub setting walks the whole tree, those
-        # three `@main` self-references are still refused for a consumer that
-        # enforces it, even after this change. Closing that means giving up the
-        # `@main` contract, which is a repository-design decision and is
-        # tracked separately rather than settled here.
-        camunda/*: ref-pin
+        # No `camunda/*` exemption: this repository's references to itself are
+        # pinned the same way, as `@<sha> # <family>-X.Y.Z`, and kept current by
+        # the `renovate-action-versions.json5` preset this repository extends.
+        "*": hash-pin
 
   # --- audits not adopted (yet) ----------------------------------------------
   # Findings below are pre-existing and unrelated to tag mutability. Enabling
