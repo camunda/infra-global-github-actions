@@ -94,7 +94,7 @@ fi
 echo '[]' > "$TMPDIR_WORK/blocks.json"
 
 # Header block with last-updated timestamp
-DATE_PROGRAM=date
+DATE_PROGRAM="date"
 if command -v gdate >/dev/null; then
   DATE_PROGRAM=gdate
 fi
@@ -239,6 +239,7 @@ if [[ "${SLACK_USER_MAP_FALLBACK:-}" != "true" ]]; then
 
   if [[ -s "$TMPDIR_WORK/unresolved_users.txt" ]]; then
     # Format as comma-separated backtick-wrapped list
+    # shellcheck disable=SC2016  # the backticks are literal Markdown
     unresolved_list=$(sed 's/.*/ `&`/' "$TMPDIR_WORK/unresolved_users.txt" | paste -s -d',' -)
     jq -c --arg users "$unresolved_list" \
       '. + [{type: "context", elements: [{type: "mrkdwn", text: ("⚠️ _Could not resolve GitHub → Slack for: " + $users + ". These users either need to add or if its already present, remove and re-add their GitHub handle in Okta to sync it to Slack. See <https://camunda.slack.com/archives/C08F5RD5X8B/p1776240827921619|instructions>._")}]}]' \

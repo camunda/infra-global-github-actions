@@ -34,7 +34,7 @@ else
   exit 1
 fi
 
-DATE_PROGRAM=date
+DATE_PROGRAM="date"
 if command -v gdate >/dev/null; then
   DATE_PROGRAM=gdate
 fi
