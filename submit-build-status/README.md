@@ -58,12 +58,24 @@ All data submitted by this action is stored as one record in the Big Query table
 | network_ingress_bytes | INTEGER | NULLABLE | Cumulative bytes received across non-loopback interfaces at job end (Linux only) |
 | user_reason      | STRING     | NULLABLE   | Based on user input |
 | user_description | STRING     | NULLABLE   | Based on user input |
+| tool_installs    | JSON       | NULLABLE   | JSON array of the tool install figures from [`camunda/infra-tools`](https://github.com/camunda/infra-tools), see below |
 
 #### Build duration
 
 When [`start-build-monitor`](../start-build-monitor/) is the first step in a job, this action automatically submits the elapsed time with whole-second precision, converted to milliseconds. The duration starts when the monitor action runs and ends when this action collects its metrics, after Google authentication but before the BigQuery request. Resource sampling also continues through authentication, preserving the existing measurement window.
 
 An explicit `build_duration_millis` input takes precedence over the automatic duration. Explicit values must be non-negative integers no greater than 72 hours (`259200000` milliseconds); invalid values emit a warning and omit the duration field without failing submission or falling back to the monitor-derived duration. Automatic duration is used only when no explicit value is supplied. If the monitor did not run, its timestamp is invalid, or the calculated duration is outside that range, the duration field is omitted without failing submission.
+
+#### Tool install figures
+
+When [`camunda/infra-tools`](https://github.com/camunda/infra-tools) installs CI tools earlier in the job, it appends one JSON object per tool to `$RUNNER_TEMP/ci-analytics/tool-installs.jsonl`. This action reads that file, if it exists and has non-blank lines, and submits its lines as one JSON array in the `tool_installs` field. The file's presence is the switch: there is no input, and it works the same for any `big_query_table_name`. The lines are opaque to this action, which neither parses nor validates their fields.
+
+If the file cannot be read, or the request with `tool_installs` fails (a network or HTTP error, or BigQuery rejects the row, for example because a line is not valid JSON), the action logs a warning and submits the row without that field, so a bad file never loses the build status. Query the figures with, for example:
+
+```sql
+SELECT JSON_VALUE(t, '$.tool') AS tool
+FROM build_status_v2, UNNEST(JSON_QUERY_ARRAY(tool_installs)) AS t
+```
 
 
 ### Integration
