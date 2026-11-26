@@ -166,7 +166,7 @@ jobs:
 
     - name: Collect stale backport PRs
       id: collect
-      uses: camunda/infra-global-github-actions/stale-backport-tracker/collect@main
+      uses: camunda/infra-global-github-actions/stale-backport-tracker/collect@b76f9dc3a1d99a9c6e7f16eb4e3bf9bf83b0feeb  # stale-backport-tracker-0.0.0
       with:
         github-token: ${{ steps.github-token.outputs.token }}
         repositories: ${{ inputs.repositories }}
@@ -208,7 +208,7 @@ jobs:
         repositories: ${{ steps.names.outputs.names }}
 
     - name: Notify stale backport PRs
-      uses: camunda/infra-global-github-actions/stale-backport-tracker/notify-github@main
+      uses: camunda/infra-global-github-actions/stale-backport-tracker/notify-github@b76f9dc3a1d99a9c6e7f16eb4e3bf9bf83b0feeb  # stale-backport-tracker-0.0.0
       with:
         github-token: ${{ steps.github-token.outputs.token }}
         stale-data: ${{ needs.collect.outputs.stale_data }}
@@ -298,7 +298,7 @@ jobs:
 
     - name: Format Slack report
       id: format
-      uses: camunda/infra-global-github-actions/stale-backport-tracker/format-slack@main
+      uses: camunda/infra-global-github-actions/stale-backport-tracker/format-slack@b76f9dc3a1d99a9c6e7f16eb4e3bf9bf83b0feeb  # stale-backport-tracker-0.0.0
       with:
         stale-data: ${{ needs.collect.outputs.stale_data }}
         repositories: ${{ inputs.repositories }}
@@ -486,11 +486,18 @@ jobs:
         STALE_DATA: ${{ needs.collect.outputs.stale_data }}
         TOTAL_STALE: ${{ needs.collect.outputs.total_stale }}
         HAS_STALE: ${{ needs.collect.outputs.has_stale }}
+        COLLECT_RESULT: ${{ needs.collect.result }}
         REPORT_TITLE: ${{ inputs.report_title }}
       run: |
         {
           echo "## 📊 ${REPORT_TITLE}"
           echo ""
+
+          # This job runs even when collecting failed, where the outputs are empty.
+          if [[ "$COLLECT_RESULT" != "success" || ( "$HAS_STALE" != "true" && "$HAS_STALE" != "false" ) ]]; then
+            echo "⚠️ **Stale backport collection did not complete successfully.** No clean status is available."
+            exit 0
+          fi
 
           if [[ "$HAS_STALE" != "true" ]]; then
             echo "✅ **No stale backport PRs found.** All backports are merged or up to date."

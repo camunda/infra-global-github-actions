@@ -36,5 +36,5 @@ Test: [`.github/workflows/test-stale-backport-tracker.yml`](.github/workflows/te
 
 Not covered, and an accepted risk pending sign-off by the maintainers:
 
-- The reusable workflow `.github/workflows/stale-backport-tracker.yml`: Vault and GitHub App token steps, the Slack find, update, pin and unpin calls, and the real `gh` and Slack API behaviour (including whether the `base:` search qualifier matches a `self-managed/` prefix before the post-filter). The workflow calls its composite actions at `@main`, so a pull request cannot exercise its own version of them. It is verified by a `dry_run: true` run from each caller, which prints the Slack blocks to the job summary and writes nothing.
+- The reusable workflow `.github/workflows/stale-backport-tracker.yml`: Vault and GitHub App token steps, the Slack find, update, pin and unpin calls, and the real `gh` and Slack API behaviour (including whether the `base:` search qualifier matches a `self-managed/` prefix before the post-filter). The workflow calls its composite actions by commit SHA, so a pull request cannot exercise its own version of them. It is verified by a `dry_run: true` run from each caller, which prints the Slack blocks to the job summary and writes nothing.
 - The real Slack API.

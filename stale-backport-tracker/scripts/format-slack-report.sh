@@ -250,13 +250,10 @@ fi
 # Legend + footer
 # Slack enforces a hard limit of 50 blocks per message. Trim excess content blocks first.
 # Each PR group uses 1 block (section with optional image accessory), plus dividers if enabled.
-# With group dividers: limit=47 (50 - 3 footer).
-# Without group dividers: limit=46 (reserve slots for truncation notice + footer).
-if [[ "$USE_GROUP_DIVIDERS" == "true" ]]; then
-  CONTENT_LIMIT=47
-else
-  CONTENT_LIMIT=46
-fi
+# Reserve 1 slot for the truncation notice and 3 for the footer, so the limit is 46 either way.
+# The divider estimate above does not count the warning blocks, so content can exceed it and
+# be truncated even in divider mode.
+CONTENT_LIMIT=46
 content_count=$(jq 'length' "$TMPDIR_WORK/blocks.json")
 if [[ "$content_count" -gt "$CONTENT_LIMIT" ]]; then
   jq --argjson limit "$CONTENT_LIMIT" '.[0:$limit]' "$TMPDIR_WORK/blocks.json" > "$TMPDIR_WORK/blocks_tmp.json"

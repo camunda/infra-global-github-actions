@@ -36,7 +36,7 @@ jobs:
   stale-backports:
     permissions:
       id-token: write  # Vault JWT login in the called workflow
-    uses: camunda/infra-global-github-actions/.github/workflows/stale-backport-tracker.yml@main
+    uses: camunda/infra-global-github-actions/.github/workflows/stale-backport-tracker.yml@<sha>  # stale-backport-tracker-X.Y.Z
     secrets: inherit
     with:
       repositories: camunda/camunda-hub
@@ -82,7 +82,7 @@ camunda/camunda keeps today's behavior with its own values:
 
 ## Notes
 
-- The workflow calls its composite actions at `@main`, as the rest of this repository does for its own actions. A caller pinning the workflow to a SHA still gets the actions of `main`.
+- The workflow calls its composite actions by commit SHA, like every other reference in this repository, and Renovate keeps the pin current. Pin the workflow itself the same way: `@<sha>  # stale-backport-tracker-X.Y.Z`.
 - Backport PRs are found by author (`backport_authors`), by a `Backport of #N` line in their body, and by their base branch starting with `target_branch_prefix`.
 - A comment is renewed after two days (deleted and recreated, so the mention notifies again). Between two renewals the PR is skipped.
 - `observe-build-status`, which camunda/camunda ran inside its own copy, is not part of the shared workflow. A caller that wants it adds a job with `needs:` on the tracker job.

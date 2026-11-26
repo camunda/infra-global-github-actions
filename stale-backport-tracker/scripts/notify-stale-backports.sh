@@ -116,9 +116,11 @@ while IFS= read -r entry; do
       state_note=$'\n\n⚠️ This PR is in **draft** state, likely due to merge conflicts that need manual resolution.'
     fi
 
-    # Check for existing bot comment — delete and recreate if older than RENOTIFY_AFTER_DAYS
+    # Check for existing bot comment — delete and recreate if older than RENOTIFY_AFTER_DAYS.
+    # The marker alone is not enough: anyone can paste it (e.g. by quoting the bot's comment),
+    # and a match may be deleted below, so only comments written by a bot count.
     existing_comment_data=$(gh api --paginate "repos/${repo}/issues/${bp_num}/comments" \
-      -q ".[] | select(.body | contains(\"${COMMENT_MARKER}\"))" 2>/dev/null | jq -s 'if length > 0 then .[0] else null end' || echo "null")
+      -q ".[] | select(.user.type == \"Bot\" and (.body | contains(\"${COMMENT_MARKER}\")))" 2>/dev/null | jq -s 'if length > 0 then .[0] else null end' || echo "null")
 
     if [[ "$existing_comment_data" != "null" ]]; then
       comment_id=$(echo "$existing_comment_data" | jq -r '.id')
@@ -228,7 +230,7 @@ Please review and merge/close these backport PRs.
 
     # Check for existing comment on original PR
     existing_orig_comment=$(gh api --paginate "repos/${repo}/issues/${orig_num}/comments" \
-      -q ".[] | select(.body | contains(\"${COMMENT_MARKER}\"))" 2>/dev/null | jq -s 'length' || echo "0")
+      -q ".[] | select(.user.type == \"Bot\" and (.body | contains(\"${COMMENT_MARKER}\")))" 2>/dev/null | jq -s 'length' || echo "0")
 
     if [[ "$existing_orig_comment" -eq 0 ]]; then
       if [[ "$DRY_RUN" == "true" ]]; then
