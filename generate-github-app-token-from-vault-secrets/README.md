@@ -48,7 +48,7 @@ jobs:
       contents: read
       id-token: write  # mint GitHub OIDC token for Vault JWT auth
     steps:
-    - uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@main
+    - uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@<sha> # <family>-X.Y.Z
       with:
         github-app-id-vault-key: THE_KEY_NAME_OF_THE_VAULT_SECRET_STORING_THE_APP_ID
         github-app-id-vault-path: the/path/of/the/vault/secret/storing/the/app/id
@@ -77,7 +77,7 @@ jobs:
   configure-pr:
     runs-on: ubuntu-latest
     steps:
-    - uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@main
+    - uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@<sha> # <family>-X.Y.Z
       with:
         github-app-id-vault-key: THE_KEY_NAME_OF_THE_VAULT_SECRET_STORING_THE_APP_ID
         github-app-id-vault-path: the/path/of/the/vault/secret/storing/the/app/id

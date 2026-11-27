@@ -5,7 +5,7 @@ Checks for commits authored by GitHub Copilot and optionally co-authored commits
 ## Usage
 
 ```yaml
-- uses: camunda/infra-global-github-actions/check-copilot-commits@main
+- uses: camunda/infra-global-github-actions/check-copilot-commits@<sha> # <family>-X.Y.Z
   with:
     repository: 'owner/repo'
     branch: 'feature-branch'
@@ -39,7 +39,7 @@ Checks for commits authored by GitHub Copilot and optionally co-authored commits
 ```yaml
 - name: Check for Copilot commits
   id: copilot-check
-  uses: camunda/infra-global-github-actions/check-copilot-commits@main
+  uses: camunda/infra-global-github-actions/check-copilot-commits@<sha> # <family>-X.Y.Z
   with:
     repository: ${{ github.repository }}
     branch: ${{ github.head_ref }}

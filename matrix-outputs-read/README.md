@@ -58,7 +58,7 @@ jobs:
     outputs:
       config: ${{ steps.read.outputs.result }}
     steps:
-      - uses: camunda/infra-global-github-actions/matrix-outputs-read@main
+      - uses: camunda/infra-global-github-actions/matrix-outputs-read@<sha> # <family>-X.Y.Z
         id: read
         with:
           matrix-step-name: prepare-clusters

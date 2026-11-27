@@ -45,7 +45,7 @@ jobs:
         # DON'T specify any cache-related options here!
 
     # This sets up the GHA cache for Yarn (no save on PRs)
-    - uses: camunda/infra-global-github-actions/setup-yarn-cache@main
+    - uses: camunda/infra-global-github-actions/setup-yarn-cache@<sha> # <family>-X.Y.Z
       with:
         directory: frontend/client
 

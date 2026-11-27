@@ -43,7 +43,7 @@ jobs:
         app-id: ${{ steps.vault-secrets.outputs.RELEASES_APP_ID }}
         private-key: ${{ steps.vault-secrets.outputs.RELEASES_APP_KEY }}
     - name: Automerge Release-Please PR
-      uses: camunda/infra-global-github-actions/teams/infra/pull-request/automerge@main
+      uses: camunda/infra-global-github-actions/teams/infra/pull-request/automerge@<sha> # <family>-X.Y.Z
       with:
         github-token: ${{ steps.app-token.outputs.token }}
         author: infra-releases[bot]

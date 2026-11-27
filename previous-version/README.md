@@ -36,7 +36,7 @@ jobs:
           ref: ${{ env.RELEASE_BRANCH }}
           fetch-depth: 0 # To fetch tags as well - required for tags processing
       - id: prev_version
-        uses: camunda/infra-global-github-actions/previous-version@main
+        uses: camunda/infra-global-github-actions/previous-version@<sha> # <family>-X.Y.Z
         with:
           version: '8.8.0'
           verbose: 'true'

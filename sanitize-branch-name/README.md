@@ -26,7 +26,7 @@ jobs:
 
     steps:
       - id: sanitize
-        uses: camunda/infra-global-github-actions/sanitize-branch-name@main
+        uses: camunda/infra-global-github-actions/sanitize-branch-name@<sha> # <family>-X.Y.Z
         with:
           branch: ${{ github.head_ref }}
           max_length: '50'

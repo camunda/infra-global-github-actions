@@ -6,7 +6,7 @@ This composite GitHub Action installs the GitHub CLI (`gh`) if it's not already 
 
 ```yaml
 - name: Setup GitHub CLI
-  uses: camunda/infra-global-github-actions/setup-gh-cli@main
+  uses: camunda/infra-global-github-actions/setup-gh-cli@<sha> # <family>-X.Y.Z
 ```
 
 ## Behavior

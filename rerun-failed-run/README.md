@@ -33,7 +33,7 @@ Retriggers failed GitHub Actions workflows, with optional error message filterin
 The calling job must grant `id-token: write` so GitHub can mint the OIDC token.
 
 ```yaml
-- uses: camunda/infra-global-github-actions/rerun-failed-run@main
+- uses: camunda/infra-global-github-actions/rerun-failed-run@<sha> # <family>-X.Y.Z
   with:
     run-id: ${{ github.run_id }}
     repository: ${{ github.repository }}
@@ -49,7 +49,7 @@ The calling job must grant `id-token: write` so GitHub can mint the OIDC token.
 The calling job must grant `id-token: write` so GitHub can mint the OIDC token.
 
 ```yaml
-- uses: camunda/infra-global-github-actions/rerun-failed-run@main
+- uses: camunda/infra-global-github-actions/rerun-failed-run@<sha> # <family>-X.Y.Z
   with:
     error-messages: |
       Process completed with exit code 1
@@ -68,7 +68,7 @@ The calling job must grant `id-token: write` so GitHub can mint the OIDC token.
 AppRole emits a warning annotation and will be removed ([team-infrastructure#1076](https://github.com/camunda/team-infrastructure/issues/1076)).
 
 ```yaml
-- uses: camunda/infra-global-github-actions/rerun-failed-run@main
+- uses: camunda/infra-global-github-actions/rerun-failed-run@<sha> # <family>-X.Y.Z
   with:
     run-id: ${{ github.run_id }}
     repository: ${{ github.repository }}

@@ -15,12 +15,12 @@ jobs:
     steps:
     - name: Log in to FOSSA
       id: fossa-login
-      uses: camunda/infra-global-github-actions/fossa/oidc-login@<sha> # <version>
+      uses: camunda/infra-global-github-actions/fossa/oidc-login@<sha> # <family>-X.Y.Z
       with:
         provider-id: '81'
         username: ci-camunda-infra
         push-only: 'false'  # pr-check, wait-for-scan and get-issues call the FOSSA API
-    - uses: camunda/infra-global-github-actions/fossa/analyze@<sha> # <version>
+    - uses: camunda/infra-global-github-actions/fossa/analyze@<sha> # <family>-X.Y.Z
       with:
         api-key: ${{ steps.fossa-login.outputs.api-key }}
         # ...

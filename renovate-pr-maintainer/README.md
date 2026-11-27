@@ -27,7 +27,7 @@ jobs:
   maintain:
     runs-on: ubuntu-latest
     steps:
-      - uses: camunda/infra-global-github-actions/renovate-pr-maintainer@main
+      - uses: camunda/infra-global-github-actions/renovate-pr-maintainer@<sha> # <family>-X.Y.Z
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 ```

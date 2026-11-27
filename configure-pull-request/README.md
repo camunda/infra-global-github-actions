@@ -30,7 +30,7 @@ jobs:
   configure-pr:
     runs-on: ubuntu-latest
     steps:
-    - uses: camunda/infra-global-github-actions/configure-pull-request@main
+    - uses: camunda/infra-global-github-actions/configure-pull-request@<sha> # <family>-X.Y.Z
       with:
         github-token: ${{ secrets.A_GITHUB_TOKEN }}
         labels: label-1,label-2

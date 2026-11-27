@@ -95,15 +95,15 @@ jobs:
     steps:
     # install any defaults
     - name: Install if required common software tooling
-      uses: camunda/infra-global-github-actions/common-tooling@main
+      uses: camunda/infra-global-github-actions/common-tooling@<sha> # <family>-X.Y.Z
     # only install missing software components
     - name: Install and overwrite common software tooling
-      uses: camunda/infra-global-github-actions/common-tooling@main
+      uses: camunda/infra-global-github-actions/common-tooling@<sha> # <family>-X.Y.Z
       with:
         overwrite: "false"
     # Install missing software with specific node and JDK version
     - name: Install and overwrite common software tooling
-      uses: camunda/infra-global-github-actions/common-tooling@main
+      uses: camunda/infra-global-github-actions/common-tooling@<sha> # <family>-X.Y.Z
       with:
         node-version: 20 # see https://github.com/actions/setup-node#supported-version-syntax for supported syntax
         java-version: 20 # see https://github.com/marketplace/actions/setup-java-jdk#supported-version-syntax for supported syntax

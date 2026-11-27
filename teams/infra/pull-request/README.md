@@ -25,7 +25,7 @@ jobs:
   validate-title:
     runs-on: ubuntu-latest
     steps:
-      - uses: camunda/infra-global-github-actions/teams/infra/pull-request/validate-title@main
+      - uses: camunda/infra-global-github-actions/teams/infra/pull-request/validate-title@<sha> # <family>-X.Y.Z
 ```
 
 ## Architecture

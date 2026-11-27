@@ -18,7 +18,7 @@ jobs:
   check-git-emails:
     runs-on: ubuntu-latest
     steps:
-    - uses: camunda/infra-global-github-actions/assert-camunda-git-emails@main
+    - uses: camunda/infra-global-github-actions/assert-camunda-git-emails@<sha> # <family>-X.Y.Z
 ```
 
 ### Allowed Email Addresses
@@ -47,7 +47,7 @@ jobs:
   check-git-emails:
     runs-on: ubuntu-latest
     steps:
-    - uses: camunda/infra-global-github-actions/assert-camunda-git-emails@main
+    - uses: camunda/infra-global-github-actions/assert-camunda-git-emails@<sha> # <family>-X.Y.Z
       with:
         additional-allowed-emails-regex: "test@example.com\\|foo@example.org"
 ```

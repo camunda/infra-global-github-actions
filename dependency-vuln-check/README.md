@@ -30,7 +30,7 @@ version shows up as `added` in the diff and is evaluated normally.
 
 ```yaml
 - uses: actions/checkout@v6
-- uses: camunda/infra-global-github-actions/dependency-vuln-check@main
+- uses: camunda/infra-global-github-actions/dependency-vuln-check@<sha> # <family>-X.Y.Z
   with:
     base-sha: ${{ github.event.pull_request.base.sha }}
     head-sha: ${{ github.event.pull_request.head.sha }}
@@ -254,7 +254,7 @@ workflow) — **not** in this action's repository.
 - To use a different path, set the `config-file` input (relative to the repo root):
 
   ```yaml
-  - uses: camunda/infra-global-github-actions/dependency-vuln-check@main
+  - uses: camunda/infra-global-github-actions/dependency-vuln-check@<sha> # <family>-X.Y.Z
     with:
       base-sha: ${{ github.event.pull_request.base.sha }}
       head-sha: ${{ github.event.pull_request.head.sha }}

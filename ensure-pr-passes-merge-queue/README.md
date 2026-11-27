@@ -58,7 +58,7 @@ jobs:
     steps:
       - name: Ensure PR passes merge queue
         id: monitor_mq
-        uses: camunda/infra-global-github-actions/ensure-pr-passes-merge-queue@main
+        uses: camunda/infra-global-github-actions/ensure-pr-passes-merge-queue@<sha> # <family>-X.Y.Z
         with:
           pr-number: ${{ github.event.pull_request.number }}
           app-id: ${{ secrets.MERGE_QUEUE_APP_ID }}

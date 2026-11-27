@@ -80,7 +80,7 @@ jobs:
         echo Hello World
 
     # Always submit build status to CI Analytics
-    - uses: camunda/infra-global-github-actions/submit-build-status@main
+    - uses: camunda/infra-global-github-actions/submit-build-status@<sha> # <family>-X.Y.Z
       if: always()  # run even in case of failures
       continue-on-error: true  # prevent failure here of marking the job as failed
       with:
@@ -95,7 +95,7 @@ jobs:
     - name: Check for aborted jobs
       if: always()  # run even in case of failures
       continue-on-error: true  # prevent failure here of marking the job as failed
-      uses: camunda/infra-global-github-actions/submit-aborted-gha-status@main
+      uses: camunda/infra-global-github-actions/submit-aborted-gha-status@<sha> # <family>-X.Y.Z
       with:
         gcp_credentials_json: "${{ secrets.YOUR_GCP_CREDENTIALS }}"
 ```
