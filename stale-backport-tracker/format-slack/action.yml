@@ -1,0 +1,72 @@
+name: Format the stale backport Slack report
+
+description: Turns the stale backport JSON into a compact Slack Block Kit `blocks` array.
+
+inputs:
+  stale-data:
+    description: JSON output of the `collect` action
+    required: true
+  repositories:
+    description: Comma-separated list of `owner/repo` that were scanned, so repositories with nothing stale are listed as clean
+    required: true
+  report-title:
+    description: Title of the report, shown in the first block
+    required: false
+    default: "Stale Backport PRs"
+  target-branch:
+    description: Exact branch the scan was restricted to, shown in the header. Empty for none.
+    required: false
+    default: ""
+  slack-cc:
+    description: Slack mention (e.g. `<!subteam^S09E9P9TPAA|@engineering-operations-team>`) added to the warning shown when the GitHub-to-Slack user map is missing. Empty for none.
+    required: false
+    default: ""
+  user-map-file:
+    description: Path to the JSON file mapping GitHub logins to Slack users. Empty for none.
+    required: false
+    default: ""
+  user-map-fallback:
+    description: When `true`, the report warns that the user map was not available
+    required: false
+    default: "false"
+  repository:
+    description: Repository running the workflow (for the "View workflow" link)
+    required: false
+    default: ${{ github.repository }}
+  run-id:
+    description: ID of the workflow run (for the "View workflow" link)
+    required: false
+    default: ${{ github.run_id }}
+
+outputs:
+  blocks:
+    description: Compact single-line JSON array of Slack blocks
+    value: ${{ steps.format.outputs.blocks }}
+
+runs:
+  using: composite
+  steps:
+  - name: Format Slack report
+    id: format
+    shell: bash
+    env:
+      GITHUB_REPOSITORY: ${{ inputs.repository }}
+      GITHUB_RUN_ID: ${{ inputs.run-id }}
+      TARGET_BRANCH: ${{ inputs.target-branch }}
+      REPOSITORIES: ${{ inputs.repositories }}
+      REPORT_TITLE: ${{ inputs.report-title }}
+      SLACK_CC: ${{ inputs.slack-cc }}
+      SLACK_USER_MAP_FILE: ${{ inputs.user-map-file }}
+      SLACK_USER_MAP_FALLBACK: ${{ inputs.user-map-fallback }}
+      STALE_DATA: ${{ inputs.stale-data }}
+      ACTION_PATH: ${{ github.action_path }}
+    run: |
+      payload=$(printf '%s' "$STALE_DATA" | bash "${ACTION_PATH}/../scripts/format-slack-report.sh")
+
+      # Compact single-line JSON: slack-github-action's strict YAML parser rejects multi-line toJSON() output.
+      blocks=$(printf '%s' "$payload" | jq -ce '.blocks | select(type == "array")') || {
+        echo "::error::format-slack-report.sh did not produce a .blocks array — aborting before posting an invalid Slack payload" >&2
+        exit 1
+      }
+
+      echo "blocks=$blocks" >> "$GITHUB_OUTPUT"

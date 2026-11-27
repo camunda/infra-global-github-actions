@@ -26,6 +26,7 @@
   "sanitize-branch-name": "1.0.0",
   "setup-gh-cli": "1.0.0",
   "setup-yarn-cache": "1.0.3",
+  "stale-backport-tracker": "0.0.0",
   "start-build-monitor": "1.0.1",
   "submit-aborted-gha-status": "1.1.0",
   "submit-build-status": "1.4.0",

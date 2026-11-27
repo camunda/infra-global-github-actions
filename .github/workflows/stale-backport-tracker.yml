@@ -1,0 +1,559 @@
+# description: Reusable workflow that tracks stale backport PRs, comments and labels them on GitHub, and keeps a pinned, hourly-updated report in Slack.
+# Callers add the schedule and their own repositories and channel. See stale-backport-tracker/README.md.
+---
+name: Stale Backport Tracker
+
+on:
+  workflow_call:
+    inputs:
+      repositories:
+        description: Comma-separated list of `owner/repo` to scan. They must belong to the same GitHub organization as the caller.
+        required: true
+        type: string
+      slack_channel_id:
+        description: ID of the Slack channel the report is posted to. Required when `notify_slack` is true, unless `slack_channel_id_vault_key` is set.
+        required: false
+        default: ''
+        type: string
+      slack_channel_id_vault_key:
+        description: Key under `slack_vault_path` that holds the channel ID, used when `slack_channel_id` is empty.
+        required: false
+        default: ''
+        type: string
+      stale_hours_threshold:
+        description: Hours after which an open backport PR is considered stale.
+        required: false
+        default: '24'
+        type: string
+      report_title:
+        description: Title of the Slack report. Also how the existing report is found, to be updated in place.
+        required: false
+        default: 'Stale Backport PRs'
+        type: string
+      notify_slack:
+        description: Post the report to Slack (pinned, updated in place during the day).
+        required: false
+        default: true
+        type: boolean
+      notify_github:
+        description: Comment on and label the stale backport PRs.
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: Collect and format only. Nothing is written to GitHub or Slack, the Slack blocks go to the job summary.
+        required: false
+        default: false
+        type: boolean
+      target_branch_prefix:
+        description: Prefix of the branches backport PRs target, e.g. `stable/` or `self-managed/`.
+        required: false
+        default: 'stable/'
+        type: string
+      target_branch:
+        description: Only report backport PRs targeting this exact branch (e.g. `stable/8.8`). Empty reports every branch with the prefix.
+        required: false
+        default: ''
+        type: string
+      target_backport_pr:
+        description: 'TEST ONLY: restrict GitHub notifications to a single backport PR number.'
+        required: false
+        default: ''
+        type: string
+      backport_authors:
+        description: Comma-separated GitHub logins that open backport PRs.
+        required: false
+        default: 'backport-action,monorepo-devops-automation[bot]'
+        type: string
+      slack_cc:
+        description: Slack mention added to the warning shown when the GitHub-to-Slack user map is missing. Empty for none.
+        required: false
+        default: '<!subteam^S09E9P9TPAA|@engineering-operations-team>'
+        type: string
+      github_app_vault_path:
+        description: Vault path of the GitHub App used to read and notify the PRs.
+        required: false
+        default: 'secret/data/products/camunda/ci/camunda'
+        type: string
+      github_app_id_vault_key:
+        description: Vault key of that GitHub App's ID.
+        required: false
+        default: 'MONOREPO_RELEASE_APP_ID'
+        type: string
+      github_app_private_key_vault_key:
+        description: Vault key of that GitHub App's private key.
+        required: false
+        default: 'MONOREPO_RELEASE_APP_PRIVATE_KEY'
+        type: string
+      user_map_repository:
+        description: Repository whose `github-slack-user-map` artifact maps GitHub logins to Slack users.
+        required: false
+        default: 'camunda/monorepo-ci-data'
+        type: string
+      user_map_app_id_vault_key:
+        description: Vault key (under `github_app_vault_path`) of the ID of the GitHub App that can download that artifact.
+        required: false
+        default: 'MONOREPO_DEVOPS_AUTOMATION_APP_ID'
+        type: string
+      user_map_app_private_key_vault_key:
+        description: Vault key (under `github_app_vault_path`) of that GitHub App's private key.
+        required: false
+        default: 'MONOREPO_DEVOPS_AUTOMATION_APP_PRIVATE_KEY'
+        type: string
+      slack_vault_path:
+        description: Vault path of the Slack secrets.
+        required: false
+        default: 'secret/data/products/camunda/ci/github-actions'
+        type: string
+      slack_bot_token_vault_key:
+        description: Vault key of the Slack bot token.
+        required: false
+        default: 'SLACK_C8_MONOREPO_NOTIFICATIONS_BOT_TOKEN'
+        type: string
+    secrets:
+      VAULT_ADDR:
+        required: true
+      VAULT_JWT_ROLE:
+        required: true
+      VAULT_JWT_PATH:
+        required: true
+      VAULT_JWT_AUDIENCE:
+        required: true
+
+defaults:
+  run:
+    shell: bash
+
+permissions: {}
+
+jobs:
+  # Collecting stays in its own job, without Vault secrets registered other than the GitHub token:
+  # GitHub drops a job output that contains the value of any masked secret, and the Vault URL
+  # shares substrings with every PR URL in `stale_data`.
+  collect:
+    name: Collect stale backport PRs
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      id-token: write  # Vault JWT login
+    outputs:
+      stale_data: ${{ steps.collect.outputs.stale-data }}
+      has_stale: ${{ steps.collect.outputs.has-stale }}
+      total_stale: ${{ steps.collect.outputs.total-stale }}
+    steps:
+    - name: Derive repository names
+      id: names
+      env:
+        REPOSITORIES: ${{ inputs.repositories }}
+      run: |
+        names=$(echo "$REPOSITORIES" | tr ',' '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's|.*/||' | paste -s -d, -)
+        echo "names=$names" >> "$GITHUB_OUTPUT"
+
+    - name: Generate GitHub token
+      id: github-token
+      uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@6644ac7ceab8e1b32359cc25a5161c46156fc319  # generate-github-app-token-from-vault-secrets-1.3.0
+      with:
+        github-app-id-vault-key: ${{ inputs.github_app_id_vault_key }}
+        github-app-id-vault-path: ${{ inputs.github_app_vault_path }}
+        github-app-private-key-vault-key: ${{ inputs.github_app_private_key_vault_key }}
+        github-app-private-key-vault-path: ${{ inputs.github_app_vault_path }}
+        vault-auth-method: jwt
+        vault-auth-jwt-role: ${{ secrets.VAULT_JWT_ROLE }}
+        vault-auth-jwt-path: ${{ secrets.VAULT_JWT_PATH }}
+        vault-auth-jwt-audience: ${{ secrets.VAULT_JWT_AUDIENCE }}
+        vault-url: ${{ secrets.VAULT_ADDR }}
+        repositories: ${{ steps.names.outputs.names }}
+
+    - name: Collect stale backport PRs
+      id: collect
+      uses: camunda/infra-global-github-actions/stale-backport-tracker/collect@b603b7d1d03c71542aac0f9402c6ba5a9418424d  # stale-backport-tracker-0.0.0
+      with:
+        github-token: ${{ steps.github-token.outputs.token }}
+        repositories: ${{ inputs.repositories }}
+        stale-hours-threshold: ${{ inputs.stale_hours_threshold }}
+        target-branch-prefix: ${{ inputs.target_branch_prefix }}
+        target-branch: ${{ inputs.target_branch }}
+        backport-authors: ${{ inputs.backport_authors }}
+
+  # GitHub Actions has dropped job outputs after a successful job before (camunda/camunda#54686), which looked like
+  # "no stale backports". The consumers wait for this check, so a missing payload fails the run instead of
+  # producing a clean report.
+  validate:
+    name: Validate collected data
+    needs: collect
+    runs-on: ubuntu-slim
+    timeout-minutes: 2
+    steps:
+    - name: Check that the collected data is complete
+      env:
+        STALE_DATA: ${{ needs.collect.outputs.stale_data }}
+        TOTAL_STALE: ${{ needs.collect.outputs.total_stale }}
+        HAS_STALE: ${{ needs.collect.outputs.has_stale }}
+      run: |
+        if ! jq -e 'type == "array"' <<< "$STALE_DATA" > /dev/null 2>&1; then
+          echo "::error::The collect job did not hand over a JSON array of stale backports (the output is missing or malformed)"
+          exit 1
+        fi
+        count=$(jq '[.[].backport_prs | length] | add // 0' <<< "$STALE_DATA")
+        expected_has_stale=false
+        if [[ "$count" -gt 0 ]]; then expected_has_stale=true; fi
+        if [[ "$count" != "$TOTAL_STALE" || "$expected_has_stale" != "$HAS_STALE" ]]; then
+          echo "::error::The collected data holds ${count} stale backport PR(s), but total_stale='${TOTAL_STALE}' and has_stale='${HAS_STALE}'"
+          exit 1
+        fi
+        echo "Collected data is complete: ${count} stale backport PR(s)"
+
+  notify-github:
+    name: Notify on GitHub PRs
+    needs: [collect, validate]
+    if: needs.collect.outputs.has_stale == 'true' && inputs.notify_github
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      id-token: write  # Vault JWT login
+    steps:
+    - name: Derive repository names
+      id: names
+      env:
+        REPOSITORIES: ${{ inputs.repositories }}
+      run: |
+        names=$(echo "$REPOSITORIES" | tr ',' '\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's|.*/||' | paste -s -d, -)
+        echo "names=$names" >> "$GITHUB_OUTPUT"
+
+    - name: Generate GitHub token
+      id: github-token
+      uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@6644ac7ceab8e1b32359cc25a5161c46156fc319  # generate-github-app-token-from-vault-secrets-1.3.0
+      with:
+        github-app-id-vault-key: ${{ inputs.github_app_id_vault_key }}
+        github-app-id-vault-path: ${{ inputs.github_app_vault_path }}
+        github-app-private-key-vault-key: ${{ inputs.github_app_private_key_vault_key }}
+        github-app-private-key-vault-path: ${{ inputs.github_app_vault_path }}
+        vault-auth-method: jwt
+        vault-auth-jwt-role: ${{ secrets.VAULT_JWT_ROLE }}
+        vault-auth-jwt-path: ${{ secrets.VAULT_JWT_PATH }}
+        vault-auth-jwt-audience: ${{ secrets.VAULT_JWT_AUDIENCE }}
+        vault-url: ${{ secrets.VAULT_ADDR }}
+        repositories: ${{ steps.names.outputs.names }}
+
+    - name: Notify stale backport PRs
+      uses: camunda/infra-global-github-actions/stale-backport-tracker/notify-github@b603b7d1d03c71542aac0f9402c6ba5a9418424d  # stale-backport-tracker-0.0.0
+      with:
+        github-token: ${{ steps.github-token.outputs.token }}
+        stale-data: ${{ needs.collect.outputs.stale_data }}
+        dry-run: ${{ inputs.dry_run }}
+        target-backport-pr: ${{ inputs.target_backport_pr }}
+        workflow-run-url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+  notify-slack:
+    name: Post Slack report
+    needs: [collect, validate]
+    if: inputs.notify_slack
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      id-token: write  # Vault JWT login
+    steps:
+    - name: Derive user map repository
+      id: user-map-repo
+      env:
+        USER_MAP_REPOSITORY: ${{ inputs.user_map_repository }}
+      run: |
+        echo "owner=${USER_MAP_REPOSITORY%%/*}" >> "$GITHUB_OUTPUT"
+        echo "name=${USER_MAP_REPOSITORY##*/}" >> "$GITHUB_OUTPUT"
+
+    - name: Generate GitHub token
+      id: github-token
+      uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@6644ac7ceab8e1b32359cc25a5161c46156fc319  # generate-github-app-token-from-vault-secrets-1.3.0
+      with:
+        github-app-id-vault-key: ${{ inputs.user_map_app_id_vault_key }}
+        github-app-id-vault-path: ${{ inputs.github_app_vault_path }}
+        github-app-private-key-vault-key: ${{ inputs.user_map_app_private_key_vault_key }}
+        github-app-private-key-vault-path: ${{ inputs.github_app_vault_path }}
+        vault-auth-method: jwt
+        vault-auth-jwt-role: ${{ secrets.VAULT_JWT_ROLE }}
+        vault-auth-jwt-path: ${{ secrets.VAULT_JWT_PATH }}
+        vault-auth-jwt-audience: ${{ secrets.VAULT_JWT_AUDIENCE }}
+        vault-url: ${{ secrets.VAULT_ADDR }}
+        owner: ${{ steps.user-map-repo.outputs.owner }}
+        repositories: ${{ steps.user-map-repo.outputs.name }}
+
+    - name: Get Slack secrets from Vault
+      id: secrets
+      # A dry run never posts, so it needs the bot token only to look up a channel ID that was not given as an input.
+      if: ${{ !(inputs.dry_run && inputs.slack_channel_id != '') }}
+      uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc  # v4.0.0
+      with:
+        url: ${{ secrets.VAULT_ADDR }}
+        method: jwt
+        role: ${{ secrets.VAULT_JWT_ROLE }}
+        path: ${{ secrets.VAULT_JWT_PATH }}
+        jwtGithubAudience: ${{ secrets.VAULT_JWT_AUDIENCE }}
+        exportEnv: false
+        secrets: |
+          ${{ inputs.slack_vault_path }} ${{ inputs.slack_bot_token_vault_key }} | SLACK_BOT_TOKEN;
+          ${{ inputs.slack_channel_id_vault_key != '' && format('{0} {1} | SLACK_CHANNEL_ID_FROM_VAULT;', inputs.slack_vault_path, inputs.slack_channel_id_vault_key) || '' }}
+
+    - name: Resolve the Slack channel
+      id: channel
+      env:
+        CHANNEL_FROM_INPUT: ${{ inputs.slack_channel_id }}
+        CHANNEL_FROM_VAULT: ${{ steps.secrets.outputs.SLACK_CHANNEL_ID_FROM_VAULT }}
+        DRY_RUN: ${{ inputs.dry_run }}
+      run: |
+        channel="${CHANNEL_FROM_INPUT:-$CHANNEL_FROM_VAULT}"
+        if [[ -z "$channel" && "$DRY_RUN" != "true" ]]; then
+          echo "::error::notify_slack is true but neither slack_channel_id nor slack_channel_id_vault_key resolves to a channel ID" >&2
+          exit 1
+        fi
+        echo "id=$channel" >> "$GITHUB_OUTPUT"
+
+    - name: Download GitHub-Slack user map
+      env:
+        GH_TOKEN: ${{ steps.github-token.outputs.token }}
+        USER_MAP_REPOSITORY: ${{ inputs.user_map_repository }}
+      run: |
+        # The GitHub-to-Slack user map is built weekly by a workflow in the user map repository
+        # (camunda/monorepo-ci-data by default) and stored as the "github-slack-user-map" artifact.
+        # It resolves Slack custom profile fields (GitHub username) into a JSON mapping of
+        # GitHub login → {slack_id, display_name, real_name}.
+        if gh run download --repo "$USER_MAP_REPOSITORY" --name github-slack-user-map --dir /tmp/map 2>/dev/null; then
+          cp /tmp/map/github-slack-user-map.json /tmp/slack-user-map.json
+          echo "Downloaded map with $(jq 'length' /tmp/slack-user-map.json) entries"
+          echo "SLACK_USER_MAP_FALLBACK=false" >> "$GITHUB_ENV"
+        else
+          echo "⚠️ No GitHub-Slack user map artifact found — Slack mentions will use fallback" >&2
+          echo '{}' > /tmp/slack-user-map.json
+          echo "SLACK_USER_MAP_FALLBACK=true" >> "$GITHUB_ENV"
+        fi
+
+    - name: Format Slack report
+      id: format
+      uses: camunda/infra-global-github-actions/stale-backport-tracker/format-slack@b603b7d1d03c71542aac0f9402c6ba5a9418424d  # stale-backport-tracker-0.0.0
+      with:
+        stale-data: ${{ needs.collect.outputs.stale_data }}
+        repositories: ${{ inputs.repositories }}
+        report-title: ${{ inputs.report_title }}
+        target-branch: ${{ inputs.target_branch }}
+        slack-cc: ${{ inputs.slack_cc }}
+        user-map-file: /tmp/slack-user-map.json
+        user-map-fallback: ${{ env.SLACK_USER_MAP_FALLBACK }}
+
+    - name: Show the Slack report instead of posting it (dry run)
+      if: inputs.dry_run
+      env:
+        BLOCKS: ${{ steps.format.outputs.blocks }}
+        CHANNEL_ID: ${{ steps.channel.outputs.id }}
+      run: |
+        {
+          echo "## 🔍 Slack report (dry run, nothing was posted)"
+          echo ""
+          echo "Channel: \`${CHANNEL_ID:-not set}\`"
+          echo ""
+          echo '```json'
+          printf '%s' "$BLOCKS" | jq .
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Find existing Slack message to update
+      id: find-message
+      if: ${{ !inputs.dry_run }}
+      continue-on-error: true
+      env:
+        SLACK_BOT_TOKEN: ${{ steps.secrets.outputs.SLACK_BOT_TOKEN }}
+        SLACK_CHANNEL: ${{ steps.channel.outputs.id }}
+        REPORT_TITLE: ${{ inputs.report_title }}
+      run: |
+        # Look for the bot's most recent report message posted today (since midnight UTC)
+        oldest=$(date -u -d 'today 00:00:00' +%s 2>/dev/null || date -u -v0H -v0M -v0S +%s)
+        response=$(curl -s \
+          -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+          "https://slack.com/api/conversations.history?channel=${SLACK_CHANNEL}&oldest=${oldest}&limit=50")
+
+        # Debug: show API status
+        echo "API ok: $(echo "$response" | jq -r '.ok')" >&2
+        echo "API error: $(echo "$response" | jq -r '.error // "none"')" >&2
+        echo "Messages count: $(echo "$response" | jq '[(.messages // [])] | length')" >&2
+
+        # Find the most recent message from this bot containing the report title
+        message_ts=$(echo "$response" | jq -r --arg title "$REPORT_TITLE" '
+          [(.messages // [])[] | select(
+            .bot_id != null and
+            (.blocks[]?.text?.text? // "" | ascii_downcase | contains($title | ascii_downcase))
+          )] | first | .ts // ""')
+
+        if [[ -n "$message_ts" ]]; then
+          echo "Found existing message: $message_ts — will update" >&2
+          echo "message_ts=$message_ts" >> "$GITHUB_OUTPUT"
+          echo "found=true" >> "$GITHUB_OUTPUT"
+
+          # Check if the existing message is already pinned
+          pinned_response=$(curl -s \
+            -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+            "https://slack.com/api/pins.list?channel=${SLACK_CHANNEL}")
+          pins_ok=$(echo "$pinned_response" | jq -r '.ok')
+          pins_error=$(echo "$pinned_response" | jq -r '.error // "none"')
+          echo "pins.list ok: $pins_ok, error: $pins_error" >&2
+          if [[ "$pins_ok" != "true" ]]; then
+            echo "pins.list failed — defaulting is_pinned=false" >&2
+            echo "is_pinned=false" >> "$GITHUB_OUTPUT"
+          else
+            is_pinned=$(echo "$pinned_response" | jq -r --arg ts "$message_ts" '
+              [(.items // [])[] | select(.type == "message" and .message.ts == $ts)] | length | . > 0')
+            echo "Message is already pinned: $is_pinned" >&2
+            echo "is_pinned=$is_pinned" >> "$GITHUB_OUTPUT"
+          fi
+        else
+          echo "No existing message found — will post new" >&2
+          echo "found=false" >> "$GITHUB_OUTPUT"
+          echo "is_pinned=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Update existing Slack message
+      if: ${{ !inputs.dry_run && steps.find-message.outputs.found == 'true' }}
+      uses: slackapi/slack-github-action@0d95c9a7becc1e6e297d76df9bc735c44f4cbcbc  # v3.0.5
+      continue-on-error: true
+      with:
+        method: chat.update
+        token: ${{ steps.secrets.outputs.SLACK_BOT_TOKEN }}
+        payload: |
+          channel: "${{ steps.channel.outputs.id }}"
+          ts: "${{ steps.find-message.outputs.message_ts }}"
+          text: "Stale backport report"
+          blocks: ${{ steps.format.outputs.blocks }}
+
+    - name: Pin existing Slack message if not already pinned
+      if: ${{ !inputs.dry_run && steps.find-message.outputs.found == 'true' && steps.find-message.outputs.is_pinned == 'false' }}
+      continue-on-error: true
+      env:
+        SLACK_BOT_TOKEN: ${{ steps.secrets.outputs.SLACK_BOT_TOKEN }}
+        SLACK_CHANNEL: ${{ steps.channel.outputs.id }}
+        MESSAGE_TS: ${{ steps.find-message.outputs.message_ts }}
+      run: |
+        response=$(curl -s -X POST "https://slack.com/api/pins.add" \
+          -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "{\"channel\":\"${SLACK_CHANNEL}\",\"timestamp\":\"${MESSAGE_TS}\"}")
+        ok=$(echo "$response" | jq -r '.ok')
+        err=$(echo "$response" | jq -r '.error // "none"')
+        echo "pins.add ok: $ok, error: $err" >&2
+        [[ "$ok" == "true" || "$err" == "already_pinned" ]]
+
+    - name: Post new Slack message
+      id: post-message
+      if: ${{ !inputs.dry_run && steps.find-message.outputs.found != 'true' }}
+      uses: slackapi/slack-github-action@0d95c9a7becc1e6e297d76df9bc735c44f4cbcbc  # v3.0.5
+      continue-on-error: true
+      with:
+        method: chat.postMessage
+        token: ${{ steps.secrets.outputs.SLACK_BOT_TOKEN }}
+        payload: |
+          channel: "${{ steps.channel.outputs.id }}"
+          text: "Stale backport report"
+          blocks: ${{ steps.format.outputs.blocks }}
+
+    - name: Pin new Slack message
+      id: pin-new
+      if: ${{ !inputs.dry_run && steps.find-message.outputs.found != 'true' }}
+      continue-on-error: true
+      env:
+        SLACK_BOT_TOKEN: ${{ steps.secrets.outputs.SLACK_BOT_TOKEN }}
+        SLACK_CHANNEL: ${{ steps.channel.outputs.id }}
+        POST_RESPONSE: ${{ steps.post-message.outputs.response }}
+      run: |
+        message_ts=$(echo "$POST_RESPONSE" | jq -r '.ts // empty')
+        if [[ -z "$message_ts" ]]; then
+          echo "No message ts in response, skipping pin" >&2
+          exit 0
+        fi
+        response=$(curl -s -X POST "https://slack.com/api/pins.add" \
+          -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "{\"channel\":\"${SLACK_CHANNEL}\",\"timestamp\":\"${message_ts}\"}")
+        ok=$(echo "$response" | jq -r '.ok')
+        err=$(echo "$response" | jq -r '.error // "none"')
+        echo "pins.add ok: $ok, error: $err" >&2
+        [[ "$ok" == "true" || "$err" == "already_pinned" ]]
+        echo "ts=$message_ts" >> "$GITHUB_OUTPUT"
+
+    # Only after the replacement is posted and pinned, so a failed post or pin never leaves the channel without a report.
+    - name: Unpin the previous Slack report
+      if: ${{ !inputs.dry_run && steps.pin-new.outputs.ts != '' }}
+      continue-on-error: true  # a leftover old pin is harmless; the next run removes it
+      env:
+        SLACK_BOT_TOKEN: ${{ steps.secrets.outputs.SLACK_BOT_TOKEN }}
+        SLACK_CHANNEL: ${{ steps.channel.outputs.id }}
+        REPORT_TITLE: ${{ inputs.report_title }}
+        NEW_TS: ${{ steps.pin-new.outputs.ts }}
+      run: |
+        pinned=$(curl -s \
+          -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+          "https://slack.com/api/pins.list?channel=${SLACK_CHANNEL}")
+        pins_ok=$(echo "$pinned" | jq -r '.ok')
+        echo "pins.list ok: $pins_ok, error: $(echo "$pinned" | jq -r '.error // "none"')" >&2
+        if [[ "$pins_ok" != "true" ]]; then
+          echo "pins.list failed — skipping unpin" >&2
+          exit 0
+        fi
+        echo "$pinned" | jq -r --arg title "$REPORT_TITLE" --arg new "$NEW_TS" '
+          [(.items // [])[] | select(
+            .type == "message" and
+            .message.ts != $new and
+            .message.bot_id != null and
+            (.message.blocks[]?.text?.text? // "" | ascii_downcase | contains($title | ascii_downcase))
+          ) | .message.ts] | .[]' | while read -r ts; do
+          echo "Unpinning old message: $ts" >&2
+          resp=$(curl -s -X POST "https://slack.com/api/pins.remove" \
+            -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"channel\":\"${SLACK_CHANNEL}\",\"timestamp\":\"${ts}\"}")
+          echo "pins.remove ok: $(echo "$resp" | jq -r '.ok'), error: $(echo "$resp" | jq -r '.error // "none"')" >&2
+        done
+
+  summary:
+    name: Generate workflow summary
+    needs: [collect, validate]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Write job summary
+      env:
+        STALE_DATA: ${{ needs.collect.outputs.stale_data }}
+        TOTAL_STALE: ${{ needs.collect.outputs.total_stale }}
+        HAS_STALE: ${{ needs.collect.outputs.has_stale }}
+        COLLECT_RESULT: ${{ needs.collect.result }}
+        VALIDATE_RESULT: ${{ needs.validate.result }}
+        REPORT_TITLE: ${{ inputs.report_title }}
+      run: |
+        {
+          echo "## 📊 ${REPORT_TITLE}"
+          echo ""
+
+          # This job runs even when collecting failed, where the outputs are empty.
+          if [[ "$COLLECT_RESULT" != "success" || "$VALIDATE_RESULT" != "success" || ( "$HAS_STALE" != "true" && "$HAS_STALE" != "false" ) ]]; then
+            echo "⚠️ **Stale backport collection did not complete successfully.** No clean status is available."
+            exit 0
+          fi
+
+          if [[ "$HAS_STALE" != "true" ]]; then
+            echo "✅ **No stale backport PRs found.** All backports are merged or up to date."
+            exit 0
+          fi
+
+          echo "Found **${TOTAL_STALE}** stale backport PR(s):"
+          echo ""
+
+          echo "$STALE_DATA" | jq -r '
+            group_by(.repository // "unknown") | .[] |
+            "## 📦 \(.[0].repository // "unknown")\n\n" +
+            ([.[] |
+              "### 📌 Original PR: [#\(.original_pr_number // "?") — \(.original_pr_title // "Unknown")](\(.original_pr_url // ""))\n" +
+              "**Author:** \(.original_pr_author // "unknown")\n\n" +
+              "| Backport PR | Target Branch | Age | Draft | Assignees |\n" +
+              "|-------------|---------------|-----|-------|-----------|\n" +
+              ([.backport_prs[] |
+                "| [#\(.backport_pr_number)](\(.backport_pr_url)) | `\(.target_branch)` | \(if .age_days > 0 then "\(.age_days)d \(.age_hours % 24)h" else "\(.age_hours)h" end) | \(if .is_draft then "⚠️ Yes" else "No" end) | \(if (.assignees | length) > 0 then (.assignees | join(", ")) else "none" end) |"
+              ] | join("\n")) + "\n"
+            ] | join("\n"))
+          '
+        } >> "$GITHUB_STEP_SUMMARY"

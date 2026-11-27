@@ -1,0 +1,113 @@
+---
+# Offline tests of the stale-backport-tracker scripts and composite actions, against a stubbed GitHub CLI.
+name: Test stale-backport-tracker
+
+on:
+  pull_request:
+    paths:
+    - 'stale-backport-tracker/**'
+    - '.github/workflows/test-stale-backport-tracker.yml'
+
+permissions: {}
+
+jobs:
+  scripts:
+    name: Scripts
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Run the script tests
+      run: bash stale-backport-tracker/test/run-tests.sh
+
+  actions:
+    name: Composite actions
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    - name: Stub the GitHub CLI
+      run: |
+        bash stale-backport-tracker/test/make-fixtures.sh "$RUNNER_TEMP/fixtures"
+        echo "FIXTURE_DIR=$RUNNER_TEMP/fixtures" >> "$GITHUB_ENV"
+        echo "$GITHUB_WORKSPACE/stale-backport-tracker/test/bin" >> "$GITHUB_PATH"
+
+    - name: Collect, with the camunda-hub prefix
+      id: collect
+      uses: ./stale-backport-tracker/collect
+      with:
+        github-token: unused
+        repositories: camunda/test
+        target-branch-prefix: self-managed/
+    - name: Assert the collect outputs
+      env:
+        HAS_STALE: ${{ steps.collect.outputs.has-stale }}
+        TOTAL_STALE: ${{ steps.collect.outputs.total-stale }}
+        STALE_DATA: ${{ steps.collect.outputs.stale-data }}
+      run: |
+        [[ "$HAS_STALE" == "true" ]]
+        [[ "$TOTAL_STALE" == "1" ]]
+        [[ "$(jq -r '.[0].backport_prs[0].target_branch' <<< "$STALE_DATA")" == "self-managed/1.0" ]]
+
+    - name: Collect, with a threshold of one hour
+      id: collect-short
+      uses: ./stale-backport-tracker/collect
+      with:
+        github-token: unused
+        repositories: camunda/test
+        target-branch-prefix: self-managed/
+        stale-hours-threshold: "1"
+    - name: Assert the threshold is applied
+      env:
+        TOTAL_STALE: ${{ steps.collect-short.outputs.total-stale }}
+      run: '[[ "$TOTAL_STALE" == "2" ]]'
+
+    - name: Format the Slack report
+      id: format
+      uses: ./stale-backport-tracker/format-slack
+      with:
+        stale-data: ${{ steps.collect.outputs.stale-data }}
+        repositories: camunda/test
+        report-title: Stale Hub Backports
+    - name: Assert the Slack blocks
+      env:
+        BLOCKS: ${{ steps.format.outputs.blocks }}
+      run: |
+        [[ "$(jq -r 'type' <<< "$BLOCKS")" == "array" ]]
+        [[ "$BLOCKS" == *"*Stale Hub Backports*"* ]]
+        [[ "$BLOCKS" == *"self-managed/1.0"* ]]
+
+    - name: Notify on GitHub (dry run)
+      uses: ./stale-backport-tracker/notify-github
+      with:
+        github-token: unused
+        stale-data: ${{ steps.collect.outputs.stale-data }}
+        dry-run: "true"
+
+  # TMP: dry run of the reusable workflow from this PR. Remove before merging.
+  tmp-dry-run:
+    name: TMP dry run of the reusable workflow
+    permissions:
+      id-token: write
+    uses: ./.github/workflows/stale-backport-tracker.yml
+    secrets:
+      VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+      VAULT_JWT_ROLE: ${{ secrets.VAULT_JWT_ROLE }}
+      VAULT_JWT_PATH: ${{ secrets.VAULT_JWT_PATH }}
+      VAULT_JWT_AUDIENCE: ${{ secrets.VAULT_JWT_AUDIENCE }}
+    with:
+      repositories: camunda/camunda-hub
+      target_branch_prefix: self-managed/
+      backport_authors: camunda-hub-helper
+      slack_channel_id: C0000000000  # dummy: a dry run does not read the Slack secrets from Vault
+      notify_slack: true
+      notify_github: true
+      dry_run: true

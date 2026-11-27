@@ -1,0 +1,74 @@
+name: Collect stale backport PRs
+
+description: >-
+  Lists the open backport PRs of one or more repositories that are older than a threshold,
+  grouped by original PR, as JSON.
+
+inputs:
+  github-token:
+    description: GitHub token that can read pull requests of every repository in `repositories`
+    required: true
+  repositories:
+    description: Comma-separated list of `owner/repo` to scan
+    required: true
+  stale-hours-threshold:
+    description: Hours after which an open backport PR is considered stale
+    required: false
+    default: "24"
+  target-branch-prefix:
+    description: Prefix of the branches backport PRs target, e.g. `stable/` or `self-managed/`
+    required: false
+    default: "stable/"
+  target-branch:
+    description: Only scan backport PRs targeting this exact branch (e.g. `stable/8.8`). Empty scans every branch with the prefix.
+    required: false
+    default: ""
+  backport-authors:
+    description: Comma-separated GitHub logins that open backport PRs
+    required: false
+    default: "backport-action,monorepo-devops-automation[bot]"
+
+outputs:
+  stale-data:
+    description: JSON array of stale backport PRs, grouped by original PR
+    value: ${{ steps.collect.outputs.stale_data }}
+  has-stale:
+    description: "`true` when at least one stale backport PR was found"
+    value: ${{ steps.collect.outputs.has_stale }}
+  total-stale:
+    description: Number of stale backport PRs found
+    value: ${{ steps.collect.outputs.total_stale }}
+
+runs:
+  using: composite
+  steps:
+  - name: Collect stale backport PRs
+    id: collect
+    shell: bash
+    env:
+      GH_TOKEN: ${{ inputs.github-token }}
+      REPOSITORIES: ${{ inputs.repositories }}
+      STALE_HOURS_THRESHOLD: ${{ inputs.stale-hours-threshold }}
+      TARGET_BRANCH_PREFIX: ${{ inputs.target-branch-prefix }}
+      TARGET_BRANCH: ${{ inputs.target-branch }}
+      BACKPORT_AUTHORS: ${{ inputs.backport-authors }}
+      ACTION_PATH: ${{ github.action_path }}
+    run: |
+      stale_data=$(bash "${ACTION_PATH}/../scripts/collect-stale-backports.sh")
+
+      total_stale=$(echo "$stale_data" | jq '[.[].backport_prs | length] | add // 0')
+      has_stale="false"
+      if [[ "$total_stale" -gt 0 ]]; then
+        has_stale="true"
+      fi
+
+      # Use heredoc delimiter for multi-line JSON output
+      {
+        echo "stale_data<<STALE_EOF"
+        echo "$stale_data"
+        echo "STALE_EOF"
+        echo "has_stale=$has_stale"
+        echo "total_stale=$total_stale"
+      } >> "$GITHUB_OUTPUT"
+
+      echo "📊 Summary: $total_stale stale backport PR(s) found"
