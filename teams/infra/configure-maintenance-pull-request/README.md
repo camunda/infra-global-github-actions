@@ -34,7 +34,7 @@ jobs:
   configure-pr:
     runs-on: ubuntu-latest
     steps:
-    - uses: camunda/infra-global-github-actions/teams/infra/configure-maintenance-pull-request@main
+    - uses: camunda/infra-global-github-actions/teams/infra/configure-maintenance-pull-request@<sha> # <family>-X.Y.Z
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         slack-webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}

@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - uses: camunda/infra-global-github-actions/preview-env/clean@main
+    - uses: camunda/infra-global-github-actions/preview-env/clean@<sha> # <family>-X.Y.Z
       with:
         labels: deploy-preview
         pull-request: ${{ inputs.pull-request }}

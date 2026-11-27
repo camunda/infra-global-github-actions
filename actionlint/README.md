@@ -70,7 +70,7 @@ jobs:
   actionlint:
     runs-on: ubuntu-latest
     steps:
-    - uses: camunda/infra-global-github-actions/actionlint@main
+    - uses: camunda/infra-global-github-actions/actionlint@<sha> # <family>-X.Y.Z
 ```
 
 ## Configuration examples
@@ -88,7 +88,7 @@ jobs:
   actionlint:
     runs-on: ubuntu-latest
     steps:
-    - uses: camunda/infra-global-github-actions/actionlint@main
+    - uses: camunda/infra-global-github-actions/actionlint@<sha> # <family>-X.Y.Z
 ```
 
 2. Set specific actionlint version
@@ -104,7 +104,7 @@ jobs:
   actionlint:
     runs-on: ubuntu-latest
     steps:
-    - uses: camunda/infra-global-github-actions/actionlint@main
+    - uses: camunda/infra-global-github-actions/actionlint@<sha> # <family>-X.Y.Z
       with:
         version: "1.7.2"
 ```
@@ -121,7 +121,7 @@ jobs:
   actionlint:
     runs-on: ubuntu-latest
     steps:
-    - uses: camunda/infra-global-github-actions/actionlint@main
+    - uses: camunda/infra-global-github-actions/actionlint@<sha> # <family>-X.Y.Z
       with:
         ignore: |-
           property "vault_.+" is not defined in object type

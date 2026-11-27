@@ -91,7 +91,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
     # Must remain first to collect the automatic duration and resource metrics.
-    - uses: camunda/infra-global-github-actions/start-build-monitor@main
+    - uses: camunda/infra-global-github-actions/start-build-monitor@<sha> # <family>-X.Y.Z
 
     # Needed to create a workspace so submit-build-status can store files!
     - uses: actions/checkout@v4
@@ -103,7 +103,7 @@ jobs:
         exit 0  # <- experiment with setting this to 1
 
     # Always submit build status to CI Analytics
-    - uses: camunda/infra-global-github-actions/submit-build-status@main
+    - uses: camunda/infra-global-github-actions/submit-build-status@<sha> # <family>-X.Y.Z
       if: always()  # run even in case of failures
       continue-on-error: true  # prevent failure here of marking the job as failed
       with:
@@ -130,13 +130,13 @@ jobs:
       contents: read
       id-token: write
     steps:
-    - uses: camunda/infra-global-github-actions/start-build-monitor@main
+    - uses: camunda/infra-global-github-actions/start-build-monitor@<sha> # <family>-X.Y.Z
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
     - name: Testing
       run: echo Hello World
 
-    - uses: camunda/infra-global-github-actions/submit-build-status@main
+    - uses: camunda/infra-global-github-actions/submit-build-status@<sha> # <family>-X.Y.Z
       if: always()
       continue-on-error: true
       with:

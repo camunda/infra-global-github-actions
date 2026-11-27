@@ -6,7 +6,7 @@ Installs apt packages on a runner whose Ubuntu mirror may be slow or unreachable
 
 ```yaml
 - name: Install gettext
-  uses: camunda/infra-global-github-actions/apt-install@main
+  uses: camunda/infra-global-github-actions/apt-install@<sha> # <family>-X.Y.Z
   with:
     packages: gettext-base
 ```

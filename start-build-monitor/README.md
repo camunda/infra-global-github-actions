@@ -11,13 +11,13 @@ jobs:
   my-job:
     runs-on: ubuntu-latest
     steps:
-      - uses: camunda/infra-global-github-actions/start-build-monitor@main
+      - uses: camunda/infra-global-github-actions/start-build-monitor@<sha> # <family>-X.Y.Z
 
       - uses: actions/checkout@v4
       # ... all other job steps unchanged ...
 
       # Always submit build status to CI Analytics as usual, unchanged
-      - uses: camunda/infra-global-github-actions/submit-build-status@main
+      - uses: camunda/infra-global-github-actions/submit-build-status@<sha> # <family>-X.Y.Z
         if: always()  # run even in case of failures
         continue-on-error: true  # prevent failure here of marking the job as failed
         with:

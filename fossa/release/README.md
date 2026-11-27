@@ -81,17 +81,17 @@ Use this action after `fossa/wait-for-scan`:
 
 ```yaml
 - name: Run FOSSA analysis
-  uses: camunda/infra-global-github-actions/fossa/analyze@<commit-sha>
+  uses: camunda/infra-global-github-actions/fossa/analyze@<sha> # <family>-X.Y.Z
   with:
     # ... analyze inputs
 
 - name: Wait for scan completion
-  uses: camunda/infra-global-github-actions/fossa/wait-for-scan@<commit-sha>
+  uses: camunda/infra-global-github-actions/fossa/wait-for-scan@<sha> # <family>-X.Y.Z
   with:
     # ... wait inputs
 
 - name: Create releases and generate reports
-  uses: camunda/infra-global-github-actions/fossa/release@<commit-sha>
+  uses: camunda/infra-global-github-actions/fossa/release@<sha> # <family>-X.Y.Z
   with:
     attribution-release-group-id: 'internal-group'
     sbom-release-group-id: 'public-group'

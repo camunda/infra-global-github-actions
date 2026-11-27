@@ -106,7 +106,7 @@ Add `id-token: write` to the job's `permissions` so GitHub can mint the OIDC tok
               secret/data/common/jenkins/downloads-camunda-cloud_google_sa_key DEV_DOWNLOAD_CENTER_GCLOUD_KEY_BYTES | GCP_CREDENTIALS_NAME;
 
       - name: Upload artifact to Camunda Download Center
-        uses: camunda/infra-global-github-actions/download-center-upload@main
+        uses: camunda/infra-global-github-actions/download-center-upload@<sha> # <family>-X.Y.Z
         with:
           gcp_credentials: ${{ steps.secrets.outputs.GCP_CREDENTIALS_NAME }}
           ee: 'true'
@@ -140,7 +140,7 @@ steps:
           secret/data/common/jenkins/downloads-camunda-cloud_google_sa_key DEV_DOWNLOAD_CENTER_GCLOUD_KEY_BYTES | GCP_CREDENTIALS_NAME;
 
   - name: Upload Enterprise Artifact to Camunda Download Center (Dev)
-    uses: camunda/infra-global-github-actions/download-center-upload@main
+    uses: camunda/infra-global-github-actions/download-center-upload@<sha> # <family>-X.Y.Z
     with:
       gcp_credentials: ${{ steps.secrets.outputs.GCP_CREDENTIALS_NAME }}
       ee: 'true'

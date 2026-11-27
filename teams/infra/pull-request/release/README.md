@@ -45,7 +45,7 @@ jobs:
         app-id: ${{ steps.vault-secrets.outputs.RELEASES_APP_ID }}
         private-key: ${{ steps.vault-secrets.outputs.RELEASES_APP_KEY }}
     - name: Handle Release Creation
-      uses: camunda/infra-global-github-actions/teams/infra/pull-request/release@main
+      uses: camunda/infra-global-github-actions/teams/infra/pull-request/release@<sha> # <family>-X.Y.Z
       with:
         github-token: ${{ steps.app-token.outputs.token }}
 ```

@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate PR title
-        uses: camunda/infra-global-github-actions/teams/infra/pull-request/validate-title@main
+        uses: camunda/infra-global-github-actions/teams/infra/pull-request/validate-title@<sha> # <family>-X.Y.Z
 ```
 
 ## Inputs

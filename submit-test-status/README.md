@@ -100,7 +100,7 @@ jobs:
         echo '{"test_name":"test 999","test_status":"failure"}' >> test_results.jsonl
 
     - name: Upload test results to CI Analytics
-      uses: camunda/infra-global-github-actions/submit-test-status@main
+      uses: camunda/infra-global-github-actions/submit-test-status@<sha> # <family>-X.Y.Z
       with:
         gcp_credentials_json: ${{ secrets.YOUR_GCP_CREDENTIALS }}
         test_results_file_path: test_results.jsonl
@@ -119,7 +119,7 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Upload test results to CI Analytics
-      uses: camunda/infra-global-github-actions/submit-test-status@main
+      uses: camunda/infra-global-github-actions/submit-test-status@<sha> # <family>-X.Y.Z
       with:
         gcp_credentials_json: ${{ secrets.YOUR_GCP_CREDENTIALS }}
         test_event_record: |

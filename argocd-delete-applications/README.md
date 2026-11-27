@@ -22,7 +22,7 @@ Delete ArgoCD applications by name or label selector, with optional age filterin
 ### Delete a single application
 
 ```yaml
-- uses: camunda/infra-global-github-actions/argocd-delete-applications@main
+- uses: camunda/infra-global-github-actions/argocd-delete-applications@<sha> # <family>-X.Y.Z
   with:
     argocd-token: ${{ steps.secrets.outputs.ARGOCD_TOKEN }}
     github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -32,7 +32,7 @@ Delete ArgoCD applications by name or label selector, with optional age filterin
 ### Delete all apps with labels
 
 ```yaml
-- uses: camunda/infra-global-github-actions/argocd-delete-applications@main
+- uses: camunda/infra-global-github-actions/argocd-delete-applications@<sha> # <family>-X.Y.Z
   with:
     argocd-token: ${{ steps.secrets.outputs.ARGOCD_TOKEN }}
     github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -46,7 +46,7 @@ Delete ArgoCD applications by name or label selector, with optional age filterin
 ### Delete apps older than 12 hours
 
 ```yaml
-- uses: camunda/infra-global-github-actions/argocd-delete-applications@main
+- uses: camunda/infra-global-github-actions/argocd-delete-applications@<sha> # <family>-X.Y.Z
   with:
     argocd-token: ${{ steps.secrets.outputs.ARGOCD_TOKEN }}
     github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -57,7 +57,7 @@ Delete ArgoCD applications by name or label selector, with optional age filterin
 ### Delete app without removing managed resources
 
 ```yaml
-- uses: camunda/infra-global-github-actions/argocd-delete-applications@main
+- uses: camunda/infra-global-github-actions/argocd-delete-applications@<sha> # <family>-X.Y.Z
   with:
     argocd-token: ${{ steps.secrets.outputs.ARGOCD_TOKEN }}
     github-token: ${{ secrets.GITHUB_TOKEN }}

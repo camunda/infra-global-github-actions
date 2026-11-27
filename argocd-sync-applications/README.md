@@ -28,7 +28,7 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
-    - uses: camunda/infra-global-github-actions/argocd-sync-applications@main
+    - uses: camunda/infra-global-github-actions/argocd-sync-applications@<sha> # <family>-X.Y.Z
       with:
         app-name: my-argocd-app-name
         argocd-token: my-argocd-token-***

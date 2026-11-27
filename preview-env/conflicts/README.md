@@ -27,7 +27,7 @@ You can simply add a new workflow file (e.g. `check-pr-conflicts.yml`) which loo
       steps:
       - uses: actions/checkout@692973e3d937129bcbf40652eb9f2f61becf3332 # v4.1.7
       - name: Check all PRs for conflict
-        uses: camunda/infra-global-github-actions/preview-env/conflicts@main # checks ALL PRs in repository
+        uses: camunda/infra-global-github-actions/preview-env/conflicts@<sha> # <family>-X.Y.Z
 ```
 
 ### Quick Cleanup
@@ -43,7 +43,7 @@ jobs:
     steps:
     - name: Check all PRs for conflict
       if: github.event_name == 'pull_request'
-      uses: camunda/infra-global-github-actions/preview-env/conflicts@main
+      uses: camunda/infra-global-github-actions/preview-env/conflicts@<sha> # <family>-X.Y.Z
       with:
         pull-request-id: ${{ github.event.pull_request.number }} # only affects current PR
   ...

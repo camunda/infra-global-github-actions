@@ -54,7 +54,7 @@ jobs:
     steps:
     - name: Generate GitHub token
       id: github-token
-      uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@<sha>  # generate-github-app-token-from-vault-secrets-X.Y.Z
+      uses: camunda/infra-global-github-actions/generate-github-app-token-from-vault-secrets@<sha> # <family>-X.Y.Z
       with:
         github-app-id-vault-key: <key of the Monorepo OS App ID>
         github-app-id-vault-path: <Vault path of the Monorepo OS App>
@@ -65,7 +65,7 @@ jobs:
         vault-auth-jwt-role: ${{ secrets.VAULT_JWT_ROLE }}
         vault-auth-jwt-audience: ${{ secrets.VAULT_JWT_AUDIENCE }}
         vault-url: ${{ secrets.VAULT_ADDR }}
-    - uses: camunda/infra-global-github-actions/add-to-monorepo-os@<sha>  # add-to-monorepo-os-X.Y.Z
+    - uses: camunda/infra-global-github-actions/add-to-monorepo-os@<sha> # <family>-X.Y.Z
       with:
         github-token: ${{ steps.github-token.outputs.token }}
 ```

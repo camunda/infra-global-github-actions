@@ -28,7 +28,7 @@ jobs:
       wrap-token: ${{ steps.wrap.outputs.wrap-token }}
     steps:
     - id: wrap
-      uses: camunda/infra-global-github-actions/vault-wrapped-secrets/wrap@<sha> # vault-wrapped-secrets-<version>
+      uses: camunda/infra-global-github-actions/vault-wrapped-secrets/wrap@<sha> # <family>-X.Y.Z
       with:
         vault-url: ${{ secrets.VAULT_ADDR }}
         vault-auth-jwt-path: ${{ secrets.VAULT_JWT_PATH }}
@@ -65,7 +65,7 @@ jobs:
       contents: read
     steps:
     - id: unwrap
-      uses: camunda/infra-global-github-actions/vault-wrapped-secrets/unwrap@<sha> # vault-wrapped-secrets-<version>
+      uses: camunda/infra-global-github-actions/vault-wrapped-secrets/unwrap@<sha> # <family>-X.Y.Z
       with:
         vault-url: ${{ secrets.VAULT_ADDR }}
         wrap-token: ${{ secrets.WRAP_TOKEN }}

@@ -48,7 +48,7 @@ jobs:
     steps:
       - name: Wait for required checks to pass
         id: wait_checks
-        uses: camunda/infra-global-github-actions/wait-for-required-checks@main
+        uses: camunda/infra-global-github-actions/wait-for-required-checks@<sha> # <family>-X.Y.Z
         with:
           repository-owner: ${{ github.repository_owner }}
           repository-name: ${{ github.event.repository.name }}

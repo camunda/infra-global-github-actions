@@ -18,7 +18,7 @@ jobs:
     steps:
       - id: add-bug-to-quality-board
         name: Add issue to Quality Board
-        uses: camunda/infra-global-github-actions/add-bug-to-quality-board@main
+        uses: camunda/infra-global-github-actions/add-bug-to-quality-board@<sha> # <family>-X.Y.Z
         with:
           github-token: ${{ secrets.ADD_TO_QUALITY_BOARD_PAT }}
           project-number: "187"            # Optional, defaults to 187

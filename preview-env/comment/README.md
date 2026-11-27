@@ -37,7 +37,7 @@ jobs:
     #########################################################################
     # Sample Deployment Call
     - name: Deploy Preview Environment
-      uses: camunda/infra-global-github-actions/preview-env/create@main
+      uses: camunda/infra-global-github-actions/preview-env/create@<sha> # <family>-X.Y.Z
       id: deploy
       with:
         revision: ${{ env.BRANCH_NAME }}
@@ -50,7 +50,7 @@ jobs:
     # Summarize Deployment results
     - name: Summarize Deployment Results
       if: always() && needs.deploy-preview.result != 'skipped'
-      uses: camunda/infra-global-github-actions/preview-env/comment@main
+      uses: camunda/infra-global-github-actions/preview-env/comment@<sha> # <family>-X.Y.Z
     ...
 ```
 
@@ -70,7 +70,7 @@ jobs:
     #########################################################################
     # Sample Deployment Call - Matrix
     - name: Deploy Preview Environment for ${{ matrix.product_context }}
-        uses: camunda/infra-global-github-actions/preview-env/create@main
+        uses: camunda/infra-global-github-actions/preview-env/create@<sha> # <family>-X.Y.Z
         id: deploy
         with:
         revision: ${{ env.BRANCH_NAME }}
@@ -87,7 +87,7 @@ jobs:
     needs:
     - deploy-preview
     steps:
-      - uses: camunda/infra-global-github-actions/preview-env/comment@main
+      - uses: camunda/infra-global-github-actions/preview-env/comment@<sha> # <family>-X.Y.Z
 ```
 
 ### Delete Summary
@@ -104,7 +104,7 @@ jobs:
     ...
     - name: Delete Deployment Results
       if: always() && needs.deploy-preview.result != 'skipped'
-      uses: camunda/infra-global-github-actions/preview-env/comment@main
+      uses: camunda/infra-global-github-actions/preview-env/comment@<sha> # <family>-X.Y.Z
     ...
 
 #################
@@ -121,7 +121,7 @@ jobs:
     needs:
     - teardown
     steps:
-      - uses: camunda/infra-global-github-actions/preview-env/comment@gha-459-preview-env-ux
+      - uses: camunda/infra-global-github-actions/preview-env/comment@<sha> # <family>-X.Y.Z
   ...
 ```
 

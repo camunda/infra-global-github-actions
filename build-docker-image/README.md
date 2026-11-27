@@ -97,7 +97,7 @@ jobs:
     # Needed to fetch the Dockerfile
     - uses: actions/checkout@v3
 
-    - uses: camunda/infra-global-github-actions/build-docker-image@main
+    - uses: camunda/infra-global-github-actions/build-docker-image@<sha> # <family>-X.Y.Z
       with:
         registry_host: registry.example.com
         registry_username: ${{ secrets.YOUR_REGISTRY_USERNAME }}
@@ -157,7 +157,7 @@ jobs:
       run: |-
         gcloud auth configure-docker europe-west1-docker.pkg.dev
     - id: build
-      uses: camunda/infra-global-github-actions/build-docker-image@refactor-docker-build
+      uses: camunda/infra-global-github-actions/build-docker-image@<sha> # <family>-X.Y.Z
       with:
         registry_host: europe-west1-docker.pkg.dev
         use_workload_identity_auth: true

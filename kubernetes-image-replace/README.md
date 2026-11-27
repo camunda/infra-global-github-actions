@@ -43,7 +43,7 @@ jobs:
       with:
         cluster_name: camunda-ci
         location: europe-west1
-    - uses: camunda/infra-global-github-actions/kubernetes-image-replace@main
+    - uses: camunda/infra-global-github-actions/kubernetes-image-replace@<sha> # <family>-X.Y.Z
       with:
         app_name: alert-int-camunda-com
         app_type: statefulset

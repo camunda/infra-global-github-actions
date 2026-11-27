@@ -43,7 +43,7 @@ jobs:
     #   name: Big B
     runs-on: ubuntu-latest
     steps:
-    - uses: camunda/infra-global-github-actions/yq-yaml-processor@main
+    - uses: camunda/infra-global-github-actions/yq-yaml-processor@<sha> # <family>-X.Y.Z
       with:
         patches: |
           - file: path/to/a.yaml
@@ -59,7 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - id: step-1
-      uses: camunda/infra-global-github-actions/yq-yaml-processor@main
+      uses: camunda/infra-global-github-actions/yq-yaml-processor@<sha> # <family>-X.Y.Z
       with:
         patches: |
           - inline: |-
@@ -71,7 +71,7 @@ jobs:
             expressions :
             - '.'
     - id: step-2
-      uses: camunda/infra-global-github-actions/yq-yaml-processor@main
+      uses: camunda/infra-global-github-actions/yq-yaml-processor@<sha> # <family>-X.Y.Z
       env:
         PREVIOUS_STEP_OUTPUT: ${{ fromJSON(steps.step-1.outputs.results)[0] }}
       with:
@@ -80,7 +80,7 @@ jobs:
             expressions :
             - '(.users[] | select(.name == "a")).age += 1'
     - id: step-3
-      uses: camunda/infra-global-github-actions/yq-yaml-processor@main
+      uses: camunda/infra-global-github-actions/yq-yaml-processor@<sha> # <family>-X.Y.Z
       env:
         PREVIOUS_STEP_OUTPUT: ${{ fromJSON(steps.step-2.outputs.results)[0] }}
       with:
