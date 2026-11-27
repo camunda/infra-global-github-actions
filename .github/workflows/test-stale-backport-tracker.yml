@@ -91,3 +91,17 @@ jobs:
         github-token: unused
         stale-data: ${{ steps.collect.outputs.stale-data }}
         dry-run: "true"
+
+  # TMP: dry run of the reusable workflow from this PR. Remove before merging.
+  tmp-dry-run:
+    name: TMP dry run of the reusable workflow
+    permissions:
+      id-token: write
+    uses: ./.github/workflows/stale-backport-tracker.yml
+    secrets: inherit
+    with:
+      repositories: camunda/camunda,camunda/zeebe-process-test
+      slack_channel_id_vault_key: SLACK_TOPMONOREPOCI_CHANNEL_ID
+      notify_slack: true
+      notify_github: true
+      dry_run: true
