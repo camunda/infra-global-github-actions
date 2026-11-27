@@ -166,7 +166,7 @@ jobs:
 
     - name: Collect stale backport PRs
       id: collect
-      uses: camunda/infra-global-github-actions/stale-backport-tracker/collect@b76f9dc3a1d99a9c6e7f16eb4e3bf9bf83b0feeb  # stale-backport-tracker-0.0.0
+      uses: camunda/infra-global-github-actions/stale-backport-tracker/collect@b603b7d1d03c71542aac0f9402c6ba5a9418424d  # stale-backport-tracker-0.0.0
       with:
         github-token: ${{ steps.github-token.outputs.token }}
         repositories: ${{ inputs.repositories }}
@@ -208,7 +208,7 @@ jobs:
         repositories: ${{ steps.names.outputs.names }}
 
     - name: Notify stale backport PRs
-      uses: camunda/infra-global-github-actions/stale-backport-tracker/notify-github@b76f9dc3a1d99a9c6e7f16eb4e3bf9bf83b0feeb  # stale-backport-tracker-0.0.0
+      uses: camunda/infra-global-github-actions/stale-backport-tracker/notify-github@b603b7d1d03c71542aac0f9402c6ba5a9418424d  # stale-backport-tracker-0.0.0
       with:
         github-token: ${{ steps.github-token.outputs.token }}
         stale-data: ${{ needs.collect.outputs.stale_data }}
@@ -298,7 +298,7 @@ jobs:
 
     - name: Format Slack report
       id: format
-      uses: camunda/infra-global-github-actions/stale-backport-tracker/format-slack@b76f9dc3a1d99a9c6e7f16eb4e3bf9bf83b0feeb  # stale-backport-tracker-0.0.0
+      uses: camunda/infra-global-github-actions/stale-backport-tracker/format-slack@b603b7d1d03c71542aac0f9402c6ba5a9418424d  # stale-backport-tracker-0.0.0
       with:
         stale-data: ${{ needs.collect.outputs.stale_data }}
         repositories: ${{ inputs.repositories }}
