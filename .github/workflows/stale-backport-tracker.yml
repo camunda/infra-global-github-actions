@@ -251,6 +251,8 @@ jobs:
 
     - name: Get Slack secrets from Vault
       id: secrets
+      # A dry run never posts, so it needs the bot token only to look up a channel ID that was not given as an input.
+      if: ${{ !(inputs.dry_run && inputs.slack_channel_id != '') }}
       uses: hashicorp/vault-action@892a26828f195e65540a40b4768ae4571f51ebfc  # v4.0.0
       with:
         url: ${{ secrets.VAULT_ADDR }}

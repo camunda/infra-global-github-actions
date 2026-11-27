@@ -70,7 +70,7 @@ camunda/camunda keeps today's behavior with its own values:
 | `report_title` | `Stale Backport PRs` | Title of the report. It is also how the existing message is found and updated, so keep it stable. |
 | `notify_slack` | `true` | Post the report to Slack. |
 | `notify_github` | `false` | Comment on and label the stale backport PRs. |
-| `dry_run` | `false` | Collect and format only. No Slack message, comment, label or reviewer request. The Slack blocks go to the job summary. |
+| `dry_run` | `false` | Collect and format only. No Slack message, comment, label or reviewer request. The Slack blocks go to the job summary. With `slack_channel_id` set, a dry run does not read the Slack secrets from Vault at all. |
 | `target_branch_prefix` | `stable/` | Prefix of the branches backport PRs target, e.g. `self-managed/`. |
 | `target_branch` | | Restrict the report to one exact branch. |
 | `target_backport_pr` | | TEST ONLY: restrict GitHub notifications to one backport PR number. |
