@@ -5,7 +5,7 @@
 // the last path segment of the released directory. Consumers pin a sub-action by commit SHA and
 // name the release in a trailing comment:
 //
-//   uses: camunda/infra-global-github-actions/teams/infra/pull-request/automerge@d56c1583... # pull-request-1.1.0
+//   uses: camunda/infra-global-github-actions/teams/infra/pull-request/automerge@d56c158341637cc71ed42e34040e9db0d0026b6c # pull-request-1.1.0
 //
 // Renovate's built-in github-actions manager drops the sub-action path, so every family in this
 // repository collapses into a single `camunda/infra-global-github-actions` dependency with no
@@ -21,10 +21,7 @@
   customManagers: [
     {
       customType: "regex",
-      managerFilePatterns: [
-        "/^\\.github/.+\\.ya?ml$/",
-        "/(^|/)action\\.ya?ml$/",
-      ],
+      managerFilePatterns: ["/\\.ya?ml$/"],
       matchStrings: [
         "uses:\\s*camunda/infra-global-github-actions/[\\w./-]+@(?<currentDigest>[a-f0-9]{40})\\s+#\\s*(?<family>[a-z0-9-]+?)-(?<currentValue>\\d+\\.\\d+\\.\\d+)\\b",
       ],

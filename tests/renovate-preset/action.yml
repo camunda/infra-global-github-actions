@@ -1,0 +1,9 @@
+---
+name: Fixture
+description: Fixture for the renovate-action-versions.json5 test.
+
+runs:
+  using: composite
+  steps:
+  - name: Automerge
+    uses: camunda/infra-global-github-actions/teams/infra/pull-request/automerge@d56c158341637cc71ed42e34040e9db0d0026b6c # pull-request-1.1.0

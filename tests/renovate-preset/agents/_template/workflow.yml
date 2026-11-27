@@ -1,0 +1,13 @@
+---
+name: Fixture
+
+on: push
+
+permissions: {}
+
+jobs:
+  fixture:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Automerge
+      uses: camunda/infra-global-github-actions/teams/infra/pull-request/automerge@d56c158341637cc71ed42e34040e9db0d0026b6c # pull-request-1.1.0

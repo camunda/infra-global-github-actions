@@ -1,0 +1,32 @@
+---
+name: Test renovate-action-versions preset
+
+on:
+  pull_request:
+    paths:
+    - 'renovate-action-versions.json5'
+    - 'tests/renovate-preset/**'
+    - '.github/workflows/test-renovate-preset.yml'
+
+permissions: {}
+
+jobs:
+  test-renovate-preset:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    container:
+      # Same Renovate version as the renovate-config-validator hook in .pre-commit-config.yaml
+      image: ghcr.io/renovatebot/renovate:44.257.6@sha256:6a036e222c8b172734be034d22d3df96d73a4e701a38bd14ea1bb97887705e75
+      # The image runs as uid 12021, which cannot write the runner's workspace mount.
+      options: --user root
+    steps:
+    - name: Checkout
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+
+    - name: Extract the fixtures with the preset and assert which files it tracks
+      run: tests/renovate-preset/test.sh
+      shell: bash
