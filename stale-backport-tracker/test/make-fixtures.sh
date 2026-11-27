@@ -6,6 +6,7 @@
 #   #102  self-managed/1.0  3 days old   -> stale with the default 24h threshold
 #   #103  self-managed/1.1  1 hour old   -> only stale with a threshold of 1h or less
 #   #104  release/9.0       3 days old   -> never a backport target
+# Open backport PRs opened by "camunda-hub-helper" (camunda-hub's backport bot), see below.
 set -euo pipefail
 
 dir="$1"
@@ -30,6 +31,24 @@ jq -n --arg old "$old" --arg recent "$recent" '
   };
   [pr(101; "stable/8.8"; $old), pr(102; "self-managed/1.0"; $old), pr(103; "self-managed/1.1"; $recent), pr(104; "release/9.0"; $old)]
 ' > "$dir/prs-backport-action.json"
+
+# camunda-hub's backport workflow opens its PRs as "camunda-hub-helper".
+#   #105  self-managed/1.2  3 days old   -> only found when backport_authors includes camunda-hub-helper
+jq -n --arg old "$old" '
+  [{
+    number: 105,
+    title: "[Backport self-managed/1.2] Fix 105",
+    url: "https://github.com/camunda/test/pull/105",
+    body: "Backport of #1105",
+    createdAt: $old,
+    isDraft: false,
+    baseRefName: "self-managed/1.2",
+    author: {login: "camunda-hub-helper"},
+    assignees: [{login: "alice"}],
+    labels: [],
+    mergeable: "MERGEABLE"
+  }]
+' > "$dir/prs-camunda-hub-helper.json"
 
 jq -n '{title: "Original fix", url: "https://github.com/camunda/test/pull/1", author: {login: "bob"}, assignees: [], reviews: []}' \
   > "$dir/original-pr.json"

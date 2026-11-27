@@ -104,7 +104,9 @@ jobs:
       VAULT_JWT_PATH: ${{ secrets.VAULT_JWT_PATH }}
       VAULT_JWT_AUDIENCE: ${{ secrets.VAULT_JWT_AUDIENCE }}
     with:
-      repositories: camunda/camunda,camunda/zeebe-process-test
+      repositories: camunda/camunda-hub
+      target_branch_prefix: self-managed/
+      backport_authors: camunda-hub-helper
       slack_channel_id: C0000000000  # dummy: a dry run does not read the Slack secrets from Vault
       notify_slack: true
       notify_github: true

@@ -29,6 +29,13 @@ case "${args[0]:-} ${args[1]:-}" in
     file="$FIXTURE_DIR/prs-${author}.json"
     if [[ -f "$file" ]]; then cat "$file"; else echo '[]'; fi | jq --arg base "$base" '[.[] | select($base == "" or .baseRefName == $base)]'
     ;;
+  "pr comment" | "pr edit" | "label create")
+    # Writes succeed, unless the test asks one of them to fail: STUB_FAIL=comment|edit
+    case "${args[0]} ${args[1]}" in
+      "pr comment") [[ "${STUB_FAIL:-}" != *comment* ]] || exit 1 ;;
+      "pr edit") [[ "${STUB_FAIL:-}" != *edit* ]] || exit 1 ;;
+    esac
+    ;;
   "pr view")
     if printf '%s ' "${args[@]}" | grep -q -- '--json commits'; then
       echo '{"commits": []}' | apply

@@ -32,9 +32,10 @@ Test: [`.github/workflows/test-stale-backport-tracker.yml`](.github/workflows/te
 |---|---|---|
 | `collect`: `stable/` and `self-managed/` prefixes, exact `target-branch`, threshold, backport authors, grouping and enrichment | camunda, camunda-hub | `run-tests.sh` "collect" checks, job `actions` |
 | `format-slack`: default and custom title, cc footer, clean report | same | `run-tests.sh` "format" checks, job `actions` |
-| `notify-github`: dry run (comment body, mentions) | same | `run-tests.sh` "notify" checks, job `actions` |
+| `notify-github`: dry run (comment body, mentions), real writes, a failed comment or label fails the run | same | `run-tests.sh` "notify" checks, job `actions` |
+| `collect`: camunda-hub's backport author (`camunda-hub-helper`) is found only through `backport_authors` | camunda-hub | `run-tests.sh` "collect" checks |
 
 Not covered, and an accepted risk pending sign-off by the maintainers:
 
-- The reusable workflow `.github/workflows/stale-backport-tracker.yml`: Vault and GitHub App token steps, the Slack find, update, pin and unpin calls, and the real `gh` and Slack API behaviour (including whether the `base:` search qualifier matches a `self-managed/` prefix before the post-filter). The workflow calls its composite actions by commit SHA, so a pull request cannot exercise its own version of them. It is verified by a `dry_run: true` run from each caller, which prints the Slack blocks to the job summary and writes nothing.
+- The reusable workflow `.github/workflows/stale-backport-tracker.yml`: Vault and GitHub App token steps, the Slack find, update, pin and unpin calls, and the real `gh` and Slack API behaviour (the `base:` search qualifier was checked against camunda/camunda and camunda-hub and matches both `stable/` and `self-managed/`; the post-filter stays as a safeguard). The Renovate bumps of `hashicorp/vault-action` and `slackapi/slack-github-action` are not automerged, because nothing here runs them against real Vault and Slack. The workflow calls its composite actions by commit SHA, so a pull request cannot exercise its own version of them. It is verified by a `dry_run: true` run from each caller, which prints the Slack blocks to the job summary and writes nothing.
 - The real Slack API.

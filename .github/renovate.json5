@@ -69,6 +69,17 @@
       addLabels: ["automerge"],
       automerge: true,
     },
+    // Used by .github/workflows/stale-backport-tracker.yml, which no CI job here runs against real Vault and Slack
+    // (see TESTING.md "Stale backport tracker"). A bump of these two is reviewed by hand, not merged on green checks.
+    // Renovate groups one dependency across files into one PR, so this applies to all their uses in the repository.
+    {
+      matchManagers: ["github-actions"],
+      matchPackageNames: [
+        "hashicorp/vault-action",
+        "slackapi/slack-github-action",
+      ],
+      automerge: false,
+    },
     {
       matchUpdateTypes: ["major", "minor", "patch"],
       matchManagers: ["pre-commit"],

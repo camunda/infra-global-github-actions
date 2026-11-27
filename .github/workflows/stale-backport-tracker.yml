@@ -175,9 +175,37 @@ jobs:
         target-branch: ${{ inputs.target_branch }}
         backport-authors: ${{ inputs.backport_authors }}
 
+  # GitHub Actions has dropped job outputs after a successful job before (camunda/camunda#54686), which looked like
+  # "no stale backports". The consumers wait for this check, so a missing payload fails the run instead of
+  # producing a clean report.
+  validate:
+    name: Validate collected data
+    needs: collect
+    runs-on: ubuntu-slim
+    timeout-minutes: 2
+    steps:
+    - name: Check that the collected data is complete
+      env:
+        STALE_DATA: ${{ needs.collect.outputs.stale_data }}
+        TOTAL_STALE: ${{ needs.collect.outputs.total_stale }}
+        HAS_STALE: ${{ needs.collect.outputs.has_stale }}
+      run: |
+        if ! jq -e 'type == "array"' <<< "$STALE_DATA" > /dev/null 2>&1; then
+          echo "::error::The collect job did not hand over a JSON array of stale backports (the output is missing or malformed)"
+          exit 1
+        fi
+        count=$(jq '[.[].backport_prs | length] | add // 0' <<< "$STALE_DATA")
+        expected_has_stale=false
+        if [[ "$count" -gt 0 ]]; then expected_has_stale=true; fi
+        if [[ "$count" != "$TOTAL_STALE" || "$expected_has_stale" != "$HAS_STALE" ]]; then
+          echo "::error::The collected data holds ${count} stale backport PR(s), but total_stale='${TOTAL_STALE}' and has_stale='${HAS_STALE}'"
+          exit 1
+        fi
+        echo "Collected data is complete: ${count} stale backport PR(s)"
+
   notify-github:
     name: Notify on GitHub PRs
-    needs: collect
+    needs: [collect, validate]
     if: needs.collect.outputs.has_stale == 'true' && inputs.notify_github
     runs-on: ubuntu-slim
     timeout-minutes: 10
@@ -218,7 +246,7 @@ jobs:
 
   notify-slack:
     name: Post Slack report
-    needs: collect
+    needs: [collect, validate]
     if: inputs.notify_slack
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -410,37 +438,6 @@ jobs:
         echo "pins.add ok: $ok, error: $err" >&2
         [[ "$ok" == "true" || "$err" == "already_pinned" ]]
 
-    - name: Unpin previous day's Slack message
-      if: ${{ !inputs.dry_run && steps.find-message.outputs.found != 'true' }}
-      continue-on-error: true
-      env:
-        SLACK_BOT_TOKEN: ${{ steps.secrets.outputs.SLACK_BOT_TOKEN }}
-        SLACK_CHANNEL: ${{ steps.channel.outputs.id }}
-        REPORT_TITLE: ${{ inputs.report_title }}
-      run: |
-        pinned=$(curl -s \
-          -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
-          "https://slack.com/api/pins.list?channel=${SLACK_CHANNEL}")
-        pins_ok=$(echo "$pinned" | jq -r '.ok')
-        echo "pins.list ok: $pins_ok, error: $(echo "$pinned" | jq -r '.error // "none"')" >&2
-        if [[ "$pins_ok" != "true" ]]; then
-          echo "pins.list failed — skipping unpin" >&2
-          exit 0
-        fi
-        echo "$pinned" | jq -r --arg title "$REPORT_TITLE" '
-          [(.items // [])[] | select(
-            .type == "message" and
-            .message.bot_id != null and
-            (.message.blocks[]?.text?.text? // "" | ascii_downcase | contains($title | ascii_downcase))
-          ) | .message.ts] | .[]' | while read -r ts; do
-          echo "Unpinning old message: $ts" >&2
-          resp=$(curl -s -X POST "https://slack.com/api/pins.remove" \
-            -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "{\"channel\":\"${SLACK_CHANNEL}\",\"timestamp\":\"${ts}\"}")
-          echo "pins.remove ok: $(echo "$resp" | jq -r '.ok'), error: $(echo "$resp" | jq -r '.error // "none"')" >&2
-        done
-
     - name: Post new Slack message
       id: post-message
       if: ${{ !inputs.dry_run && steps.find-message.outputs.found != 'true' }}
@@ -455,6 +452,7 @@ jobs:
           blocks: ${{ steps.format.outputs.blocks }}
 
     - name: Pin new Slack message
+      id: pin-new
       if: ${{ !inputs.dry_run && steps.find-message.outputs.found != 'true' }}
       continue-on-error: true
       env:
@@ -475,10 +473,45 @@ jobs:
         err=$(echo "$response" | jq -r '.error // "none"')
         echo "pins.add ok: $ok, error: $err" >&2
         [[ "$ok" == "true" || "$err" == "already_pinned" ]]
+        echo "ts=$message_ts" >> "$GITHUB_OUTPUT"
+
+    # Only after the replacement is posted and pinned, so a failed post or pin never leaves the channel without a report.
+    - name: Unpin the previous Slack report
+      if: ${{ !inputs.dry_run && steps.pin-new.outputs.ts != '' }}
+      continue-on-error: true  # a leftover old pin is harmless; the next run removes it
+      env:
+        SLACK_BOT_TOKEN: ${{ steps.secrets.outputs.SLACK_BOT_TOKEN }}
+        SLACK_CHANNEL: ${{ steps.channel.outputs.id }}
+        REPORT_TITLE: ${{ inputs.report_title }}
+        NEW_TS: ${{ steps.pin-new.outputs.ts }}
+      run: |
+        pinned=$(curl -s \
+          -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+          "https://slack.com/api/pins.list?channel=${SLACK_CHANNEL}")
+        pins_ok=$(echo "$pinned" | jq -r '.ok')
+        echo "pins.list ok: $pins_ok, error: $(echo "$pinned" | jq -r '.error // "none"')" >&2
+        if [[ "$pins_ok" != "true" ]]; then
+          echo "pins.list failed — skipping unpin" >&2
+          exit 0
+        fi
+        echo "$pinned" | jq -r --arg title "$REPORT_TITLE" --arg new "$NEW_TS" '
+          [(.items // [])[] | select(
+            .type == "message" and
+            .message.ts != $new and
+            .message.bot_id != null and
+            (.message.blocks[]?.text?.text? // "" | ascii_downcase | contains($title | ascii_downcase))
+          ) | .message.ts] | .[]' | while read -r ts; do
+          echo "Unpinning old message: $ts" >&2
+          resp=$(curl -s -X POST "https://slack.com/api/pins.remove" \
+            -H "Authorization: Bearer ${SLACK_BOT_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"channel\":\"${SLACK_CHANNEL}\",\"timestamp\":\"${ts}\"}")
+          echo "pins.remove ok: $(echo "$resp" | jq -r '.ok'), error: $(echo "$resp" | jq -r '.error // "none"')" >&2
+        done
 
   summary:
     name: Generate workflow summary
-    needs: collect
+    needs: [collect, validate]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -489,6 +522,7 @@ jobs:
         TOTAL_STALE: ${{ needs.collect.outputs.total_stale }}
         HAS_STALE: ${{ needs.collect.outputs.has_stale }}
         COLLECT_RESULT: ${{ needs.collect.result }}
+        VALIDATE_RESULT: ${{ needs.validate.result }}
         REPORT_TITLE: ${{ inputs.report_title }}
       run: |
         {
@@ -496,7 +530,7 @@ jobs:
           echo ""
 
           # This job runs even when collecting failed, where the outputs are empty.
-          if [[ "$COLLECT_RESULT" != "success" || ( "$HAS_STALE" != "true" && "$HAS_STALE" != "false" ) ]]; then
+          if [[ "$COLLECT_RESULT" != "success" || "$VALIDATE_RESULT" != "success" || ( "$HAS_STALE" != "true" && "$HAS_STALE" != "false" ) ]]; then
             echo "⚠️ **Stale backport collection did not complete successfully.** No clean status is available."
             exit 0
           fi

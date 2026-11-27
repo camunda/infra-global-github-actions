@@ -37,17 +37,42 @@ jobs:
     permissions:
       id-token: write  # Vault JWT login in the called workflow
     uses: camunda/infra-global-github-actions/.github/workflows/stale-backport-tracker.yml@<sha>  # stale-backport-tracker-X.Y.Z
-    secrets: inherit
+    secrets:   # explicit, see below
+      VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+      VAULT_JWT_ROLE: ${{ secrets.VAULT_JWT_ROLE }}
+      VAULT_JWT_PATH: ${{ secrets.VAULT_JWT_PATH }}
+      VAULT_JWT_AUDIENCE: ${{ secrets.VAULT_JWT_AUDIENCE }}
     with:
       repositories: camunda/camunda-hub
       target_branch_prefix: self-managed/
-      slack_channel_id: C0XXXXXXXXX   # the only value a new repository must provide
+      backport_authors: camunda-hub-helper   # camunda-hub's backport bot; the default authors are camunda/camunda's
+      slack_channel_id: C0XXXXXXXXX   # the channel ID is the only value that is always new
       notify_slack: true
       notify_github: true
       dry_run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run }}
 ```
 
-The caller needs the `VAULT_ADDR`, `VAULT_JWT_ROLE`, `VAULT_JWT_PATH` and `VAULT_JWT_AUDIENCE` secrets, and `id-token: write`.
+The caller needs the `VAULT_ADDR`, `VAULT_JWT_ROLE`, `VAULT_JWT_PATH` and `VAULT_JWT_AUDIENCE` secrets, and `id-token: write`. Pass the secrets explicitly (`secrets:` with the four names) instead of `secrets: inherit`, which zizmor flags:
+
+```yaml
+    secrets:
+      VAULT_ADDR: ${{ secrets.VAULT_ADDR }}
+      VAULT_JWT_ROLE: ${{ secrets.VAULT_JWT_ROLE }}
+      VAULT_JWT_PATH: ${{ secrets.VAULT_JWT_PATH }}
+      VAULT_JWT_AUDIENCE: ${{ secrets.VAULT_JWT_AUDIENCE }}
+```
+
+### Before a repository's first run
+
+A caller file is not enough on its own. These are set up outside this repository:
+
+| Prerequisite | Provided by |
+|---|---|
+| The GitHub App (`MONOREPO_RELEASE_APP` by default) is installed on every repository in `repositories`, with pull request and issue write access | Organization admins |
+| The caller repository's Vault role can read the GitHub App and Slack secrets under the configured paths | Engineering Operations |
+| The Slack bot is a member of the channel and can read history, post, update and pin there | The channel owner |
+| `backport_authors` lists the login that opens the repository's backport PRs, if it is not a default (`camunda-hub-helper` for camunda-hub) | The caller |
+| The `stale-backport` label: created by the notifier when missing, so only the app's permission to create labels is needed | Automatic |
 
 camunda/camunda keeps today's behavior with its own values:
 

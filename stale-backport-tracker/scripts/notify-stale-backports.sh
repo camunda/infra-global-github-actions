@@ -44,6 +44,8 @@ fi
 notified_count=0
 skipped_count=0
 updated_count=0
+failed_count=0
+labelled_repos=" "  # repositories whose label was already ensured in this run
 
 DATE_PROGRAM="date"
 if command -v gdate >/dev/null; then
@@ -73,6 +75,7 @@ while IFS= read -r entry; do
     bp_age_days=$(jq -r ".[$group_idx].backport_prs[$bp_idx].age_days" "$TMPDIR_WORK/stale_data.json")
     bp_is_draft=$(jq -r ".[$group_idx].backport_prs[$bp_idx].is_draft" "$TMPDIR_WORK/stale_data.json")
     bp_has_conflict=$(jq -r ".[$group_idx].backport_prs[$bp_idx].has_conflict" "$TMPDIR_WORK/stale_data.json")
+    pr_failed=false
 
     # Get assignees as space-separated list
     bp_assignees=$(jq -r ".[$group_idx].backport_prs[$bp_idx].assignees // [] | .[]" "$TMPDIR_WORK/stale_data.json" 2>/dev/null || true)
@@ -184,10 +187,22 @@ ${state_note}
         echo "  ✅ Comment added" >&2
       else
         echo "  ❌ Failed to add comment" >&2
+        pr_failed=true
+      fi
+
+      # Make sure the label exists in the repository (a repository that never had a stale backport has none).
+      # Creating it fails when it already exists, which is fine.
+      if [[ "$labelled_repos" != *" ${repo} "* ]]; then
+        gh label create "$STALE_LABEL" --repo "$repo" --color "d93f0b" \
+          --description "Backport PR open longer than the stale threshold" >/dev/null 2>&1 || true
+        labelled_repos="${labelled_repos}${repo} "
       fi
 
       # Add stale-backport label
-      gh pr edit "$bp_num" --add-label "$STALE_LABEL" --repo "$repo" 2>/dev/null || true
+      if ! gh pr edit "$bp_num" --add-label "$STALE_LABEL" --repo "$repo" >/dev/null 2>&1; then
+        echo "  ❌ Failed to add the ${STALE_LABEL} label" >&2
+        pr_failed=true
+      fi
 
       # If original PR was authored by a bot, add original PR approvers as reviewers
       if [[ "$orig_author" =~ ^app/ && -n "$orig_approvers" ]]; then
@@ -198,13 +213,20 @@ ${state_note}
             echo "  ⏭️  $approver is already a reviewer on PR #${bp_num}, skipping" >&2
           else
             echo "  👥 Adding $approver as reviewer on PR #${bp_num}..." >&2
-            gh pr edit "$bp_num" --add-reviewer "$approver" --repo "$repo" 2>/dev/null || true
+            if ! gh pr edit "$bp_num" --add-reviewer "$approver" --repo "$repo" >/dev/null 2>&1; then
+              # Not required for the reminder itself (the approver may not be able to review), so only warn.
+              echo "  ⚠️  Could not add $approver as reviewer on PR #${bp_num}" >&2
+            fi
           fi
         done <<< "$orig_approvers"
       fi
     fi
 
-    notified_count=$((notified_count + 1))
+    if [[ "$pr_failed" == "true" ]]; then
+      failed_count=$((failed_count + 1))
+    else
+      notified_count=$((notified_count + 1))
+    fi
   done
 
   # Optionally notify on the original PR with a summary of all its stale backports
@@ -240,10 +262,19 @@ Please review and merge/close these backport PRs.
         echo "--- end ---" >&2
       else
         echo "💬 Commenting on original PR #${orig_num}..." >&2
-        gh pr comment "$orig_num" --body "$orig_comment" --repo "$repo" >/dev/null 2>&1 || true
+        if ! gh pr comment "$orig_num" --body "$orig_comment" --repo "$repo" >/dev/null 2>&1; then
+          echo "  ❌ Failed to comment on original PR #${orig_num}" >&2
+          failed_count=$((failed_count + 1))
+        fi
       fi
     fi
   fi
 done < <(jq -c 'range(length) as $i | {index: $i, group: .[$i]}' "$TMPDIR_WORK/stale_data.json")
 
-echo "📊 Notifications: ${notified_count} new, ${updated_count} re-notified, ${skipped_count} skipped (recently notified)" >&2
+echo "📊 Notifications: ${notified_count} new, ${updated_count} re-notified, ${skipped_count} skipped (recently notified), ${failed_count} failed" >&2
+
+# A reminder that could not be written must not look like a success.
+if [[ "$failed_count" -gt 0 ]]; then
+  echo "::error::${failed_count} stale backport PR(s) could not be notified (comment or label failed)" >&2
+  exit 1
+fi
