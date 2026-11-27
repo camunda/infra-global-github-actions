@@ -27,7 +27,7 @@ A git tag is a **mutable pointer**. An attacker who compromises an upstream repo
 This matters more here than in a normal repository, for two reasons:
 
 - **This repository is public and consumed by other teams.** Its composite actions run inside workflows across Camunda, frequently in jobs holding Vault, GCP, Teleport, and Artifactory credentials. An unpinned third-party action in a composite action is not just our exposure — every downstream repository inherits it transitively, and none of those consumers can see or gate it.
-- **Consumers reference this repository at `@main`.** They pick up whatever `main` holds at run time, so a compromised transitive dependency propagates immediately, without a Renovate PR anywhere in the chain.
+- **Consumers pin this repository as `@<sha> # <family>-X.Y.Z`, kept current by the [`renovate-action-versions.json5`](../renovate-action-versions.json5) preset.** Each Renovate bump carries the third-party references of a release into every consumer, so those references must be pinned here.
 
 ### Why GitHub's own actions are not exempt
 
@@ -47,6 +47,8 @@ Note the carve-out is for **reusable workflows**, not for organization ownership
 
 This repository's references to itself are pinned like any other action, as `@<sha> # <family>-X.Y.Z`, and kept current by the [`renovate-action-versions.json5`](../renovate-action-versions.json5) preset that [`.github/renovate.json5`](../.github/renovate.json5) extends. A change to a self-referenced action therefore reaches the actions that use it through a Renovate bump, not on its own.
 
+The preset scans every YAML file, but only tracks pins whose trailing comment is `# <family>-X.Y.Z`. Pins commented `# main` or `# generate-github-app-token-from-vault-secrets: v1.1.0`, or without a comment, are not tracked.
+
 ### Alternatives considered
 
 - **Pin only new references, leave existing tags alone.** Cheaper, but leaves the actual exposure in place — the tags already on `main` are the ones a compromised upstream would move. Rejected.
@@ -54,6 +56,7 @@ This repository's references to itself are pinned like any other action, as `@<s
 - **Mirror the `camunda/camunda` and `infra-core` trust boundary exactly** (`actions/*` and `github/*` on `ref-pin`). Consistent across repositories, and defensible on pure threat-model grounds, but it would leave this repository's consumers broken under a setting they already enforce. Rejected; see [above](#why-githubs-own-actions-are-not-exempt).
 - **Renovate's `helpers:pinGitHubActionDigests` preset.** Pins digests automatically, but it is not a gate: nothing stops a contributor from adding an unpinned action, and it would also pin `actions/*` and `camunda/*` against the trust boundary above. Rejected.
 - **A hand-rolled pre-commit script.** No new dependency, but it reimplements a maintained tool and diverges from the policy the other Camunda repositories already run. Rejected.
+- **Limit the preset to `.github/` and `action.yml`, or extend it to Markdown.** The preset scans every YAML file instead, so pins outside `.github/` (e.g. `agents/_template/workflow.yml`) are tracked too. Its regex only matches `uses: camunda/infra-global-github-actions/<path>@<40-char SHA> # <family>-X.Y.Z`, so the wider glob adds no false positives. Markdown would rewrite examples in the CHANGELOGs, ADRs and docs of every consumer; a repository that wants that can add the pattern locally. Both rejected.
 - **Floating major tags in the comment (`@<sha> # v4`).** Shorter, but it converts routine upstream releases into review toil — see below. Rejected.
 
 ## 🔧 How

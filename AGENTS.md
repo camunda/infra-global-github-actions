@@ -7,6 +7,7 @@ Public repository of reusable GitHub Actions (composite actions and reusable wor
 - Composite actions in YAML and Bash, linted by `pre-commit run -a` (actionlint, zizmor, shellcheck, Renovate config validator). Tool versions are pinned in `.tool-versions`.
 - Third-party actions are pinned by commit SHA with the full version in the comment.
 - Every workflow step has a `name:`.
+- New actions use hyphenated input names (e.g. `repository-owner`); existing underscore inputs are kept for compatibility.
 
 ## Tests
 

@@ -11,7 +11,7 @@ Every action is released on its own line, tagged `<family>-X.Y.Z`, where the fam
 Reference an action by commit SHA and name its release in a trailing comment:
 
 ```yaml
-- uses: camunda/infra-global-github-actions/teams/infra/pull-request/automerge@d56c158341637cc71ed42e34040e9db0d0026b6c  # pull-request-1.1.0
+- uses: camunda/infra-global-github-actions/teams/infra/pull-request/automerge@d56c158341637cc71ed42e34040e9db0d0026b6c # pull-request-1.1.0
 ```
 
 Resolve a tag to its SHA with:
@@ -30,7 +30,7 @@ Extend [`renovate-action-versions.json5`](renovate-action-versions.json5) so Ren
 }
 ```
 
-Renovate's built-in `github-actions` manager drops the sub-action path from the dependency name, so without the preset every family here collapses into one `camunda/infra-global-github-actions` entry with no version to compare, and pins go stale with no signal at all. The preset adds a custom manager that reads the family out of the trailing comment, which is why that comment has to carry the full release (`# pull-request-1.1.0`, never `# 1.1.0`).
+Renovate's built-in `github-actions` manager drops the sub-action path from the dependency name, so without the preset every family here collapses into one `camunda/infra-global-github-actions` entry with no version to compare, and pins go stale with no signal at all. The preset adds a custom manager that reads the family out of the trailing comment, which is why that comment has to carry the full release (`# pull-request-1.1.0`, never `# 1.1.0`). It scans every YAML file; pins commented `# main` or `# generate-github-app-token-from-vault-secrets: v1.1.0`, or without a comment, are not tracked.
 
 It ships that manager only. Labels, grouping and automerge stay with the consumer, matched on the dependency name the manager emits:
 
