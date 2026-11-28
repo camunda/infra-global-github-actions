@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.1.4 (2026-11-28)
+
+## What's Changed
+* test(preview-env): add an end-to-end test of the Argo CD CLI usage by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/927
+* chore(deps): update quay.io/argoproj/argocd docker tag to v3.6.3 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/893
+* fix: pin self-referenced actions to release SHAs by @clementnero in https://github.com/camunda/infra-global-github-actions/pull/929
+* fix(vault-wrapped-secrets): keep the wrapping token out of the consuming job's log by @kellervater in https://github.com/camunda/infra-global-github-actions/pull/931
+* chore: release main by @infra-releases[bot] in https://github.com/camunda/infra-global-github-actions/pull/928
+* chore(deps): update amannn/action-semantic-pull-request action to v6.1.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/934
+* chore(deps): update dependency fossas/fossa-cli to v3.21.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/937
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/939
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/pull-request-1.1.3...pull-request-1.1.4
+
 ## 1.1.3 (2026-11-22)
 
 ## What's Changed

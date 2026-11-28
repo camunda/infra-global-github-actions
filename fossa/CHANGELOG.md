@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.4 (2026-11-28)
+
+## What's Changed
+* chore(deps): update amannn/action-semantic-pull-request action to v6.1.4 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/934
+* chore(deps): update dependency fossas/fossa-cli to v3.21.1 by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/937
+* chore(deps): update pre-commit hooks by @renovate[bot] in https://github.com/camunda/infra-global-github-actions/pull/939
+
+
+**Full Changelog**: https://github.com/camunda/infra-global-github-actions/compare/fossa-1.1.3...fossa-1.1.4
+
 ## 1.1.3 (2026-11-26)
 
 ## What's Changed
